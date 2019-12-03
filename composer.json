@@ -23,14 +23,10 @@
             "role": "lead developer"
         }
     ],
-    "require": {
-        "silverstripe/framework": "~4@stable"
-    },
-    "scripts": [
+    "scripts": {
         "php-lint": "vendor/bin/ecs check app/src/ --fix --config vendor/sunnysideup/easy-coding-standards/ecs.yml",
         "php-bugfix": "vendor/bin/phpstan analyse -l 1 -c vendor/sunnysideup/easy-coding-standards/phpstan.neon app/src"
-
-    ],
+    },
     "bin": [
         "bin/php-lint",
         "bin/php-bugfix",
