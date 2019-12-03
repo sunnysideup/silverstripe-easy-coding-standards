@@ -1,0 +1,39 @@
+{
+    "name": "sunnysideup/easy-coding-standards",
+    "type": "silverstripe-vendormodule",
+    "description": "ECS PHP Linting.",
+    "keywords": [
+        "Silverstripe-CMS",
+        "CMS",
+        "Silverstripe",
+        "PHP",
+        "Linting",
+        "linter",
+        "clean",
+        "easy coding standards",
+        "PHP-CS-Fixer",
+        "PHP_CodeSniffer",
+        "phpstan"
+    ],
+    "license": "BSD-3-Clause",
+    "authors": [
+        {
+            "name": "Nicolaas Francken",
+            "email": "modules@sunnysideup.co.nz",
+            "role": "lead developer"
+        }
+    ],
+    "require": {
+        "silverstripe/framework": "~4@stable"
+    },
+    "scripts": [
+        "php-lint": "vendor/bin/ecs check app/src/ --fix --config vendor/sunnysideup/easy-coding-standards/ecs.yml",
+        "php-bugfix": "vendor/bin/phpstan analyse -l 1 -c vendor/sunnysideup/easy-coding-standards/phpstan.neon app/src"
+
+    ],
+    "bin": [
+        "bin/php-lint",
+        "bin/php-bugfix",
+        "bin/php-git-commit-lint"
+    ]
+}

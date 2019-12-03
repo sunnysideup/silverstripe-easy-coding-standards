@@ -1,0 +1,2 @@
+#!/bin/bash
+vendor/bin/phpstan analyse -l 1 -c vendor/sunnysideup/easy-coding-standards/phpstan.neon app/src

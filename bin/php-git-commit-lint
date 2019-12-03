@@ -1,0 +1,19 @@
+#!/bin/bash
+if [ -z "$(git status --porcelain)" ]; then
+    echo "# Working directory clean"
+    vendor/bin/php-lint
+    vendor/bin/php-bugfix > KNOWN_ISSUES
+    git commit app/src -m "PATCH: automated cleanup"
+    git push
+    echo "
+---------------------------
+DONE
+---------------------------
+    "
+else
+    echo "
+---------------------------
+Sorry, can not run, there are uncommitted changes
+---------------------------
+    "
+fi
