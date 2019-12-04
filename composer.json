@@ -24,8 +24,8 @@
         }
     ],
     "require-dev": {
-        "phpstan/phpstan": "*",
-        "symplify/easy-coding-standard": "*"
+        "phpstan/phpstan": "^0.12",
+        "symplify/easy-coding-standard": "dev-master"
     },
     "scripts": {
         "php-lint": "vendor/bin/ecs check app/src/ --fix --config vendor/sunnysideup/easy-coding-standards/ecs.yml",
