@@ -24,7 +24,7 @@
         }
     ],
     "require": {
-        "phpstan/phpstan": "^0.12",
+        "phpstan/phpstan": "*",
         "symplify/easy-coding-standard": "~6.1"
     },
     "scripts": {
