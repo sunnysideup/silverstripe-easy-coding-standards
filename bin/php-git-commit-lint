@@ -1,13 +1,16 @@
 #!/bin/bash
+: ${dir:=app/src} # dir will take on the value "app/src" if not overridden
+: ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
+: ${logFile:=LINTINIG_ERRORS.txt} # configFile will take on the value "app/_config.php" if not overridden
+
 if [ -z "$(git status --porcelain)" ]; then
-    : ${dir:=app/src} # dir will take on the value "app/src" if not overridden
-    : ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
     echo "# Working directory clean"
-    > KNOWN_ISSUES
-    dir=$dir vendor/bin/php-lint >> KNOWN_ISSUES
-    configFile=$configFile vendor/bin/php-bugfix >> KNOWN_ISSUES
-    git add KNOWN_ISSUES
+    > $logFile
+    dir=$dir vendor/bin/php-lint >> $logFile
+    configFile=$configFile vendor/bin/php-bugfix >> $logFile
+    git add ./$logFile
     git commit app/src -m "PATCH: automated cleanup"
+    git commit ./$logFile -m "PATCH: adding log file"
     git push
     echo "
 ---------------------------
