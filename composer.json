@@ -23,6 +23,10 @@
             "role": "lead developer"
         }
     ],
+    "require-dev": {
+        "phpstan/phpstan": "*",
+        "symplify/easy-coding-standard": "*"
+    },
     "scripts": {
         "php-lint": "vendor/bin/ecs check app/src/ --fix --config vendor/sunnysideup/easy-coding-standards/ecs.yml",
         "php-bugfix": "vendor/bin/phpstan analyse -l 1 -c vendor/sunnysideup/easy-coding-standards/phpstan.neon app/src"

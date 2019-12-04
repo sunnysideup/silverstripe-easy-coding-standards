@@ -1,2 +1,3 @@
 #!/bin/bash
-vendor/bin/ecs check app/src/ --fix --config vendor/sunnysideup/easy-coding-standards/ecs.yml
+cp vendor/sunnysideup/easy-coding-standards/ecs.yml ./
+vendor/bin/ecs check app/src/ --fix
