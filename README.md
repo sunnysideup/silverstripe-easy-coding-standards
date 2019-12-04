@@ -3,7 +3,7 @@ PHP Linter all in one.
 # How to install
 
 Just like any other Silverstripe module:
-composer require --dev 'sunnysideup/easy-coding-standards'
+`composer require --dev sunnysideup/easy-coding-standards`
 
 # How to use:
 
