@@ -17,4 +17,9 @@ From project root, run:
 
 # assumptions made
 
-Your code lives in `app/src`
+Your code lives in `app/src`  you can set an alternative dir like this:
+
+`dir=myproject vendor/bin/php-lint`
+`configFile=myproject/_config.php vendor/bin/php-lint`
+
+`dir=myproject vendor/bin/php-bugfix`
