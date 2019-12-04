@@ -1,4 +1,5 @@
 #!/bin/bash
 : ${dir:=app/src}
+: ${level:=4}
 cp vendor/sunnysideup/easy-coding-standards/phpstan.neon ./
-vendor/bin/phpstan analyse -l 1 -c phpstan.neon $dir
+vendor/bin/phpstan analyse -l $level -c phpstan.neon $dir
