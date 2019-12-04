@@ -1,6 +1,8 @@
 #!/bin/bash
 : ${dir:=app/src} # dir will take on the value "app/src" if not overridden
-: ${configFile:=app/_config.php} # dir will take on the value "app/src" if not overridden
+: ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
+
 cp vendor/sunnysideup/easy-coding-standards/ecs.yml ./
+
 vendor/bin/ecs check $dir --fix
 vendor/bin/ecs check $configFile --fix
