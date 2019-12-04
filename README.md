@@ -1,4 +1,6 @@
-PHP Linter all in one.
+# What it does
+
+Lints your silverstripe php code, checks for potential bugs.
 
 # How to install
 
