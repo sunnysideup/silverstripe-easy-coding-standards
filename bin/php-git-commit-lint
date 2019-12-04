@@ -2,22 +2,27 @@
 : ${dir:=app/src} # dir will take on the value "app/src" if not overridden
 : ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
 : ${logFile:=LINTING_ERRORS.txt} # configFile will take on the value "app/_config.php" if not overridden
-
+: ${level:=4} # level will take on the value "4" if not overridden
 if [ -z "$(git status --porcelain)" ]; then
     echo "# Working directory clean"
     > $logFile
-    dir=$dir vendor/bin/php-lint >> $logFile
-    configFile=$configFile vendor/bin/php-bugfix >> $logFile
+    echo "# run linter"
+    dir=$dir configFile=$configFile vendor/bin/php-lint >> $logFile
+    echo "# run bugfix"
+    level=$level vendor/bin/php-bugfix >> $logFile
+    echo "# adding files"
     git add app/src
     git add ./$logFile
     git add ./ecs.yml
     git add ./phpstan.neon
     git add $configFile
+    echo "# committing files"
     git commit app/src -m "PATCH: automated cleanup of src dir"
     git commit $configFile -m "PATCH: automated cleanup of config file"
     git commit ./$logFile -m "PATCH: adding log file"
     git commit ./ecs.yml -m "PATCH: adding esc.yml file"
     git commit ./phpstan.neon -m "PATCH: adding phpstan.neon file"
+    echo "# pushing files"
     git push
     echo "
 ---------------------------
