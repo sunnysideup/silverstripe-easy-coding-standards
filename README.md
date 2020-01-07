@@ -21,7 +21,7 @@ From project root, run:
 
 # available settings
 
-Your code lives in `app/src`  you can set an alternative dir like this:
+If your code does not live in `app/src` you can set an alternative dir like this:
 
 ## lint
 `dir=myproject vendor/bin/php-lint`
