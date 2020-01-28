@@ -5,7 +5,17 @@ Lints your silverstripe php code, checks for potential bugs.
 # How to install
 
 Just like any other Silverstripe module:
-`composer require --dev sunnysideup/easy-coding-standards`
+`composer require --dev sunnysideup/easy-coding-standards:dev-master`
+
+## global install
+
+start with
+`composer global require sunnysideup/easy-coding-standards:dev-master`
+
+then add path to `~/.bash_rc` (or otherwise):
+`PATH=~/.composer/vendor/bin:$PATH`
+
+then you should be able to run it from anywhere... 
 
 # How to use:
 
