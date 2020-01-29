@@ -7,23 +7,19 @@ WORKING_DIR=$(pwd)
 : ${level:=4} # level will take on the value "4" if not overridden
 if [ -z "$(git status --porcelain)" ]; then
     echo "# Working directory clean"
-    > $logFile
+    > $WORKING_DIR/$logFile
     echo "# run linter"
-    dir=$dir configFile=$configFile vendor/bin/php-lint >> $logFile
+    dir=$WORKING_DIR/$dir configFile=$WORKING_DIR/$configFile $SCRIPT_DIR/php-lint >> $WORKING_DIR/$logFile
     echo "# run bugfix"
-    level=$level vendor/bin/php-bugfix >> $logFile
+    level=$level $SCRIPT_DIR/php-bugfix >> $WORKING_DIR/$logFile
     echo "# adding files"
-    git add app/src
-    git add ./$logFile
-    git add ./ecs.yml
-    git add ./phpstan.neon
-    git add $configFile
+    git add $WORKING_DIR/$dir
+    git add $WORKING_DIR/$configFile
+    git add $WORKING_DIR/$logFile
     echo "# committing files"
-    git commit app/src -m "PATCH: automated cleanup of src dir"
-    git commit $configFile -m "PATCH: automated cleanup of config file"
-    git commit ./$logFile -m "PATCH: adding log file"
-    git commit ./ecs.yml -m "PATCH: adding esc.yml file"
-    git commit ./phpstan.neon -m "PATCH: adding phpstan.neon file"
+    git commit $WORKING_DIR/$dir -m "PATCH: automated cleanup of src dir"
+    git commit $WORKING_DIR/$configFile -m "PATCH: automated cleanup of config file"
+    git commit $WORKING_DIR/$logFile -m "PATCH: adding log file"
     echo "# pushing files"
     git push
     echo "

@@ -4,7 +4,5 @@ WORKING_DIR=$(pwd)
 : ${dir:=app/src} # dir will take on the value "app/src" if not overridden
 : ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
 
-cp vendor/sunnysideup/easy-coding-standards/ecs.yml ./
-
-vendor/bin/ecs check $dir --fix
-vendor/bin/ecs check $configFile --fix
+$SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml
+$SCRIPT_DIR/ecs check $WORKING_DIR/$configFile --fix --clear-cache
