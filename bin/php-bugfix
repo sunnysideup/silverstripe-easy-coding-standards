@@ -3,5 +3,5 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 : ${dir:=app/src}
 : ${level:=4}
-cp vendor/sunnysideup/easy-coding-standards/phpstan.neon ./
-vendor/bin/phpstan analyse -l $level -c phpstan.neon $dir
+cp $SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon $WORKING_DIR/
+SCRIPT_DIR/phpstan analyse -l $level -c phpstan.neon $WORKING_DIR/$dir
