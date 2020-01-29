@@ -1,5 +1,6 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+WORKING_DIR=$(pwd)
 : ${dir:=app/src} # dir will take on the value "app/src" if not overridden
 : ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
 
