@@ -1,6 +1,9 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
+
 : ${dir:=app/src}
 : ${level:=4}
-$SCRIPT_DIR/phpstan analyse -l $level -c $SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon $WORKING_DIR/$dir
+
+
+$SCRIPT_DIR/phpstan analyse  -l $level $WORKING_DIR/$dir
