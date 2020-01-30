@@ -11,18 +11,19 @@ Just like any other Silverstripe module:
 
 start with
 `composer global require sunnysideup/easy-coding-standards:dev-master`
+`composer global update`
 
 then add path to `~/.bash_rc` (or otherwise):
 `PATH=~/.composer/vendor/bin:$PATH`
 
-then you should be able to run it from anywhere... 
+then you should be able to run it from anywhere...
 
 # How to use:
 
 From project root, run:
- - `vendor/bin/php-lint` 
+ - `vendor/bin/php-lint`
    - lints app/src
- - `vendor/bin/php-bugfix` 
+ - `vendor/bin/php-bugfix`
    - checks app/src for bugs
  - `vendor/bin/php-git-commit-lint`
    - runs the above commands,
