@@ -21,11 +21,11 @@ then you should be able to run it from anywhere...
 # How to use:
 
 From project root, run:
- - `vendor/bin/php-lint`
+ - `vendor/bin/php-sslint-ecs`
    - lints app/src
- - `vendor/bin/php-bugfix`
+ - `vendor/bin/php-sslint-stan`
    - checks app/src for bugs
- - `vendor/bin/php-git-commit-lint`
+ - `vendor/bin/php-sslint-all`
    - runs the above commands,
    - writes all errors to KNOW_ISSUES file in project root dir
    - commits all the changes to the project
@@ -35,12 +35,12 @@ From project root, run:
 If your code does not live in `app/src` you can set an alternative dir like this:
 
 ## lint
-`dir=myproject vendor/bin/php-lint`
-`configFile=myproject/_config.php vendor/bin/php-lint`
+`dir=myproject vendor/bin/php-sslint-ecs`
+`configFile=myproject/_config.php vendor/bin/php-sslint-ecs`
 
 ## bugfix
-`dir=myproject vendor/bin/php-bugfix`
-`level=7 vendor/bin/php-bugfix`
+`dir=myproject vendor/bin/php-sslint-stan`
+`level=7 vendor/bin/php-sslint-stan`
 
 ## commit
-`dir=myproject configFile=myproject/_config.php vendor/bin/php-git-commit-lint`
+`dir=myproject configFile=myproject/_config.php vendor/bin/php-sslint-all`

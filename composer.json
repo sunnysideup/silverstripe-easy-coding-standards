@@ -28,12 +28,12 @@
         "symplify/easy-coding-standard": "^6.1"
     },
     "scripts": {
-        "php-lint": "vendor/bin/ecs check app/src/ --fix --config vendor/sunnysideup/easy-coding-standards/ecs.yml",
-        "php-bugfix": "vendor/bin/phpstan analyse -l 1 -c vendor/sunnysideup/easy-coding-standards/phpstan.neon app/src"
+        "php-sslint-ecs": "vendor/bin/ecs check app/src/ --fix --config vendor/sunnysideup/easy-coding-standards/ecs.yml",
+        "php-sslint-stan": "vendor/bin/phpstan analyse -l 1 -c vendor/sunnysideup/easy-coding-standards/phpstan.neon app/src"
     },
     "bin": [
-        "bin/php-lint",
-        "bin/php-bugfix",
-        "bin/php-git-commit-lint"
+        "bin/php-sslint-ecs",
+        "bin/php-sslint-stan",
+        "bin/php-sslint-all"
     ]
 }
