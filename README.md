@@ -19,13 +19,19 @@ Lints your silverstripe php code, checks for potential bugs.
 now you should be able to run it from anywhere... like this:
 
 apply easy coding standards:
-`php-sslint-ecs`
+```sh
+php-sslint-ecs
+```
 
 lint your code for bugs:
-`php-sslint-stan`
-
+```sh
+php-sslint-stan
+```
 quick and dirty: do both and commit it ... 
-`php-sslint-all`
+```sh
+php-sslint-all
+```
+
 
 
 # How to use:
