@@ -62,13 +62,12 @@ vendor/bin/php-sslint-all
 
 If your code does not live in `app/src` you can set an alternative dir like this:
 
-## lint
+## dir
 `dir=myproject vendor/bin/php-sslint-ecs`
+
+## configFile
 `configFile=myproject/_config.php vendor/bin/php-sslint-ecs`
 
-## bugfix
-`dir=myproject vendor/bin/php-sslint-stan`
+## level
 `level=7 vendor/bin/php-sslint-stan`
 
-## commit
-`dir=myproject configFile=myproject/_config.php vendor/bin/php-sslint-all`
