@@ -4,19 +4,29 @@ Lints your silverstripe php code, checks for potential bugs.
 
 # How to install
 
-Just like any other Silverstripe module:
-`composer require --dev sunnysideup/easy-coding-standards:dev-master`
+ - open your terminal
+ - browse to root folder or project and type: `composer require --dev sunnysideup/easy-coding-standards:dev-master`
 
 ## global install
 
-start with
+1. open your terminal and type
 `composer global require sunnysideup/easy-coding-standards:dev-master`
 `composer global update`
 
-then add path to `~/.bash_rc` (or otherwise):
+2. then add path to `~/.bash_rc` (or otherwise):
 `PATH=~/.composer/vendor/bin:$PATH`
 
-then you should be able to run it from anywhere...
+now you should be able to run it from anywhere... like this:
+
+apply easy coding standards:
+`php-sslint-ecs`
+
+lint your code for bugs:
+`php-sslint-stan`
+
+quick and dirty: do both and commit it ... 
+`php-sslint-all`
+
 
 # How to use:
 
