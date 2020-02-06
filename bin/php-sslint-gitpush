@@ -3,6 +3,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 : ${dir:=app/src} # dir will take on the value "app/src" if not overridden
 : ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
+: ${message:=LINTING}
 
 echo "# adding files to git repo"
 git add $WORKING_DIR/$dir
@@ -10,9 +11,9 @@ git add $WORKING_DIR/$configFile
 git add $WORKING_DIR/$logFile
 
 echo "# committing files to git repo"
-git commit $WORKING_DIR/$dir -m "PATCH: automated cleanup"
-git commit $WORKING_DIR/$configFile -m "PATCH: automated cleanup"
-git commit $WORKING_DIR/$logFile -m "PATCH: automated cleanup add log file"
+git commit $WORKING_DIR/$dir -m "$message"
+git commit $WORKING_DIR/$configFile -m "$message"
+git commit $WORKING_DIR/$logFile -m "$message"
 
 echo "# pushing commits to git repo"
 git push
