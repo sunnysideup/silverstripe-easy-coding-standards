@@ -5,19 +5,20 @@ WORKING_DIR=$(pwd)
 : ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
 : ${logFile:=LINTING_ERRORS.txt} # configFile will take on the value "app/_config.php" if not overridden
 : ${level:=4} # level will take on the value "4" if not overridden
+: ${message:=LINTING} # level will take on the value "4" if not overridden
 if [ -z "$(git status --porcelain)" ]; then
 
     echo "# Working directory clean"
     > $WORKING_DIR/$logFile
 
     echo "# run linter"
-    dir=$WORKING_DIR/$dir configFile=$WORKING_DIR/$configFile $SCRIPT_DIR/php-sslint-ecs >> $WORKING_DIR/$logFile
+    dir=$dir configFile=$configFile $SCRIPT_DIR/php-sslint-ecs >> $WORKING_DIR/$logFile
 
     echo "# run bugfix"
-    dir=$WORKING_DIR/$dir configFile=$WORKING_DIR/$configFile level=$level $SCRIPT_DIR/php-sslint-stan >> $WORKING_DIR/$logFile
+    dir=$dir configFile=$configFile level=$level $SCRIPT_DIR/php-sslint-stan >> $WORKING_DIR/$logFile
 
     echo "# commit and push"
-    dir=$WORKING_DIR/$dir configFile=$WORKING_DIR/$configFile $SCRIPT_DIR/php-sslint-gitpush
+    message=$message dir=$dir configFile=$configFile $SCRIPT_DIR/php-sslint-gitpush
 
     echo "
 ---------------------------
