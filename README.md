@@ -60,24 +60,25 @@ vendor/bin/php-sslint-all
 ```
 
 # available settings
-
 If your code does not live in `app/src` you can set an alternative dir like this:
-
 ## dir 
 ```shell
 dir=myproject vendor/bin/php-sslint-ecs
 ```
-default: `app/src`
+
 
 ## configFile
+On top of your code dir you can add one config file:
 ```shell
 configFile=myproject/_config.php vendor/bin/php-sslint-ecs
 ```
 default: `app/_config.php`
-We are adding this so that you can do the src dir and the config file at the same time. 
 
 ## level
+This is only relevant for php-stan. 
+1 = only highlight serious worries, 
+6 = highlight most issues. 
 ```shell
 level=7 vendor/bin/php-sslint-stan
 ```
-default: 4, this is only relevant for php-stan.
+default: `4`
