@@ -82,3 +82,6 @@ This is only relevant for php-stan.
 level=7 vendor/bin/php-sslint-stan
 ```
 default: `4`
+
+## logFile
+The log file to record any errors / recommendations. The default is: `LINTING_ERRORS.txt`.  This is used by the "all in one" command.
