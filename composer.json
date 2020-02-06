@@ -27,13 +27,10 @@
         "phpstan/phpstan": "^0.11",
         "symplify/easy-coding-standard": "^6.1"
     },
-    "scripts": {
-        "php-sslint-ecs": "vendor/bin/ecs check app/src/ --fix --config vendor/sunnysideup/easy-coding-standards/ecs.yml",
-        "php-sslint-stan": "vendor/bin/phpstan analyse -l 1 -c vendor/sunnysideup/easy-coding-standards/phpstan.neon app/src"
-    },
     "bin": [
         "bin/php-sslint-ecs",
         "bin/php-sslint-stan",
-        "bin/php-sslint-all"
+        "bin/php-sslint-all",
+        "bin/php-sslint-gitpush"
     ]
 }
