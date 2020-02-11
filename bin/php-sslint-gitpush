@@ -4,7 +4,7 @@ WORKING_DIR=$(pwd)
 : ${dir:=app/src} # dir will take on the value "app/src" if not overridden
 : ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
 : ${message:=LINTING}
-: ${logFile:=LINTING_LOG.TXT}
+: ${logFile:=LINTING_ERRORS.txt}
 
 echo "# adding files to git repo"
 git add $WORKING_DIR/$dir
