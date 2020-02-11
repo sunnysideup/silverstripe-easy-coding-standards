@@ -25,19 +25,36 @@ PATH=~/.composer/vendor/bin:$PATH
 
 now you should be able to run it from anywhere... like this:
 
+## How to use
+From the root dir of your project (the folder where the composer.json file lives). 
+
 ### apply easy coding standards:
 ```shell
 php-sslint-ecs
 ```
+options:
+- dir
+- configFile
 
 ### lint your code for bugs:
 ```shell
 php-sslint-stan
 ```
+options:
+- dir
+- configFile
+- level
+
 ### quick and dirty: do both and commit it ... 
 ```shell
 php-sslint-all
 ```
+- dir
+- configFile
+- level
+- message
+- logFile
+
 
 Typically you would run these from the root directory of your project. 
 
@@ -79,9 +96,13 @@ This is only relevant for php-stan.
 1 = only highlight serious worries, 
 6 = highlight most issues. 
 ```shell
-level=7 vendor/bin/php-sslint-stan
+level=2 vendor/bin/php-sslint-stan
 ```
 default: `4`
 
 ## logFile
 The log file to record any errors / recommendations. The default is: `LINTING_ERRORS.txt`.  This is used by the "all in one" command.
+
+
+## message
+Git commit message. 
