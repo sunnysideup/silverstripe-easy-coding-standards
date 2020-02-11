@@ -51,7 +51,6 @@ php-sslint-all
 ```
 - dir
 - configFile
-- level
 - message
 - logFile
 
