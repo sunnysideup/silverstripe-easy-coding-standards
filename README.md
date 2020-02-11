@@ -72,7 +72,7 @@ vendor/bin/php-sslint-stan
 ```
 ### quick and dirty: do both and commit it ... 
 ```shell
-vendor/bin/php-sslint-all
+vendor/bin/php-sslint-gitpush
 ```
 
 # available settings
@@ -100,7 +100,7 @@ level=2 vendor/bin/php-sslint-stan
 default: `4`
 
 ## logFile
-The log file to record any errors / recommendations. The default is: `LINTING_ERRORS.txt`.  This is used by the "all in one" command.
+The log file to record any errors / recommendations. The default is: `LINTING_ERRORS.txt`.  This is used by the `php-sslint-gitpush` command.
 
 
 ## message
