@@ -6,8 +6,9 @@ WORKING_DIR=$(pwd)
 : ${logFile:=LINTING_ERRORS.txt} # configFile will take on the value "app/_config.php" if not overridden
 : ${level:=4} # level will take on the value "4" if not overridden
 : ${message:=LINTING} # level will take on the value "4" if not overridden
+cd $dir
 if [ -z "$(git status --porcelain)" ]; then
-
+    cd -
     echo "# Working directory clean"
     > $WORKING_DIR/$logFile
 
@@ -26,6 +27,7 @@ DONE
 ---------------------------
     "
 else
+    cd -
     echo "
 ---------------------------
 Sorry, can not run, there are uncommitted changes
