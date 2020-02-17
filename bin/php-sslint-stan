@@ -2,16 +2,20 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 
-echo "---------------------------------";
-echo "Running PHP STAN";
-echo "---------------------------------";
-echo "script dir: $SCRIPT_DIR";
-echo "script dir: $WORKING_DIR"
-echo "---------------------------------";
 
 : ${dir:=app/src}
 : ${configFile:=app/_config.php} # configFile will take on the value "app/_config.php" if not overridden
 : ${level:=4}
+
+
+echo "---------------------------------";
+echo "Running PHP STAN";
+echo "---------------------------------";
+echo "directory of script: $SCRIPT_DIR";
+echo "directory to analyse: $WORKING_DIR/$dir";
+echo "config file (also analysed): $WORKING_DIR/$configFile";
+echo "level: $level (1/6)";
+echo "---------------------------------";
 
 $SCRIPT_DIR/phpstan analyse  -l $level $WORKING_DIR/$dir
 $SCRIPT_DIR/phpstan analyse  -l $level $WORKING_DIR/$configFile
