@@ -22,6 +22,7 @@ composer global update
 ```shell
 PATH=~/.composer/vendor/bin:$PATH
 ```
+To make the composer `vendor/bin` available anywhere
 
 now you should be able to run it from anywhere like this:
 ```shell
