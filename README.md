@@ -61,9 +61,6 @@ php-sslint-all
 - logFile
 
 
-Typically you would run these from the root directory of your project.
-
-
 # How to use:
 From project root, run:
 
