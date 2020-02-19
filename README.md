@@ -128,7 +128,7 @@ Set an alternative location for the PHP Stan config file.
 
 ## logFile
 The log file to record any errors / recommendations.
-The default is: `LINTING_ERRORS.txt`.  This is used by the `php-sslint-gitpush` command.
+The default is: `LINTING_ERRORS.txt`.  This is used by the `php-sslint-all` command.
 
 ## message
-Git commit message.
+Git commit message. This is used by the `php-sslint-all` command.
