@@ -10,7 +10,6 @@ parameters:
 
     autoload_directories:
         - %currentWorkingDirectory%/app/src
-        - %currentWorkingDirectory%/src
 
     excludes_analyse:
         - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
