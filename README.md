@@ -29,7 +29,7 @@ now you should be able to run it from anywhere like this:
 php-sslint-ecs
 ```
 
-## How to use
+# How to use
 From the root dir of your project (the folder where the composer.json file lives).
 
 ### apply easy coding standards:
