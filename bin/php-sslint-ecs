@@ -17,8 +17,6 @@ echo "Available settings (in front of command: dir, also, ecsConfig)";
 echo "e.g. dir=foo/bar php-sslint-ecs";
 echo "---------------------------------";
 
-$SCRIPT_DIR/ecs show  --config $ecsConfig
-
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/ecs check $WORKING_DIR/$also --fix --clear-cache --config $ecsConfig
