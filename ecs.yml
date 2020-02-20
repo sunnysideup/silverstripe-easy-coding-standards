@@ -9,3 +9,4 @@ parameters:
         SlevomatCodingStandard\Sniffs\Classes\UnusedPrivateElementsSniff.UnusedProperty: ~
         SlevomatCodingStandard\Sniffs\Classes\ModernClassNameReferenceSniff.ClassNameReferencedViaMagicConstant: ~
         PHP_CodeSniffer\Standards\Generic\Sniffs\CodeAnalysis\AssignmentInConditionSniff.Found: ~
+        PhpCsFixer\Fixer\ClassNotation\SelfAccessorFixer: ~
