@@ -8,3 +8,4 @@ parameters:
     skip:
         SlevomatCodingStandard\Sniffs\Classes\UnusedPrivateElementsSniff.UnusedProperty: ~
         PHP_CodeSniffer\Standards\Generic\Sniffs\CodeAnalysis\AssignmentInConditionSniff.Found: ~
+        SlevomatCodingStandard\Sniffs\Classes\ModernClassNameReferenceSniff: ~
