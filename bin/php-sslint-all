@@ -6,7 +6,7 @@ WORKING_DIR=$(pwd)
 : ${logFile:=LINTING_ERRORS.txt} #
 : ${message:=LINTING}
 
-echo "# changing directory to to $dir"
+echo "# changing directory to $dir"
 cd $dir
 if [ -z "$(git status --porcelain)" ]; then
     cd -
