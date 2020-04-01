@@ -33,3 +33,6 @@ git commit . -m "$message"
 
 echo "# pushing commits to git repo"
 git push
+
+echo "# going back to: $WORKING_DIR"
+cd $WORKING_DIR
