@@ -54,7 +54,7 @@ sslint-stan
 ```
 
 
-### quick and dirty: do both and commit it ...
+### quick and dirty - do both and commit the results:
 ```shell
 vendor/bin/sslint-all
 ```
@@ -64,19 +64,28 @@ If installed globally:
 sslint-all
 ```
 
-### lint js
+### bonus: lint your javascript:
+If you install js standards, like this (you may need to use `sudo`):
+```shell
+npm install standard --global
+```
+
+Then you can the following command to fix your js:
 ```shell
 vendor/bin/sslint-js
 ```
-
 
 If installed globally:
 ```shell
 sslint-js
 ```
+You may need to set the right directory - e.g.
 
 # available settings
 Set the directory you want to check / fix / analyse:
+```shell
+dir=app/client/javascript/ sslint-js
+```
 
 ### dir
 ```shell

@@ -6,7 +6,7 @@ WORKING_DIR=$(pwd)
 
 echo "---------------------------------";
 echo "Running JS Standard";
-echo "Please run 'sudo npm install standard --global' first!";
+echo "Please run 'npm install standard --global' first!";
 echo "---------------------------------";
 echo "directory of script: $SCRIPT_DIR/";
 echo "directory to analyse: $WORKING_DIR/$dir";
