@@ -26,7 +26,7 @@ To make the composer `vendor/bin` available anywhere
 
 now you should be able to run it from anywhere like this:
 ```shell
-php-sslint-ecs
+sslint-ecs
 ```
 
 
@@ -35,33 +35,33 @@ From project root, run:
 
 ### apply easy coding standards:
 ```shell
-vendor/bin/php-sslint-ecs
+vendor/bin/sslint-ecs
 ```
 
 If installed globally, you can run:
 ```shell
-php-sslint-ecs
+sslint-ecs
 ```
 
 ### lint your code for bugs:
 ```shell
-vendor/bin/php-sslint-stan
+vendor/bin/sslint-stan
 ```
 
 If installed globally, you can run:
 ```shell
-php-sslint-stan
+sslint-stan
 ```
 
 
 ### quick and dirty: do both and commit it ...
 ```shell
-vendor/bin/php-sslint-all
+vendor/bin/sslint-all
 ```
 
 If installed globally, you can just run:
 ```shell
-php-sslint-all
+sslint-all
 ```
 
 
@@ -71,14 +71,14 @@ Set the directory you want to check / fix / analyse:
 
 ## dir
 ```shell
-dir=myproject php-sslint-ecs
+dir=myproject sslint-ecs
 ```
 default: `app/src`
 
 ## also
 On top of your code dir you can add one config file:
 ```shell
-also=myproject/_config.php php-sslint-ecs
+also=myproject/_config.php sslint-ecs
 ```
 default: `app/_config.php`
 
@@ -87,7 +87,7 @@ This is only relevant for php-stan.
 1 = only show serious worries,
 6 = show all issues.
 ```shell
-level=2 php-sslint-stan
+level=2 sslint-stan
 ```
 default: `4`
 
@@ -99,7 +99,7 @@ Set an alternative location for the PHP Stan config file.
 
 ## logFile
 The log file to record any errors / recommendations.
-The default is: `LINTING_ERRORS.txt`.  This is used by the `php-sslint-all` command.
+The default is: `LINTING_ERRORS.txt`.  This is used by the `sslint-all` command.
 
 ## message
-Git commit message. This is used by the `php-sslint-all` command.
+Git commit message. This is used by the `sslint-all` command.
