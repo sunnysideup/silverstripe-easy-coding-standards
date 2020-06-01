@@ -7,7 +7,7 @@ WORKING_DIR=$(pwd)
 echo "---------------------------------";
 echo "Running JS Standard";
 echo "---------------------------------";
-echo "directory of script: $SCRIPT_DIR";
+echo "directory of script: $SCRIPT_DIR/";
 echo "directory to analyse: $WORKING_DIR";
 echo "e.g. dir=foo/bar sslint-js";
 echo "---------------------------------";

@@ -26,7 +26,7 @@
   "require": {
     "phpstan/phpstan": "^0.11",
     "symplify/easy-coding-standard": "^6.1",
-    "standard/standard": "^14.3"
+    "standard/standard": "*"
   },
   "bin": [
     "bin/sslint-ecs",
@@ -39,7 +39,7 @@
       "type": "package",
       "package": {
         "name": "standard/standard",
-        "version": "14.3.4",
+        "version": "dev-master",
         "type": "package",
         "source": {
           "type": "git",
