@@ -1,0 +1,16 @@
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+WORKING_DIR=$(pwd)
+
+: ${dir:=app/client/javascript}
+
+echo "---------------------------------";
+echo "Running JS Standard";
+echo "---------------------------------";
+echo "directory of script: $SCRIPT_DIR";
+echo "directory to analyse: $WORKING_DIR";
+echo "e.g. dir=foo/bar sslint-js";
+echo "---------------------------------";
+
+echo "# analysing $WORKING_DIR/$dir";
+$SCRIPT_DIR/standard --fix $WORKING_DIR/$dir
