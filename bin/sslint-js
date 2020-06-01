@@ -13,4 +13,5 @@ echo "e.g. dir=foo/bar sslint-js";
 echo "---------------------------------";
 
 echo "# analysing $WORKING_DIR/$dir";
+npm install standard --global
 $SCRIPT_DIR/standard --fix $WORKING_DIR/$dir

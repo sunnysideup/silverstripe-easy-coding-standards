@@ -25,28 +25,12 @@
   ],
   "require": {
     "phpstan/phpstan": "^0.11",
-    "symplify/easy-coding-standard": "^6.1",
-    "standard/standard": "*"
+    "symplify/easy-coding-standard": "^6.1"
   },
   "bin": [
     "bin/sslint-ecs",
     "bin/sslint-stan",
     "bin/sslint-all",
     "bin/sslint-gitpush"
-  ],
-  "repositories": [
-    {
-      "type": "package",
-      "package": {
-        "name": "standard/standard",
-        "version": "dev-master",
-        "type": "package",
-        "source": {
-          "type": "git",
-          "reference": "jsstandard",
-          "url": "git@github.com:standard/standard.git"
-        }
-      }
-    }
   ]
 }
