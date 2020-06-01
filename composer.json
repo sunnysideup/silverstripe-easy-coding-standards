@@ -28,9 +28,10 @@
     "symplify/easy-coding-standard": "^6.1"
   },
   "bin": [
+    "bin/sslint-all",
     "bin/sslint-ecs",
     "bin/sslint-stan",
-    "bin/sslint-all",
+    "bin/sslint-js",
     "bin/sslint-gitpush"
   ]
 }
