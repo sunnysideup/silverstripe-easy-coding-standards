@@ -2,16 +2,16 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 
-: ${dir:=app/client/javascript}
+: ${dir:=app}
 
 echo "---------------------------------";
 echo "Running JS Standard";
+echo "Please run 'sudo npm install standard --global' first!";
 echo "---------------------------------";
 echo "directory of script: $SCRIPT_DIR/";
-echo "directory to analyse: $WORKING_DIR";
+echo "directory to analyse: $WORKING_DIR/$dir";
 echo "e.g. dir=foo/bar sslint-js";
 echo "---------------------------------";
 
 echo "# analysing $WORKING_DIR/$dir";
-npm install standard --global
-$SCRIPT_DIR/standard --fix $WORKING_DIR/$dir
+standard --fix $WORKING_DIR/$dir
