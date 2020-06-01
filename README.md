@@ -10,7 +10,7 @@ Lints your silverstripe php code, checks for potential bugs.
  composer require --dev sunnysideup/easy-coding-standards:dev-master
  ```
 
-## global install
+## global install (recommended)
 
 1. open your terminal and type
 ```shell
@@ -38,7 +38,7 @@ From project root, run:
 vendor/bin/sslint-ecs
 ```
 
-If installed globally, you can run:
+If installed globally:
 ```shell
 sslint-ecs
 ```
@@ -48,7 +48,7 @@ sslint-ecs
 vendor/bin/sslint-stan
 ```
 
-If installed globally, you can run:
+If installed globally:
 ```shell
 sslint-stan
 ```
@@ -59,30 +59,39 @@ sslint-stan
 vendor/bin/sslint-all
 ```
 
-If installed globally, you can just run:
+If installed globally:
 ```shell
 sslint-all
 ```
 
+### lint js
+```shell
+vendor/bin/sslint-js
+```
 
+
+If installed globally:
+```shell
+sslint-js
+```
 
 # available settings
 Set the directory you want to check / fix / analyse:
 
-## dir
+### dir
 ```shell
 dir=myproject sslint-ecs
 ```
 default: `app/src`
 
-## also
+### also
 On top of your code dir you can add one config file:
 ```shell
 also=myproject/_config.php sslint-ecs
 ```
 default: `app/_config.php`
 
-## level
+### level
 This is only relevant for php-stan.
 1 = only show serious worries,
 6 = show all issues.
@@ -91,15 +100,15 @@ level=2 sslint-stan
 ```
 default: `4`
 
-## ecsConfig
+### ecsConfig
 Set an alternative location for the Easy Coding Standards config file.
 
-## stanConfig
+### stanConfig
 Set an alternative location for the PHP Stan config file.
 
-## logFile
+### logFile
 The log file to record any errors / recommendations.
 The default is: `LINTING_ERRORS.txt`.  This is used by the `sslint-all` command.
 
-## message
+### message
 Git commit message. This is used by the `sslint-all` command.
