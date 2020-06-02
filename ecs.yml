@@ -3,7 +3,7 @@ imports:
     - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/psr2.yaml' }
     - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/clean-code.yaml' }
     - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/common.yaml' }
-    - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/dead-code.yaml' }
+    # - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/dead-code.yaml' }
 
 parameters:
     skip:
