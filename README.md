@@ -121,3 +121,7 @@ The default is: `LINTING_ERRORS.txt`.  This is used by the `sslint-all` command.
 
 ### message
 Git commit message. This is used by the `sslint-all` command.
+
+# pro tips
+
+ - Always run from root of project, even if you are linting a vendor module.
