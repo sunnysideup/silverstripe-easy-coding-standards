@@ -1,15 +1,18 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
+if [ "$1" != "" ]; then
+    dir=$1;
+else
+    dir='app/src'
+fi
 
-dir='app/src'
 also='app/_config.php'
 message='PATCH: linting'
 
-while getopts d:a:m: flag
+while getopts a:m: flag
 do
     case "${flag}" in
-        d) dir=${OPTARG};;
         a) also=${OPTARG};;
         m) message=${OPTARG};;
     esac

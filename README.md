@@ -26,45 +26,50 @@ To make the composer `vendor/bin` available anywhere
 
 now you should be able to run it from anywhere like this:
 ```shell
-sslint-ecs
+sslint-ecs [dir]
 ```
 
 
 # How to use:
-From project root, run:
+Once intalled you can run some simple commands to lint your Silverstripe (and other) code.
+Make sure to always run from root of project, even if you are linting a vendor module.
+All commands take one parameter: the dir you wan to lint.
+
+The default is `app/src`.
+
 
 ### apply easy coding standards:
 ```shell
-vendor/bin/sslint-ecs
+vendor/bin/sslint-ecs [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-ecs
+sslint-ecs [dir]
 ```
 
 ### lint your code for bugs:
 ```shell
-vendor/bin/sslint-stan
+vendor/bin/sslint-stan [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-stan
+sslint-stan [dir]
 ```
 
 
-### quick and dirty - do both and commit the results:
+### lint, git and push:
 ```shell
-vendor/bin/sslint-all
+vendor/bin/sslint-all [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-all
+sslint-all [dir]
 ```
 
-### bonus: lint your javascript:
+### bonus - lint your javascript:
 If you install js standards, like this (you may need to use `sudo`):
 ```shell
 npm install standard --global
@@ -72,56 +77,41 @@ npm install standard --global
 
 Then you can the following command to fix your js:
 ```shell
-vendor/bin/sslint-js
+vendor/bin/sslint-js [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-js
+sslint-js [dir]
 ```
 You may need to set the right directory - e.g.
 
-# available settings
-Set the directory you want to check / fix / analyse:
-```shell
-sslint-js -d app/client/javascript/
-```
+# available flags
 
-### dir
-```shell
-sslint-ecs -d myproject
-```
-default: `app/src`
-
-### also
+### -a (also)
 On top of your code dir you can add one config file:
 ```shell
-sslint-ecs -a myproject/_config.php
+sslint-ecs -a myproject/_config.php foo/bar
 ```
 default: `app/_config.php`
 
-### level
+### -e (ecsConfig)
+Set an alternative location for the Easy Coding Standards config file.
+This is used by the `sslint-ecs` command.
+
+### -l (level)
 This is only relevant for php-stan.
 1 = only show serious worries,
 6 = show all issues.
 ```shell
-sslint-stan -l 2
+sslint-stan -l 2 foo/bar
 ```
 default: `4`
+This is used by the `sslint-stan` command.
 
-### ecsConfig
-Set an alternative location for the Easy Coding Standards config file.
-
-### stanConfig
+### -s (stanConfig)
 Set an alternative location for the PHP Stan config file.
+This is used by the `sslint-stan` command.
 
-### logFile
-The log file to record any errors / recommendations.
-The default is: `LINTING_ERRORS.txt`.  This is used by the `sslint-all` command.
-
-### message
+### -m (message)
 Git commit message. This is used by the `sslint-all` command.
-
-# pro tips
-
- - Always run from root of project, even if you are linting a vendor module.

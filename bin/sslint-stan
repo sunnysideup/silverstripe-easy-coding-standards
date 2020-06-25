@@ -3,16 +3,19 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
+if [ "$1" != "" ]; then
+    dir=$1;
+else
+    dir='app/src'
+fi
 
-dir='app/src'
 also='app/_config.php'
 stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
 level=4
 
-while getopts d:a:s:l: flag
+while getopts a:s:l: flag
 do
     case "${flag}" in
-        d) dir=${OPTARG};;
         a) also=${OPTARG};;
         s) stanConfig=${OPTARG};;
         l) level=${OPTARG};;
@@ -30,13 +33,14 @@ echo "  also check (e.g. _config.php file): $WORKING_DIR/$also";
 echo "  level: $level (1/6)";
 echo "  php stan config file: $stanConfig";
 echo "---------------------------------";
-echo "Available settings:";
+echo "  Available settings:";
 echo "---------------------------------";
-echo "  -d (directory)" ;
 echo "  -a (also lint)";
 echo "  -s (stan config file locaton)";
 echo "  -l (level of scrutiny (1 - 6))";
-echo "  e.g. sslint-stan -d foo/bar -l 6 ";
+echo "---------------------------------";
+echo "  Example usage:"
+echo "  e.g. sslint-stan foo/bar -l 6 ";
 echo "---------------------------------";
 echo ""
 echo ""

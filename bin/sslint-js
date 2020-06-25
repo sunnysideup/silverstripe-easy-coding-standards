@@ -3,7 +3,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 
 
-dir='app/src'
+if [ "$1" != "" ]; then
+    dir=$1;
+else
+    dir='app/client/javascript'
+fi
 
 while getopts a: flag
 do
@@ -14,15 +18,16 @@ done
 echo ""
 echo ""
 echo "---------------------------------";
-echo "Running JS Standard";
+echo "  Running JS Standard";
 echo "---------------------------------";
-echo "Please run 'npm install standard --global' first!";
+echo "  Please run 'npm install standard --global' first!";
 echo "---------------------------------";
-echo " directory of script: $SCRIPT_DIR/";
-echo " directory to analyse: $WORKING_DIR/$dir";
-echo " e.g. dir=foo/bar sslint-js";
+echo "  directory of script: $SCRIPT_DIR/";
+echo "  directory to analyse: $WORKING_DIR/$dir";
+echo "---------------------------------";
+echo "  Example usage:"
+echo "  e.g. sslint-js app/client/javascript";
 echo "---------------------------------";
 echo ""
 echo ""
-echo "# analysing $WORKING_DIR/$dir";
 standard --fix $WORKING_DIR/$dir
