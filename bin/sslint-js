@@ -11,14 +11,18 @@ do
         a) dir=${OPTARG};;
     esac
 done
+echo ""
+echo ""
 echo "---------------------------------";
 echo "Running JS Standard";
+echo "---------------------------------";
 echo "Please run 'npm install standard --global' first!";
 echo "---------------------------------";
-echo "directory of script: $SCRIPT_DIR/";
-echo "directory to analyse: $WORKING_DIR/$dir";
-echo "e.g. dir=foo/bar sslint-js";
+echo " directory of script: $SCRIPT_DIR/";
+echo " directory to analyse: $WORKING_DIR/$dir";
+echo " e.g. dir=foo/bar sslint-js";
 echo "---------------------------------";
-
+echo ""
+echo ""
 echo "# analysing $WORKING_DIR/$dir";
 standard --fix $WORKING_DIR/$dir

@@ -13,18 +13,22 @@ do
     esac
 done
 
+echo ""
+echo ""
 echo "---------------------------------";
-echo "Running GIT PUSH";
+echo "  Running GIT PUSH";
 echo "---------------------------------";
-echo "directory of script: $SCRIPT_DIR";
-echo "directory to commit: $WORKING_DIR/$dir";
-echo "message: $message";
+echo "  directory of script: $SCRIPT_DIR";
+echo "  directory to commit: $WORKING_DIR/$dir";
+echo "  message: $message";
 echo "---------------------------------";
-echo "Available settings:";
-echo "-d (directory)" ;
-echo "-m (commit message)";
-echo "e.g. sslint-gitpush -m 'PATCH' ";
+echo "  Available settings:";
+echo "  -d (directory)" ;
+echo "  -m (commit message)";
+echo "  e.g. sslint-gitpush -m 'PATCH' ";
 echo "---------------------------------";
+echo ""
+echo ""
 
 echo "# going to right directory: $WORKING_DIR/$dir"
 cd $WORKING_DIR/$dir

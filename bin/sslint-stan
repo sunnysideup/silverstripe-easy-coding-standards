@@ -3,15 +3,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
-echo "---------------------------------";
-echo "Running PHP STAN";
-echo "---------------------------------";
-echo "directory of script: $SCRIPT_DIR";
-echo "directory to analyse: $WORKING_DIR/$dir";
-echo "also check (e.g. _config.php file): $WORKING_DIR/$also";
-echo "Available settings (put in front of command: dir, also, level, stanConfig)";
-echo "e.g. dir=foo/bar sslint-stan";
-echo "---------------------------------";
 
 dir='app/src'
 also='app/_config.php'
@@ -28,21 +19,24 @@ do
     esac
 done
 
+echo ""
+echo ""
 echo "---------------------------------";
-echo "Running PHP STAN";
+echo "  Running PHP STAN";
 echo "---------------------------------";
-echo "directory of script: $SCRIPT_DIR";
-echo "directory to analyse: $WORKING_DIR/$dir";
-echo "also check (e.g. _config.php file): $WORKING_DIR/$also";
-echo "level: $level (1/6)";
-echo "php stan config file: $stanConfig";
+echo "  directory of script: $SCRIPT_DIR";
+echo "  directory to analyse: $WORKING_DIR/$dir";
+echo "  also check (e.g. _config.php file): $WORKING_DIR/$also";
+echo "  level: $level (1/6)";
+echo "  php stan config file: $stanConfig";
 echo "---------------------------------";
 echo "Available settings:";
-echo "-d (directory)" ;
-echo "-a (also lint)";
-echo "-s (stan config file locaton)";
-echo "-l (level of scrutiny (1 - 6))";
-echo "e.g. sslint-stan -d foo/bar -l 6 ";
+echo "---------------------------------";
+echo "  -d (directory)" ;
+echo "  -a (also lint)";
+echo "  -s (stan config file locaton)";
+echo "  -l (level of scrutiny (1 - 6))";
+echo "  e.g. sslint-stan -d foo/bar -l 6 ";
 echo "---------------------------------";
 
 
