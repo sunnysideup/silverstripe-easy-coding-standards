@@ -4,7 +4,7 @@ WORKING_DIR=$(pwd)
 
 dir='app/src'
 also='app/_config.php'
-message='WIP'
+message='PATCH: linter'
 
 while getopts d:a:m: flag
 do
@@ -14,23 +14,26 @@ do
         m) message=${OPTARG};;
     esac
 done
-
-echo "# changing directory to $dir"
+echo "
+---------------------------"
+echo "# changing directory to $dir and committing and pushing"
 cd $dir
 git add . -A
 git commit . -m "WIP"
+echo "
+---------------------------"
 
 if [ -z "$(git status --porcelain)" ]; then
     cd -
 
     echo "# run linter"
-    dir=$dir also=$also $SCRIPT_DIR/sslint-ecs 
+    $SCRIPT_DIR/sslint-ecs -d $dir -a $also
 
     echo "# run bugfix"
-    dir=$dir also=$also $SCRIPT_DIR/sslint-stan 
-    
+    $SCRIPT_DIR/sslint-stan -d $dir -a $also
+
     echo "# commit and push"
-    message=$message dir=$dir also=$also $SCRIPT_DIR/sslint-gitpush
+    $SCRIPT_DIR/sslint-gitpush -m $message -d $dir -a $also
 
     echo "
 ---------------------------
