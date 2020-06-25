@@ -6,7 +6,7 @@ WORKING_DIR=$(pwd)
 if [ "$1" != "" ]; then
     dir=$1;
 else
-    dir='app/client/javascript'
+
 fi
 
 while getopts a: flag
@@ -15,6 +15,30 @@ do
         a) dir=${OPTARG};;
     esac
 done
+
+help_and_exit() {
+    echo "---------------------------------";
+    echo "  Available settings:";
+    echo "   NONE";
+    echo "---------------------------------";
+    echo "  Example usage:"
+    echo "  sslint-js foo/bar";
+    echo "---------------------------------";
+    echo ""
+    echo ""
+    exit;
+}
+
+dir='app/client/javascript'
+while (( $# )); do
+  case $1 in
+    -*)               printf 'Unknown option: %q\n\n' "$1";
+                      help_and_exit 1 ;;
+    *) dir=$1;;
+  esac
+  shift
+done
+
 echo ""
 echo ""
 echo "---------------------------------";
@@ -22,7 +46,6 @@ echo "  Running JS Standard";
 echo "---------------------------------";
 echo "  Please run 'npm install standard --global' first!";
 echo "---------------------------------";
-echo "  directory of script: $SCRIPT_DIR/";
 echo "  directory to analyse: $WORKING_DIR/$dir";
 echo "---------------------------------";
 echo "  Example usage:"

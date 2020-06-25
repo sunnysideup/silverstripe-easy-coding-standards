@@ -3,21 +3,34 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 # : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
-if [ "$1" != "" ]; then
-    dir=$1;
-else
-    dir='app/src'
-fi
+
+
+help_and_exit() {
+    echo "---------------------------------";
+    echo "  Available settings:";
+    echo "  -a (also lint)";
+    echo "  -e (ecs config file locaton)";
+    echo "---------------------------------";
+    echo "  Example usage:"
+    echo "  sslint-ecs foo/bar -a app_more/_config.php ";
+    echo "---------------------------------";
+    echo ""
+    echo ""
+    exit;
+}
 
 also='app/_config.php'
 ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml"
-
-while getopts a:e: flag
-do
-    case "${flag}" in
-        a) also=${OPTARG};;
-        e) ecsConfig=${OPTARG};;
-    esac
+dir='app/src'
+while (( $# )); do
+  case $1 in
+    -a|--also)        also=$2;shift ;;
+    -e|--ecsConfig)   message=$2;shift ;;
+    -*)               printf 'Unknown option: %q\n\n' "$1";
+                      help_and_exit 1 ;;
+    *) dir=$1;;
+  esac
+  shift
 done
 
 echo ""
@@ -29,13 +42,6 @@ echo "  directory of script: $SCRIPT_DIR";
 echo "  directory to analyse: $WORKING_DIR/$dir";
 echo "  also check (e.g. _config.php file): $WORKING_DIR/$also";
 echo "  ecs config file: $ecsConfig";
-echo "---------------------------------";
-echo "  Available settings:";
-echo "  -a (also lint)";
-echo "  -e (ecs config file locaton)";
-echo "---------------------------------";
-echo "  Example usage:"
-echo "  sslint-ecs foo/bar -a app_more/_config.php ";
 echo "---------------------------------";
 echo ""
 echo ""

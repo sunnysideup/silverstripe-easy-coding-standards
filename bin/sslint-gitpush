@@ -2,19 +2,30 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 
-if [ "$1" != "" ]; then
-    dir=$1;
-else
-    dir='app/src'
-fi
+help_and_exit() {
+    echo "---------------------------------";
+    echo "  Available settings:";
+    echo "  -m (commit message)";
+    echo "---------------------------------";
+    echo "  Example usage:"
+    echo "  e.g. sslint-gitpush app/src -m 'PATCH' ";
+    echo "---------------------------------";
+    echo ""
+    echo ""
 
-message='WIP'
+    exit;
+}
 
-while getopts m: flag
-do
-    case "${flag}" in
-        m) message=${OPTARG};;
-    esac
+message="wip"
+dir='app/src'
+while (( $# )); do
+  case $1 in
+    -m|--message)     message=$2;shift ;;
+    -*)               printf 'Unknown option: %q\n\n' "$1";
+                      help_and_exit 1 ;;
+    *) dir=$1;;
+  esac
+  shift
 done
 
 echo ""
@@ -25,13 +36,6 @@ echo "---------------------------------";
 echo "  directory of script: $SCRIPT_DIR";
 echo "  directory to commit: $WORKING_DIR/$dir";
 echo "  message: $message";
-echo "---------------------------------";
-echo "  Available settings:";
-echo "  -d (directory)" ;
-echo "  -m (commit message)";
-echo "---------------------------------";
-echo "  Example usage:"
-echo "  e.g. sslint-gitpush app/src -m 'PATCH' ";
 echo "---------------------------------";
 echo ""
 echo ""

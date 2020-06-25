@@ -9,17 +9,37 @@ else
     dir='app/src'
 fi
 
+
+
+help_and_exit() {
+    echo "---------------------------------";
+    echo "  Available settings:";
+    echo "---------------------------------";
+    echo "  -a (also lint)";
+    echo "  -s (stan config file locaton)";
+    echo "  -l (level of scrutiny (1 - 6))";
+    echo "---------------------------------";
+    echo "  Example usage:"
+    echo "  e.g. sslint-stan foo/bar -l 6 ";
+    echo "---------------------------------";
+    echo ""
+    echo ""
+    exit;
+}
+
 also='app/_config.php'
 stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
 level=4
-
-while getopts a:s:l: flag
-do
-    case "${flag}" in
-        a) also=${OPTARG};;
-        s) stanConfig=${OPTARG};;
-        l) level=${OPTARG};;
-    esac
+while (( $# )); do
+  case $1 in
+    -a|--also)        also=$2;shift ;;
+    -l|--level)       level=$2;shift ;;
+    -s|--stanConfig)  stanConfig=$2;shift ;;
+    -*)               printf 'Unknown option: %q\n\n' "$1";
+                      help_and_exit 1 ;;
+    *) dir=$1;;
+  esac
+  shift
 done
 
 echo ""
@@ -33,21 +53,10 @@ echo "  also check (e.g. _config.php file): $WORKING_DIR/$also";
 echo "  level: $level (1/6)";
 echo "  php stan config file: $stanConfig";
 echo "---------------------------------";
-echo "  Available settings:";
-echo "---------------------------------";
-echo "  -a (also lint)";
-echo "  -s (stan config file locaton)";
-echo "  -l (level of scrutiny (1 - 6))";
-echo "---------------------------------";
-echo "  Example usage:"
-echo "  e.g. sslint-stan foo/bar -l 6 ";
-echo "---------------------------------";
 echo ""
 echo ""
 
 if test -f "$WORKING_DIR/$also"; then
-    echo "# analysing $WORKING_DIR/$also";
     $SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$also
 fi
-echo "# analysing $WORKING_DIR/$dir";
 $SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$dir
