@@ -1,24 +1,34 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-: ${dir:=app/src}
-: ${also:=app/_config.php}
-: ${logFile:=LINTING_ERRORS.txt} #
-: ${message:=LINTING}
+
+dir='app/src'
+also='app/_config.php'
+message='WIP'
+
+while getopts d:a:m: flag
+do
+    case "${flag}" in
+        d) dir=${OPTARG};;
+        a) also=${OPTARG};;
+        m) message=${OPTARG};;
+    esac
+done
 
 echo "# changing directory to $dir"
 cd $dir
+git add . -A
+git commit . -m "WIP"
+
 if [ -z "$(git status --porcelain)" ]; then
     cd -
-    echo "# Working directory clean"
-    > $WORKING_DIR/$logFile
 
     echo "# run linter"
-    dir=$dir also=$also $SCRIPT_DIR/sslint-ecs >> $WORKING_DIR/$logFile
+    dir=$dir also=$also $SCRIPT_DIR/sslint-ecs 
 
     echo "# run bugfix"
-    dir=$dir also=$also $SCRIPT_DIR/sslint-stan >> $WORKING_DIR/$logFile
-
+    dir=$dir also=$also $SCRIPT_DIR/sslint-stan 
+    
     echo "# commit and push"
     message=$message dir=$dir also=$also $SCRIPT_DIR/sslint-gitpush
 
