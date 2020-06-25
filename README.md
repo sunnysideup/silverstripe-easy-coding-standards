@@ -84,19 +84,19 @@ You may need to set the right directory - e.g.
 # available settings
 Set the directory you want to check / fix / analyse:
 ```shell
-dir=app/client/javascript/ sslint-js
+sslint-js -d app/client/javascript/
 ```
 
 ### dir
 ```shell
-dir=myproject sslint-ecs
+sslint-ecs -d myproject
 ```
 default: `app/src`
 
 ### also
 On top of your code dir you can add one config file:
 ```shell
-also=myproject/_config.php sslint-ecs
+sslint-ecs -a myproject/_config.php
 ```
 default: `app/_config.php`
 
@@ -105,7 +105,7 @@ This is only relevant for php-stan.
 1 = only show serious worries,
 6 = show all issues.
 ```shell
-level=2 sslint-stan
+sslint-stan -l 2
 ```
 default: `4`
 
