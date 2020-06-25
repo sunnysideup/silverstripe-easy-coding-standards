@@ -38,7 +38,8 @@ echo "  -s (stan config file locaton)";
 echo "  -l (level of scrutiny (1 - 6))";
 echo "  e.g. sslint-stan -d foo/bar -l 6 ";
 echo "---------------------------------";
-
+echo ""
+echo ""
 
 if test -f "$WORKING_DIR/$also"; then
     echo "# analysing $WORKING_DIR/$also";

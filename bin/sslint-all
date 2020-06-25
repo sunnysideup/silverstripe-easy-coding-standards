@@ -33,7 +33,7 @@ if [ -z "$(git status --porcelain)" ]; then
     $SCRIPT_DIR/sslint-stan -d $dir -a $also
 
     echo "# commit and push"
-    $SCRIPT_DIR/sslint-gitpush -m "$message" -d $dir -a $also
+    $SCRIPT_DIR/sslint-gitpush -m "$message" -d $dir
 
     echo "
 ---------------------------
