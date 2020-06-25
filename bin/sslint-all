@@ -4,7 +4,7 @@ WORKING_DIR=$(pwd)
 
 dir='app/src'
 also='app/_config.php'
-message='PATCH: linter'
+message='PATCH: linting'
 
 while getopts d:a:m: flag
 do
@@ -33,7 +33,7 @@ if [ -z "$(git status --porcelain)" ]; then
     $SCRIPT_DIR/sslint-stan -d $dir -a $also
 
     echo "# commit and push"
-    $SCRIPT_DIR/sslint-gitpush -m $message -d $dir -a $also
+    $SCRIPT_DIR/sslint-gitpush -m "$message" -d $dir -a $also
 
     echo "
 ---------------------------
