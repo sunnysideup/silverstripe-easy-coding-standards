@@ -1,42 +1,59 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
+
+
+help_and_exit() {
+  local retval=${1:-1}
+  cat <<EOF
+${0##*/} [-a|--also] [-m|--message] [dir]
+EOF
+  exit "$retval"
+}
+
+message='PATCH: linting'
+also='app/_config.php'
+args=( )
+dry_run=0; xfer=0
+while (( $# )); do
+  case $1 in
+    -a|--also)         also='app/_config.php' ;;
+    -m|--message)      message='PATCH: linting' ;;
+    -*)                printf 'Unknown option: %q\n\n' "$1"
+                         help_and_exit 1 ;;
+    *)                 args+=( "$1" ) ;;
+  esac
+  shift
+done
+set -- "${args[@]}"
 if [ "$1" != "" ]; then
     dir=$1;
 else
     dir='app/src'
 fi
-
-also='app/_config.php'
-message='PATCH: linting'
-
-while getopts a:m: flag
-do
-    case "${flag}" in
-        a) also=${OPTARG};;
-        m) message=${OPTARG};;
-    esac
-done
 echo "
+
 ---------------------------"
 echo "# changing directory to $dir and committing and pushing"
 cd $dir
 git add . -A
 git commit . -m "WIP"
 echo "
----------------------------"
+---------------------------
+
+"
 
 if [ -z "$(git status --porcelain)" ]; then
     cd -
 
     echo "# run linter"
-    $SCRIPT_DIR/sslint-ecs -d $dir -a $also
+    $SCRIPT_DIR/sslint-ecs -a $also $dir
 
     echo "# run bugfix"
-    $SCRIPT_DIR/sslint-stan -d $dir -a $also
+    $SCRIPT_DIR/sslint-stan -a $also $dir
 
     echo "# commit and push"
-    $SCRIPT_DIR/sslint-gitpush -m "$message" -d $dir
+    $SCRIPT_DIR/sslint-gitpush  -m "$message" $dir
 
     echo "
 ---------------------------
