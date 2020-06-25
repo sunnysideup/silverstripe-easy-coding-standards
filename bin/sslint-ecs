@@ -1,10 +1,20 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-: ${dir:=app/src}
-: ${also:=app/_config.php}
-: ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
+dir='app/src'
+also='app/_config.php'
+ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml"
+
+while getopts d:a:e: flag
+do
+    case "${flag}" in
+        d) dir=${OPTARG};;
+        a) also=${OPTARG};;
+        e) ecsConfig=${OPTARG};;
+    esac
+done
 
 echo "---------------------------------";
 echo "Running Easy Conding Standards";
@@ -13,8 +23,12 @@ echo "directory of script: $SCRIPT_DIR";
 echo "directory to analyse: $WORKING_DIR/$dir";
 echo "also check (e.g. _config.php file): $WORKING_DIR/$also";
 echo "ecs config file: $ecsConfig";
-echo "Available settings (in front of command: dir, also, ecsConfig)";
-echo "e.g. dir=foo/bar sslint-ecs";
+echo "---------------------------------";
+echo "Available settings:";
+echo "-d (directory)" ;
+echo "-a (also lint)";
+echo "-e (ecs config file locaton)";
+echo "e.g. sslint-ecs -d foo/bar ";
 echo "---------------------------------";
 
 

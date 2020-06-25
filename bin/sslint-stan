@@ -1,11 +1,32 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
+# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
-: ${dir:=app/src}
-: ${also:=app/_config.php}
-: ${level:=4}
-: ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
+echo "---------------------------------";
+echo "Running PHP STAN";
+echo "---------------------------------";
+echo "directory of script: $SCRIPT_DIR";
+echo "directory to analyse: $WORKING_DIR/$dir";
+echo "also check (e.g. _config.php file): $WORKING_DIR/$also";
+echo "Available settings (put in front of command: dir, also, level, stanConfig)";
+echo "e.g. dir=foo/bar sslint-stan";
+echo "---------------------------------";
+
+dir='app/src'
+also='app/_config.php'
+stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
+level=4
+
+while getopts d:a:s:l: flag
+do
+    case "${flag}" in
+        d) dir=${OPTARG};;
+        a) also=${OPTARG};;
+        s) stanConfig=${OPTARG};;
+        l) level=${OPTARG};;
+    esac
+done
 
 echo "---------------------------------";
 echo "Running PHP STAN";
@@ -15,9 +36,15 @@ echo "directory to analyse: $WORKING_DIR/$dir";
 echo "also check (e.g. _config.php file): $WORKING_DIR/$also";
 echo "level: $level (1/6)";
 echo "php stan config file: $stanConfig";
-echo "Available settings (put in front of command: dir, also, level, stanConfig)";
-echo "e.g. dir=foo/bar sslint-stan";
 echo "---------------------------------";
+echo "Available settings:";
+echo "-d (directory)" ;
+echo "-a (also lint)";
+echo "-s (stan config file locaton)";
+echo "-l (level of scrutiny (1 - 6))";
+echo "e.g. sslint-stan -d foo/bar -l 6 ";
+echo "---------------------------------";
+
 
 if test -f "$WORKING_DIR/$also"; then
     echo "# analysing $WORKING_DIR/$also";

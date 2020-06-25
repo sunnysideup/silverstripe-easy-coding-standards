@@ -1,21 +1,29 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-: ${dir:=app/src}
-: ${also:=app/_config.php}
-: ${message:=LINTING}
-: ${logFile:=LINTING_ERRORS.txt}
 
+dir='app/src'
+message='WIP'
+
+while getopts d:m: flag
+do
+    case "${flag}" in
+        d) dir=${OPTARG};;
+        m) message=${OPTARG};;
+    esac
+done
 
 echo "---------------------------------";
 echo "Running GIT PUSH";
 echo "---------------------------------";
 echo "directory of script: $SCRIPT_DIR";
 echo "directory to commit: $WORKING_DIR/$dir";
-
-echo "messge: $message";
-echo "Available settings (in front of command: dir, also, ecsConfig)";
-echo "e.g. dir=foo/bar sslint-ecs";
+echo "message: $message";
+echo "---------------------------------";
+echo "Available settings:";
+echo "-d (directory)" ;
+echo "-m (commit message)";
+echo "e.g. sslint-gitpush -m 'PATCH' ";
 echo "---------------------------------";
 
 echo "# going to right directory: $WORKING_DIR/$dir"
