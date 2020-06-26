@@ -32,6 +32,7 @@
     "bin/sslint-ecs",
     "bin/sslint-stan",
     "bin/sslint-js",
-    "bin/sslint-gitpush"
+    "bin/sslint-gitpush",
+    "bin/sslint-compat"
   ]
 }
