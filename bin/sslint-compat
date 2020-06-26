@@ -36,7 +36,7 @@ echo ""
 echo "---------------------------------";
 echo "  Running PHP Compatability";
 echo "---------------------------------";
-echo "  make sure to global install: squizlabs/php_codesniffer + phpcompatibility/php-compatibility
+echo "  make sure to global install: squizlabs/php_codesniffer + phpcompatibility/php-compatibility"
 echo "  directory of script: $SCRIPT_DIR";
 echo "  directory to analyse: $WORKING_DIR/$dir";
 echo "  PHP Version: $phpVersion";
