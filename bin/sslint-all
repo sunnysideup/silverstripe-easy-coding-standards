@@ -45,7 +45,7 @@ if [ -z "$(git status --porcelain)" ]; then
     cd -
     
     echo "# run php check"
-    $SCRIPT_DIR/sslint-compat src/
+    $SCRIPT_DIR/sslint-compat $dir
 
     echo "# run linter"
     $SCRIPT_DIR/sslint-ecs -a $also $dir
