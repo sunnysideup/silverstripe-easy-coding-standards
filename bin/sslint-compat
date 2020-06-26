@@ -45,7 +45,7 @@ echo "---------------------------------";
 echo ""
 echo ""
 
-$SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../vendor/phpcompatibility/php-compatibility"
+$SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
 $SCRIPT_DIR/phpcs --config-set colors 1
 $SCRIPT_DIR/phpcs --config-set severity 1
 $SCRIPT_DIR/phpcs --config-show 
