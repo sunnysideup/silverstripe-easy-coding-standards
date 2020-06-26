@@ -2,8 +2,8 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 
-# composer global install squizlabs/php_codesniffer --dev
-# composer global install phpcompatibility/php-compatibility --dev
+# composer global require squizlabs/php_codesniffer --dev
+# composer global require phpcompatibility/php-compatibility --dev
 
 
 help_and_exit() {
@@ -36,7 +36,8 @@ echo ""
 echo "---------------------------------";
 echo "  Running PHP Compatability";
 echo "---------------------------------";
-echo "  make sure to global install: squizlabs/php_codesniffer + phpcompatibility/php-compatibility
+echo "  make sure to run: "
+echo "    composer global require squizlabs/php_codesniffer  phpcompatibility/php-compatibility --dev"
 echo "  directory of script: $SCRIPT_DIR";
 echo "  directory to analyse: $WORKING_DIR/$dir";
 echo "  PHP Version: $phpVersion";
@@ -44,7 +45,7 @@ echo "---------------------------------";
 echo ""
 echo ""
 
-$SCRIPT_DIR/phpcs --config-set installed_paths SCRIPT_DIR/../vendor/phpcompatibility/php-compatibility"
+$SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../vendor/phpcompatibility/php-compatibility"
 $SCRIPT_DIR/phpcs --config-set colors 1
 $SCRIPT_DIR/phpcs --config-set severity 1
 $SCRIPT_DIR/phpcs --config-show 
