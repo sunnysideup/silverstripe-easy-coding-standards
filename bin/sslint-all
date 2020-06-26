@@ -38,7 +38,7 @@ echo "# changing directory to $dir and committing and pushing"
 echo "---------------------------"
 cd $dir
 git add . -A
-git commit . -m "WIP"
+git commit . -m "$message"
 echo "---------------------------"
 
 if [ -z "$(git status --porcelain)" ]; then
