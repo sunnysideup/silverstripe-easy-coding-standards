@@ -58,6 +58,15 @@ If installed globally:
 sslint-stan [dir]
 ```
 
+### check for outdated code
+```shell
+vendor/bin/sslint-compat [dir]
+```
+
+If installed globally:
+```shell
+sslint-compat [dir]
+```
 
 ### lint, git and push:
 ```shell
@@ -95,23 +104,30 @@ sslint-ecs -a myproject/_config.php foo/bar
 ```
 default: `app/_config.php`
 
-### -e (ecsConfig)
-Set an alternative location for the Easy Coding Standards config file.
-This is used by the `sslint-ecs` command.
-
 ### -l (level)
-This is only relevant for php-stan.
+This is only relevant for `sslint-stan`.
 1 = only show serious worries,
 6 = show all issues.
+default: `4`
 ```shell
 sslint-stan -l 2 foo/bar
 ```
-default: `4`
-This is used by the `sslint-stan` command.
 
-### -s (stanConfig)
-Set an alternative location for the PHP Stan config file.
-This is used by the `sslint-stan` command.
+
+### -p (level)
+This is only relevant for `sslint-compat`.
+default: `7.4`
+```shell
+sslint-compat -p 7.3 foo/bar
+```
 
 ### -m (message)
 Git commit message. This is used by the `sslint-all` command.
+
+### -e (ecsConfig)
+This is used by the `sslint-ecs` command.
+Set an alternative location for the Easy Coding Standards config file.
+
+### -s (stanConfig)
+This is used by the `sslint-stan` command.
+Set an alternative location for the PHP Stan config file.
