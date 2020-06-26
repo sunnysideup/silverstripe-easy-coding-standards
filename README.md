@@ -7,7 +7,7 @@ Lints your silverstripe php code, checks for potential bugs.
 1. open your terminal
 2. browse to root folder of your project and type:
  ```shell
- composer require --dev sunnysideup/easy-coding-standards:dev-master
+composer require --dev sunnysideup/easy-coding-standards:dev-master
  ```
 
 ## global install (recommended)
