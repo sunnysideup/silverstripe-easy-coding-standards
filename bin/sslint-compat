@@ -1,12 +1,9 @@
-# composer global install squizlabs/php_codesniffer --dev
-# composer global install phpcompatibility/php-compatibility --dev
-./vendor/bin/phpcs --config-set installed_paths vendor/phpcompatibility/php-compatibility
-
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
+# composer global install squizlabs/php_codesniffer --dev
+# composer global install phpcompatibility/php-compatibility --dev
 
 
 help_and_exit() {
