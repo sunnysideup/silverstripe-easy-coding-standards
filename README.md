@@ -20,7 +20,7 @@ composer global update
 
 2. then add path to `~/.bashrc` (or otherwise):
 ```shell
-echo "PATH=~/.composer/vendor/bin:$PATH" >> ~/.bashrc
+PATH=~/.composer/vendor/bin:$PATH
 ```
 To make the composer `vendor/bin` available anywhere
 
