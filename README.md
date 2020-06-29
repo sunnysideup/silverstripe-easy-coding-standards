@@ -18,9 +18,9 @@ composer global require sunnysideup/easy-coding-standards:dev-master
 composer global update
 ```
 
-2. then add path to `~/.bash_rc` (or otherwise):
+2. then add path to `~/.bashrc` (or otherwise):
 ```shell
-PATH=~/.composer/vendor/bin:$PATH
+echo "PATH=~/.composer/vendor/bin:$PATH" >> ~/.bashrc
 ```
 To make the composer `vendor/bin` available anywhere
 
