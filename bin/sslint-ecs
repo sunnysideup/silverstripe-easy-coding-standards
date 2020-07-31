@@ -25,7 +25,7 @@ dir='app/src'
 while (( $# )); do
   case $1 in
     -a|--also)        also=$2;shift ;;
-    -e|--ecsConfig)   message=$2;shift ;;
+    -e|--ecsConfig)   ecsConfig=$2;shift ;;
     -*)               printf 'Unknown option: %q\n\n' "$1";
                       help_and_exit 1 ;;
     *) dir=$1;;
