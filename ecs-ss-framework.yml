@@ -12,5 +12,5 @@ parameters:
         SlevomatCodingStandard\Sniffs\Classes\ModernClassNameReferenceSniff.ClassNameReferencedViaMagicConstant: ~
         PHP_CodeSniffer\Standards\Generic\Sniffs\CodeAnalysis\AssignmentInConditionSniff.Found: ~
         PhpCsFixer\Fixer\ClassNotation\SelfAccessorFixer: ~
-        hpCsFixer\Fixer\Operator\NotOperatorWithSuccessorSpaceFixer: ~
+        PhpCsFixer\Fixer\Operator\NotOperatorWithSuccessorSpaceFixer: ~
         PhpCsFixer\Fixer\ClassNotation\OrderedClassElementsFixer: ~
