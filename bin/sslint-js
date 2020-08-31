@@ -6,7 +6,7 @@ WORKING_DIR=$(pwd)
 if [ "$1" != "" ]; then
     dir=$1;
 else
-
+    dir='app/client/src'
 fi
 
 while getopts a: flag
@@ -22,6 +22,7 @@ help_and_exit() {
     echo "   NONE";
     echo "---------------------------------";
     echo "  Example usage:"
+    echo "  sslint-js .";
     echo "  sslint-js foo/bar";
     echo "---------------------------------";
     echo ""
@@ -29,7 +30,6 @@ help_and_exit() {
     exit;
 }
 
-dir='app/client/javascript'
 while (( $# )); do
   case $1 in
     -*)               printf 'Unknown option: %q\n\n' "$1";
@@ -44,13 +44,14 @@ echo ""
 echo "---------------------------------";
 echo "  Running JS Standard";
 echo "---------------------------------";
-echo "  Please run 'npm install standard --global' first!";
+echo "  Make sure you have run 'npm install standard --global'";
 echo "---------------------------------";
-echo "  directory to analyse: $WORKING_DIR/$dir";
+echo "  files to analyse: $WORKING_DIR/$dir/*.js";
 echo "---------------------------------";
 echo "  Example usage:"
 echo "  e.g. sslint-js app/client/javascript";
+echo "  e.g. sslint-js .";
 echo "---------------------------------";
 echo ""
 echo ""
-standard --fix $WORKING_DIR/$dir
+standard --fix $dir/*.js
