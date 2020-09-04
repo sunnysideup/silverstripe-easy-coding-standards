@@ -15,16 +15,14 @@ help_and_exit() {
     echo "  -c: commit and push also";
     echo "---------------------------------";
     echo "  Example usage:"
-    echo "  e.g. sslint-vendor-packages vendor/myvendorname -c";
+    echo "  e.g. sslint-vendor-packages vendor/my-vendor-name -c";
     echo "---------------------------------";
     echo ""
     echo ""
     exit;
 }
 
-also='app/_config.php'
-stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
-level=4
+commit='no'
 while (( $# )); do
   case $1 in
     -c|--commit-and-push)  commit='yes';shift ;;
@@ -49,5 +47,5 @@ echo ""
 
 find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {} && cd {} && git status -s)' \;
 if [[ "$commit" == "yes" ]]; then
-  find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {} && cd {} && git status -s && git add . -A && git commit . -m "PATCH: LINTER" && git push)' \;
+  find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {} && cd {} && git status -s && git add . -A && git commit . -m "PATCH: linter" && git push)' \;
 fi
