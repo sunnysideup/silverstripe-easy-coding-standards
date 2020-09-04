@@ -1,0 +1,53 @@
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+WORKING_DIR=$(pwd)
+
+if [ "$1" != "" ]; then
+    dir=$1;
+else
+    dir='vendor'
+fi
+
+help_and_exit() {
+    echo "---------------------------------";
+    echo "  Available settings:";
+    echo "---------------------------------";
+    echo "  -c: commit and push also - enter yes to commit";
+    echo "---------------------------------";
+    echo "  Example usage:"
+    echo "  e.g. sslint-vendor-packages vendor/myvendorname -c yes";
+    echo "---------------------------------";
+    echo ""
+    echo ""
+    exit;
+}
+
+also='app/_config.php'
+stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
+level=4
+while (( $# )); do
+  case $1 in
+    -c|--commit-and-push)  commit=$2;shift ;;
+    -*)               printf 'Unknown option: %q\n\n' "$1";
+                      help_and_exit 1 ;;
+    *) dir=$1;;
+  esac
+  shift
+done
+
+echo ""
+echo ""
+echo "---------------------------------";
+echo "  Checking Vendor Packages for Changes";
+echo "---------------------------------";
+echo "  directory of script: $SCRIPT_DIR";
+echo "  directory to analyse: $WORKING_DIR/$dir";
+echo "  also commit?: $commit";
+echo "---------------------------------";
+echo ""
+echo ""
+
+find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {} && cd {} && git status -s)' \;
+if [[ "$commit" == "yes" ]]; then
+  find vendor/sunnysideup -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {} && cd {} && git status -s && git add . -A && git commit . -m "PATCH: LINTER" && git push)' \;
+fi
