@@ -35,6 +35,7 @@
     "bin/sslint-stan",
     "bin/sslint-js",
     "bin/sslint-gitpush",
-    "bin/sslint-compat"
+    "bin/sslint-compat",
+    "sslint-vendor-packages"
   ]
 }
