@@ -47,5 +47,5 @@ echo ""
 
 find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {} && cd {} && git status -s)' \;
 if [[ "$commit" == "yes" ]]; then
-  find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {} && cd {} && git status -s && git add . -A && git commit . -m "PATCH: linter" && git push)' \;
+  find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {}; cd {}; git status -s; git add . -A; git commit . -m "PATCH: automated commit"; git pull; git push)' \;
 fi
