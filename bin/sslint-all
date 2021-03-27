@@ -43,15 +43,18 @@ echo "---------------------------"
 
 if [ -z "$(git status --porcelain)" ]; then
     cd -
-    
+
     echo "# run php check"
     $SCRIPT_DIR/sslint-compat $dir
 
     echo "# run linter"
     $SCRIPT_DIR/sslint-ecs -a $also $dir
 
+    echo "# run rector"
+    $SCRIPT_DIR/sslint-rector -a $also $dir
+
     echo "# run bugfix"
-    $SCRIPT_DIR/sslint-stan -a $also $dir
+    $SCRIPT_DIR/sslint-stan -a $also $dir > KNOWN_ISSUES_TMP
 
     echo "# commit and push"
     $SCRIPT_DIR/sslint-gitpush  -m "PATCH: linting" $dir

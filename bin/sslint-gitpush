@@ -16,7 +16,7 @@ help_and_exit() {
     exit;
 }
 
-message="wip"
+message="WIP"
 dir='app/src'
 while (( $# )); do
   case $1 in
@@ -52,6 +52,9 @@ echo "# committing files to git repo"
 git commit . -m "$message"
 #git commit $WORKING_DIR/$also -m "$message"
 #git commit $WORKING_DIR/$logFile -m "$message"
+
+echo "# pushing commits to git repo"
+git pull
 
 echo "# pushing commits to git repo"
 git push
