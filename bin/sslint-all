@@ -34,7 +34,9 @@ done
 
 
 echo "---------------------------"
+echo "-------------------------------------------------------------------"
 echo "# changing directory to $dir and committing and pushing"
+echo "-------------------------------------------------------------------"
 echo "---------------------------"
 cd $dir
 git add . -A
@@ -58,6 +60,9 @@ if [ -z "$(git status --porcelain)" ]; then
 
     echo "# commit and push"
     $SCRIPT_DIR/sslint-gitpush  -m "PATCH: linting" $dir
+
+    echo "# commit and push"
+    $SCRIPT_DIR/sslint-vendor-packages  -m "PATCH: linting" $dir
 
     echo "
 ---------------------------
