@@ -1,0 +1,52 @@
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+WORKING_DIR=$(pwd)
+# : ${rectorConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rector.php}
+
+
+
+help_and_exit() {
+    echo "---------------------------------";
+    echo "  Available settings:";
+    echo "  -a (also lint)";
+    echo "  -e (config file locaton)";
+    echo "---------------------------------";
+    echo "  Example usage:"
+    echo "  sslint-rector foo/bar -a app_more/_config.php ";
+    echo "---------------------------------";
+    echo ""
+    echo ""
+    exit;
+}
+
+also='app/_config.php'
+rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rector.php"
+dir='app/src'
+while (( $# )); do
+  case $1 in
+    -a|--also)          also=$2;shift ;;
+    -e|--rectorConfig)  rectorConfig=$2;shift ;;
+    -*)                 printf 'Unknown option: %q\n\n' "$1";
+                        help_and_exit 1 ;;
+    *)                  dir=$1;;
+  esac
+  shift
+done
+
+echo ""
+echo ""
+echo "---------------------------------";
+echo "  Running Rector";
+echo "---------------------------------";
+echo "  directory of script:     $SCRIPT_DIR";
+echo "  directory to analyse:    $WORKING_DIR/$dir";
+echo "  also check:              $WORKING_DIR/$also";
+echo "  rector config file:      $rectorConfig";
+echo "---------------------------------";
+echo ""
+echo ""
+
+if test -f "$WORKING_DIR/$also"; then
+    $SCRIPT_DIR/rector process $WORKING_DIR/$also --config $rectorConfig
+fi
+$SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig

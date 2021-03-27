@@ -20,7 +20,7 @@ help_and_exit() {
 }
 
 also='app/_config.php'
-ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml"
+ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.php"
 dir='app/src'
 while (( $# )); do
   case $1 in
