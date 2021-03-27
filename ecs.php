@@ -5,6 +5,8 @@ declare(strict_types=1);
 use PhpCsFixer\Fixer\ArrayNotation\ArraySyntaxFixer;
 
 use PhpCsFixer\Fixer\ClassNotation\SelfAccessorFixer;
+
+use PhpCsFixer\Fixer\Phpdoc\NoSuperfluousPhpdocTagsFixer;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symplify\EasyCodingStandard\ValueObject\Option;
 use Symplify\EasyCodingStandard\ValueObject\Set\SetList;
