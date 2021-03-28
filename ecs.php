@@ -52,6 +52,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         SelfAccessorFixer::class,
         ArrayOpenerAndCloserNewlineFixer::class,
         ArrayListItemNewlineFixer::class,
+        OrderedClassElementsFixer::class,
     ]);
 
 };
