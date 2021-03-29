@@ -28,7 +28,7 @@
     "symplify/easy-coding-standard": "^9.0",
     "squizlabs/php_codesniffer": "^3.5",
     "phpcompatibility/php-compatibility": "^9.3",
-    "rector/rector": "^0.8"
+    "rector/rector": "^0.10.3"
   },
   "bin": [
     "bin/sslint-all",
