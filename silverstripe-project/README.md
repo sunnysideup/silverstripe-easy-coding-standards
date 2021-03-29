@@ -67,8 +67,12 @@ The idea is that we:
     - include as CI?
     - how to apply to 100s of modules easily?
 
+# what to add:
 
-# current shows
+https://github.com/silverleague/silverstripe-ideannotator/blob/master/docs/en/Installation.md
+
+
+# current rules
 
 ## ecs
 ```shell
