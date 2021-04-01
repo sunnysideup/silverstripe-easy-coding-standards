@@ -50,9 +50,14 @@ echo ""
 echo ""
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/ecs check $WORKING_DIR/$also --fix --clear-cache --config $ecsConfig
+    $SCRIPT_DIR/sslint-ecs -e $ecsConfig $WORKING_DIR/$also
 fi
+
+
+
 $SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
+
+
 
 echo "################################################"
 echo "################################################"

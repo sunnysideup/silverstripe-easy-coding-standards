@@ -56,11 +56,7 @@ $SCRIPT_DIR/phpcs --config-set severity 1
 $SCRIPT_DIR/phpcs --config-show
 $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
-    $SCRIPT_DIR/phpcs --config-set colors 1
-    $SCRIPT_DIR/phpcs --config-set severity 1
-    $SCRIPT_DIR/phpcs --config-show
-    $SCRIPT_DIR/phpcs -p $WORKING_DIR/$also --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion
+    $SCRIPT_DIR/sslint-compat -p $phpVersion $WORKING_DIR/$also
 fi
 
 echo "################################################"
