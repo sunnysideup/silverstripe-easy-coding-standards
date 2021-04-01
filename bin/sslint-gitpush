@@ -49,11 +49,11 @@ echo "---------------------------------";
 echo "  directory of script:           $SCRIPT_DIR";
 echo "  directory to commit:           $WORKING_DIR/$dir";
 echo "---------------------------------";
-echo "  also commit?:                  $commitAndPush";
-echo "  message:                       $message";
-echo "  new Tag?:                      $newTag";
-echo "  also check:                    $WORKING_DIR/$also";
-echo "  also include themes?:          $alsoDoThemes";
+echo "  Commit and Push?:              $commitAndPush";
+echo "  Message:                       $message";
+echo "  Create New Tag?:               $newTag";
+echo "  Also check:                    $WORKING_DIR/$also";
+echo "  Also include themes?:          $alsoDoThemes";
 echo "---------------------------------";
 echo ""
 echo ""
@@ -105,11 +105,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     git status
 
     if test -f "$WORKING_DIR/$also"; then
-        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'"  -c $commitAndPush -n $newTag $WORKING_DIR/$also
+        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'" -a 'nothing-here-hopefully' -c $commitAndPush -n $newTag $WORKING_DIR/$also
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
-        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'"  -c $commitAndPush -n $newTag $WORKING_DIR/themes
+        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'"  -a 'nothing-here-hopefully' -t no -c $commitAndPush -n $newTag $WORKING_DIR/themes
     fi
 else
     echo ""

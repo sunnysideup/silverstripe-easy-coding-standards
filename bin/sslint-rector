@@ -51,7 +51,7 @@ echo ""
 echo ""
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sslint-rector -r $ecsConfig $WORKING_DIR/$also
+    $SCRIPT_DIR/sslint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also
 fi
 
 $SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig

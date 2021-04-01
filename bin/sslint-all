@@ -117,14 +117,14 @@ if [ -z "$(git status --porcelain)" ]; then
         echo "#########################"
         echo "# run the above on $also"
         echo "#########################"
-        $SCRIPT_DIR/sslint-all -m ""  -c no -t no -j $javascriptAlso -p $phpVersion $WORKING_DIR/$also
+        $SCRIPT_DIR/sslint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $WORKING_DIR/$also
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
         echo "#########################"
         echo "# run the above on themes"
         echo "#########################"
-        $SCRIPT_DIR/sslint-all -m ""  -c no  -j $javascriptAlso $WORKING_DIR/themes
+        $SCRIPT_DIR/sslint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso $WORKING_DIR/themes
     fi
 
 

@@ -50,8 +50,8 @@ echo "  Directory of script:           $SCRIPT_DIR";
 echo "  Directory to analyse:          $WORKING_DIR/$dir";
 echo "---------------------------------";
 echo "  Message:                       $message";
-echo "  Also commit?:                  $commitAndPush";
-echo "  New tag?:                      $newTag";
+echo "  Commit and Push?:              $commitAndPush";
+echo "  Create New tag?:               $newTag";
 echo ""
 echo ""
 

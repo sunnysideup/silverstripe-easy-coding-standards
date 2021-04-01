@@ -57,6 +57,6 @@ echo ""
 echo ""
 
 if test -f "$WORKING_DIR/$also"; then
-    $$SCRIPT_DIR/sslint-rector -l $level -s $stanConfig $WORKING_DIR/$alsoo
+    $$SCRIPT_DIR/sslint-rector -a 'nothing-here-hopefully' -l $level -s $stanConfig $WORKING_DIR/$alsoo
 fi
 $SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$dir
