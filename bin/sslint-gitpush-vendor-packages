@@ -14,6 +14,7 @@ help_and_exit() {
     echo "---------------------------------";
     echo "  -m, --message                  message - e.g. Lint";
     echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
+    echo "  -n, --new-tag                  create new tag";
     echo ""
     echo "---------------------------------";
     echo "  Example usage:"
@@ -27,10 +28,12 @@ help_and_exit() {
 
 commitAndPush='no'
 message='PATCH: automated linter'
+newTag='no'
 while (( $# )); do
   case $1 in
     -m|--message)          message=$2;shift ;;
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
+    -n|--newTag)           newTag=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
     *)                     dir=$1;;
@@ -43,26 +46,30 @@ echo ""
 echo "---------------------------------";
 echo "  Checking Vendor Packages for Changes";
 echo "---------------------------------";
-echo "  directory of script:           $SCRIPT_DIR";
-echo "  directory to analyse:          $WORKING_DIR/$dir";
+echo "  Directory of script:           $SCRIPT_DIR";
+echo "  Directory to analyse:          $WORKING_DIR/$dir";
 echo "---------------------------------";
-echo "  message:                       $message";
-echo "  also commit?:                  $commitAndPush";
+echo "  Message:                       $message";
+echo "  Also commit?:                  $commitAndPush";
+echo "  New tag?:                      $newTag";
 echo ""
 echo ""
-
-echo "------------------------------------------"
-echo "check status of project in vendor"
-echo "------------------------------------------"
-find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {}  ;  cd {}  ;  git status -s)' \;
 
 if [[ "$commitAndPush" == "yes" ]]; then
 
     echo "------------------------------------------"
-    echo "commit in $WORKING_DIR/$dir"
+    echo "going to look for folders in $WORKING_DIR/$dir"
     echo "------------------------------------------"
 
-    find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {}  ;  cd {}  ; '$SCRIPT_DIR/sslint-gitpush' . -m "'$message'" )' \;
+    find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
+        while IFS= read -r -d '' line; do
+
+            echo "------------------------------------------"
+            echo "$line"  ;
+            echo "------------------------------------------"
+            cd "$line";
+            $SCRIPT_DIR/sslint-gitpush . -m "$message" -c $commitAndPush -n $newTag ;
+        done
 
 fi
 

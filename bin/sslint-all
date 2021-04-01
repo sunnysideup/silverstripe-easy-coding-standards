@@ -10,11 +10,11 @@ help_and_exit() {
     echo "  -f, --full-crazy-works         do it all (excluding javascript!)";
     echo "  -a, --also                     also lint, e.g. app/_config.php or app/";
     echo "  -c, --commit-and-push          also commit and push - set to yes to enable";
+    echo "  -n, --new-tag                  create patch tag - e.g. increment from version 6.0.1 to 6.0.2";
     echo "  -m, --message                  commit message";
     echo "  -t, --themes-also              include folders in themes";
     echo "  -j, --javascript-also          include javascript linting"
     echo "  -p, --php-version              php version - e.g. 7.4";
-    echo "  -n, --create-new-version       create patch tag - e.g. increment from version 6.0.1 to 6.0.2";
     echo " "
     echo "---------------------------------";
     echo "  Example usage:"
@@ -32,8 +32,8 @@ full='no'
 also='app/_config.php'
 alsoDoThemes='no'
 commitAndPush='no'
+newTag='no'
 message='PATCH: linter'
-createTag='no'
 javascriptAlso='no'
 phpVersion='7.4'
 while (( $# )); do
@@ -42,8 +42,8 @@ while (( $# )); do
     -a|--also)               also=$2;shift ;;
     -t|--themes-also)        alsoDoThemes=$2;shift ;;
     -c|--commit-and-push)    commitAndPush=$2;shift ;;
+    -n|--new-tag)            newTag=$2;shift ;;
     -m|--message)            message=$2;shift ;;
-    -n|--create-new-version) createTag=$2;shift ;;
     -j|--javascript-also)    javascriptAlso=$2;shift ;;
     -p|--php-version)        phpVersion=$2;shift ;;
     -*)                      printf 'Unknown option: %q\n\n' "$1";
@@ -57,7 +57,7 @@ if [[ "$full" == "yes" ]]; then
     full='no'
     alsoDoThemes='yes'
     commitAndPush='yes'
-    createTag='yes'
+    newTag='yes'
     message='PATCH: linter'
 fi
 
@@ -73,6 +73,7 @@ echo "  Full Crazy Works:              $full";
 echo "  Also Check:                    $WORKING_DIR/$also";
 echo "  Also include themes?:          $alsoDoThemes";
 echo "  Commit And Push:               $commitAndPush";
+echo "  New Tag:                       $newTag";
 echo "  Message:                       $message";
 echo "  Javascript Also:               $javascriptAlso";
 echo "  PHP Version:                   $phpVersion";
@@ -137,7 +138,7 @@ if [ -z "$(git status --porcelain)" ]; then
     echo "------------------------------------------"
     echo "commit in $WORKING_DIR/$dir and other places"
     echo "------------------------------------------"
-    $SCRIPT_DIR/sslint-gitpush -m $message  -c $commitAndPush -a $WORKING_DIR/$also -t $alsoDoThemes $WORKING_DIR
+    $SCRIPT_DIR/sslint-gitpush -m $message  -c $commitAndPush -n $newTag -a $WORKING_DIR/$also -t $alsoDoThemes $WORKING_DIR
 
     echo "
 ---------------------------
