@@ -1,0 +1,59 @@
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+WORKING_DIR=$(pwd)
+
+
+help_and_exit() {
+    echo "---------------------------------";
+    echo "  Available settings:";
+    echo "---------------------------------";
+    echo " NONE"
+    echo "---------------------------------";
+    echo "  Example usage:"
+    echo "---------------------------------";
+    echo "  sslint-dev-build .";
+    echo "---------------------------------";
+    echo ""
+    echo ""
+    exit;
+}
+
+dir='./'
+
+while (( $# )); do
+  case $1 in
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       dir=$1;;
+  esac
+  shift
+done
+
+echo ""
+echo ""
+echo "---------------------------------";
+echo "  Running Lint All";
+echo "---------------------------------";
+echo "  Directory of script:           $SCRIPT_DIR";
+echo "  Directory to analyse:          $WORKING_DIR/$dir";
+echo "---------------------------------";
+echo "---------------------------------";
+echo ""
+echo ""
+
+echo "---------------------------"
+echo "# changing directory to $dir "
+echo "---------------------------"
+cd $dir
+echo "---------------------------"
+
+
+composer install
+composer vendor-expose
+composer dumpautoload
+sudo chown www-data public/assets -R
+sudo -u www-data vendor/bin/sake dev/build flush=all
+
+echo "################################################"
+echo "################################################"
+echo "################################################"
