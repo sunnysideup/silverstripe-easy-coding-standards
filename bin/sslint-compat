@@ -9,11 +9,14 @@ WORKING_DIR=$(pwd)
 help_and_exit() {
     echo "---------------------------------";
     echo "  Available settings:";
-    echo "  -p (php version)";
+    echo "---------------------------------";
+    echo "  -p, --php-version              php version (e.g. 7.4)";
+    echo "---------------------------------";
+    echo ""
     echo "---------------------------------";
     echo "  Example usage:"
-    echo "  sslint-compat foo/bar -p 7.4 ";
     echo "---------------------------------";
+    echo "  sslint-compat   -p 7.4   foo/bar ";
     echo ""
     echo ""
     exit;
@@ -23,10 +26,10 @@ phpVersion="7.4"
 dir='app/src'
 while (( $# )); do
   case $1 in
-    -p|--phpVersion)  phpVersion=$2;shift ;;
-    -*)               printf 'Unknown option: %q\n\n' "$1";
-                      help_and_exit 1 ;;
-    *) dir=$1;;
+    -p|--php-version)  phpVersion=$2;shift ;;
+    -*)                printf 'Unknown option: %q\n\n' "$1";
+                       help_and_exit 1 ;;
+    *)                 dir=$1;;
   esac
   shift
 done
@@ -36,9 +39,9 @@ echo ""
 echo "---------------------------------";
 echo "  Running PHP Compatability";
 echo "---------------------------------";
-echo "  directory of script: $SCRIPT_DIR";
-echo "  directory to analyse: $WORKING_DIR/$dir";
-echo "  PHP Version: $phpVersion";
+echo "  directory of script:   $SCRIPT_DIR";
+echo "  directory to analyse:  $WORKING_DIR/$dir";
+echo "  PHP Version:           $phpVersion";
 echo "---------------------------------";
 echo ""
 echo ""
@@ -46,5 +49,9 @@ echo ""
 $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
 $SCRIPT_DIR/phpcs --config-set colors 1
 $SCRIPT_DIR/phpcs --config-set severity 1
-$SCRIPT_DIR/phpcs --config-show 
+$SCRIPT_DIR/phpcs --config-show
 $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion
+
+echo "################################################"
+echo "################################################"
+echo "################################################"

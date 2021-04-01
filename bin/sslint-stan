@@ -9,23 +9,22 @@ else
     dir='app/src'
 fi
 
+echo "---------------------------------";
+echo "  Available settings:";
+echo "---------------------------------";
+echo "  -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+echo "  -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
+echo "  -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
+echo " "
+echo "---------------------------------";
+echo "  Example usage:"
+echo "---------------------------------";
+echo "  sslint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
+echo "---------------------------------";
+echo ""
+echo ""
+exit;
 
-
-help_and_exit() {
-    echo "---------------------------------";
-    echo "  Available settings:";
-    echo "---------------------------------";
-    echo "  -a (also lint)";
-    echo "  -s (stan config file locaton)";
-    echo "  -l (level of scrutiny (1 - 6))";
-    echo "---------------------------------";
-    echo "  Example usage:"
-    echo "  e.g. sslint-stan foo/bar -l 6 ";
-    echo "---------------------------------";
-    echo ""
-    echo ""
-    exit;
-}
 
 also='app/_config.php'
 stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
@@ -34,7 +33,7 @@ while (( $# )); do
   case $1 in
     -a|--also)        also=$2;shift ;;
     -l|--level)       level=$2;shift ;;
-    -s|--stanConfig)  stanConfig=$2;shift ;;
+    -s|--stan-config)  stanConfig=$2;shift ;;
     -*)               printf 'Unknown option: %q\n\n' "$1";
                       help_and_exit 1 ;;
     *) dir=$1;;
@@ -47,11 +46,12 @@ echo ""
 echo "---------------------------------";
 echo "  Running PHP STAN";
 echo "---------------------------------";
-echo "  directory of script: $SCRIPT_DIR";
-echo "  directory to analyse: $WORKING_DIR/$dir";
-echo "  also check (e.g. _config.php file): $WORKING_DIR/$also";
-echo "  level: $level (1/6)";
-echo "  php stan config file: $stanConfig";
+echo "  directory of script:              $SCRIPT_DIR";
+echo "  directory to analyse:             $WORKING_DIR/$dir";
+echo "---------------------------------";
+echo "  also check:                       $WORKING_DIR/$also";
+echo "  level:                            $level (1/6)";
+echo "  php stan config file:             $stanConfig";
 echo "---------------------------------";
 echo ""
 echo ""

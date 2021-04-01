@@ -6,63 +6,80 @@ WORKING_DIR=$(pwd)
 help_and_exit() {
     echo "---------------------------------";
     echo "  Available settings:";
-    echo "  -a (also lint)";
-    echo "  -m (commit message)";
+    echo "---------------------------------";
+    echo "  -a, --also                     also lint, e.g. app/_config.php or app/";
+    echo "  -p, --php-version              php version - e.g. 7.4";
+    echo "  -c, --commit-and-push          also commit and push - set to yes to enable";
+    echo " "
     echo "---------------------------------";
     echo "  Example usage:"
-    echo "  sslint-all foo/bar -a app_more/_config.php ";
+    echo "---------------------------------";
+    echo "  sslint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
     echo "---------------------------------";
     echo ""
     echo ""
     exit;
 }
 
-message='PATCH: linting'
 also='app/_config.php'
 dir='app/src'
+phpVersion='7.4'
+commitAndPush='no'
 while (( $# )); do
   case $1 in
-    -a|--also)      also=$2;shift ;;
-    -m|--message)   message=$2;shift ;;
-    -*)             printf 'Unknown option: %q\n\n' "$1";
-                    help_and_exit 1 ;;
-    *) dir=$1;;
+    -a|--also)            also=$2;shift ;;
+    -c|--commit-and-push) commitAndPush=$2;shift ;;
+    -p|--php-version)     phpVersion=$2;shift ;;
+    -*)                   printf 'Unknown option: %q\n\n' "$1";
+                          help_and_exit 1 ;;
+    *)                    dir=$1;;
   esac
   shift
 done
 
-
+echo ""
+echo ""
+echo "---------------------------------";
+echo "  Running Lint All";
+echo "---------------------------------";
+echo "  directory of script:           $SCRIPT_DIR";
+echo "  directory to analyse:          $WORKING_DIR/$dir";
+echo "  Also Check:                    $also";
+echo "  Commit And Push:               $commitAndPush";
+echo "  PHP Version:                   $phpVersion";
+echo "---------------------------------";
+echo ""
+echo ""
 
 echo "---------------------------"
-echo "-------------------------------------------------------------------"
-echo "# changing directory to $dir and committing and pushing"
-echo "-------------------------------------------------------------------"
+echo "# changing directory to $dir "
 echo "---------------------------"
 cd $dir
-git add . -A
-git commit . -m "$message"
 echo "---------------------------"
 
 if [ -z "$(git status --porcelain)" ]; then
     cd -
 
     echo "# run php check"
-    $SCRIPT_DIR/sslint-compat $dir
+    $SCRIPT_DIR/sslint-compat -p $phpVersion $dir
 
-    echo "# run linter"
+    echo "# run linter ecs #1"
     $SCRIPT_DIR/sslint-ecs -a $also $dir
 
-    echo "# run rector"
+    echo "# run rector #1"
     $SCRIPT_DIR/sslint-rector -a $also $dir
 
-    echo "# run bugfix"
-    $SCRIPT_DIR/sslint-stan -a $also $dir > KNOWN_ISSUES_TMP
+    echo "# run ecs #2"
+    $SCRIPT_DIR/sslint-ecs -a $also $dir
 
-    echo "# commit and push"
-    $SCRIPT_DIR/sslint-gitpush  -m "PATCH: linting" $dir
+    echo "# run rector #2"
+    $SCRIPT_DIR/sslint-rector -a $also $dir
 
-    echo "# commit and push"
-    $SCRIPT_DIR/sslint-vendor-packages  -m "PATCH: linting" $dir
+    echo "# run ecs #3"
+    $SCRIPT_DIR/sslint-ecs -a $also $dir
+
+    echo "# run stan"
+    $SCRIPT_DIR/sslint-stan -a $also -l 2 $dir > KNOWN_ISSUES_AUTOMATED_FILE
 
     echo "
 ---------------------------
@@ -77,3 +94,7 @@ Sorry, can not run, there are uncommitted changes
 ---------------------------
     "
 fi
+
+echo "################################################"
+echo "################################################"
+echo "################################################"

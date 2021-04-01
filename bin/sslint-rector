@@ -8,11 +8,14 @@ WORKING_DIR=$(pwd)
 help_and_exit() {
     echo "---------------------------------";
     echo "  Available settings:";
-    echo "  -a (also lint)";
-    echo "  -e (config file locaton)";
+    echo "---------------------------------";
+    echo "  -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    echo "  -r, --rector-config            rector config file locaton e.g. ../rector.php";
+    echo " "
     echo "---------------------------------";
     echo "  Example usage:"
-    echo "  sslint-rector foo/bar -a app_more/_config.php ";
+    echo "---------------------------------";
+    echo "  sslint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
     echo "---------------------------------";
     echo ""
     echo ""
@@ -25,7 +28,7 @@ dir='app/src'
 while (( $# )); do
   case $1 in
     -a|--also)          also=$2;shift ;;
-    -e|--rectorConfig)  rectorConfig=$2;shift ;;
+    -r|--rector-config) rectorConfig=$2;shift ;;
     -*)                 printf 'Unknown option: %q\n\n' "$1";
                         help_and_exit 1 ;;
     *)                  dir=$1;;
@@ -38,10 +41,11 @@ echo ""
 echo "---------------------------------";
 echo "  Running Rector";
 echo "---------------------------------";
-echo "  directory of script:     $SCRIPT_DIR";
-echo "  directory to analyse:    $WORKING_DIR/$dir";
-echo "  also check:              $WORKING_DIR/$also";
-echo "  rector config file:      $rectorConfig";
+echo "  directory of script:           $SCRIPT_DIR";
+echo "  directory to analyse:          $WORKING_DIR/$dir";
+echo "---------------------------------";
+echo "  also check:                    $WORKING_DIR/$also";
+echo "  rector config file:            $rectorConfig";
 echo "---------------------------------";
 echo ""
 echo ""
@@ -49,4 +53,5 @@ echo ""
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/rector process $WORKING_DIR/$also --config $rectorConfig
 fi
+
 $SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig

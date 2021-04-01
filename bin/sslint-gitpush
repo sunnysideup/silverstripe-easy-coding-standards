@@ -5,10 +5,13 @@ WORKING_DIR=$(pwd)
 help_and_exit() {
     echo "---------------------------------";
     echo "  Available settings:";
-    echo "  -m (commit message)";
+    echo "---------------------------------";
+    echo "  -m, --message                  commit message";
+    echo ""
     echo "---------------------------------";
     echo "  Example usage:"
-    echo "  e.g. sslint-gitpush app/src -m 'PATCH' ";
+    echo "---------------------------------";
+    echo "  e.g. sslint-gitpush   -m 'PATCH'   app/src ";
     echo "---------------------------------";
     echo ""
     echo ""
@@ -33,15 +36,19 @@ echo ""
 echo "---------------------------------";
 echo "  Running GIT PUSH";
 echo "---------------------------------";
-echo "  directory of script: $SCRIPT_DIR";
-echo "  directory to commit: $WORKING_DIR/$dir";
-echo "  message: $message";
+echo "  directory of script:           $SCRIPT_DIR";
+echo "  directory to commit:           $WORKING_DIR/$dir";
+echo "---------------------------------";
+echo "  message:                       $message";
 echo "---------------------------------";
 echo ""
 echo ""
 
 echo "# going to right directory: $WORKING_DIR/$dir"
 cd $WORKING_DIR/$dir
+
+echo "# check git status"
+git status
 
 echo "# adding files to git repo"
 git add . -A
@@ -61,3 +68,10 @@ git push
 
 echo "# going back to: $WORKING_DIR"
 cd $WORKING_DIR
+
+echo "# check git status"
+git status
+
+echo "################################################"
+echo "################################################"
+echo "################################################"

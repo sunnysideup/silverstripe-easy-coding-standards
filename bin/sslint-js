@@ -19,9 +19,12 @@ done
 help_and_exit() {
     echo "---------------------------------";
     echo "  Available settings:";
-    echo "   NONE";
+    echo "---------------------------------";
+    echo "  --NONE--";
+    echo ""
     echo "---------------------------------";
     echo "  Example usage:"
+    echo "---------------------------------";
     echo "  sslint-js .";
     echo "  sslint-js foo/bar";
     echo "---------------------------------";
@@ -34,7 +37,7 @@ while (( $# )); do
   case $1 in
     -*)               printf 'Unknown option: %q\n\n' "$1";
                       help_and_exit 1 ;;
-    *) dir=$1;;
+    *)                dir=$1;;
   esac
   shift
 done
@@ -44,7 +47,11 @@ echo ""
 echo "---------------------------------";
 echo "  Running JS Standard";
 echo "---------------------------------";
-echo "  Make sure you have run 'npm install standard --global'";
+echo ""
+echo ""
+echo "  Make sure you have run 'sudo npm install standard --global'";
+echo ""
+echo ""
 echo "---------------------------------";
 echo "  files to analyse: $WORKING_DIR/$dir/*.js";
 echo "---------------------------------";
@@ -54,4 +61,6 @@ echo "  e.g. sslint-js .";
 echo "---------------------------------";
 echo ""
 echo ""
+
+npm install standard --global
 standard --fix $dir/*.js
