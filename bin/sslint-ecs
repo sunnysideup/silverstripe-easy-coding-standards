@@ -27,11 +27,11 @@ ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.php"
 dir='app/src'
 while (( $# )); do
   case $1 in
-    -a|--also)        also=$2;shift ;;
+    -a|--also)         also=$2;shift ;;
     -e|--ecs-config)   ecsConfig=$2;shift ;;
-    -*)               printf 'Unknown option: %q\n\n' "$1";
-                      help_and_exit 1 ;;
-    *) dir=$1;;
+    -*)                printf 'Unknown option: %q\n\n' "$1";
+                       help_and_exit 1 ;;
+    *)                 dir=$1;;
   esac
   shift
 done

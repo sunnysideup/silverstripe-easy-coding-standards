@@ -10,6 +10,7 @@ help_and_exit() {
     echo "  -a, --also                     also lint, e.g. app/_config.php or app/";
     echo "  -p, --php-version              php version - e.g. 7.4";
     echo "  -c, --commit-and-push          also commit and push - set to yes to enable";
+    echo "  -j, --javascript-also          include javascript linting"
     echo " "
     echo "---------------------------------";
     echo "  Example usage:"
@@ -24,11 +25,13 @@ help_and_exit() {
 also='app/_config.php'
 dir='app/src'
 phpVersion='7.4'
-commitAndPush='no'
+commitAndPush='yes'
+javascriptAlso='no'
 while (( $# )); do
   case $1 in
     -a|--also)            also=$2;shift ;;
     -c|--commit-and-push) commitAndPush=$2;shift ;;
+    -j|--javascript-also) javascriptAlso=$2;shift ;;
     -p|--php-version)     phpVersion=$2;shift ;;
     -*)                   printf 'Unknown option: %q\n\n' "$1";
                           help_and_exit 1 ;;
@@ -44,8 +47,10 @@ echo "  Running Lint All";
 echo "---------------------------------";
 echo "  directory of script:           $SCRIPT_DIR";
 echo "  directory to analyse:          $WORKING_DIR/$dir";
+echo "---------------------------------";
 echo "  Also Check:                    $also";
 echo "  Commit And Push:               $commitAndPush";
+echo "  Javascript Also:               $javascriptAlso";
 echo "  PHP Version:                   $phpVersion";
 echo "---------------------------------";
 echo ""
@@ -61,7 +66,7 @@ if [ -z "$(git status --porcelain)" ]; then
     cd -
 
     echo "# run php check"
-    $SCRIPT_DIR/sslint-compat -p $phpVersion $dir
+    $SCRIPT_DIR/sslint-compat -a $also -p $phpVersion $dir
 
     echo "# run linter ecs #1"
     $SCRIPT_DIR/sslint-ecs -a $also $dir

@@ -11,6 +11,7 @@ help_and_exit() {
     echo "  Available settings:";
     echo "---------------------------------";
     echo "  -p, --php-version              php version (e.g. 7.4)";
+    echo "  -a, --also                     also lint, e.g. app/_config.php or app/";
     echo "---------------------------------";
     echo ""
     echo "---------------------------------";
@@ -27,6 +28,7 @@ dir='app/src'
 while (( $# )); do
   case $1 in
     -p|--php-version)  phpVersion=$2;shift ;;
+    -a|--also)         also=$2;shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -39,9 +41,11 @@ echo ""
 echo "---------------------------------";
 echo "  Running PHP Compatability";
 echo "---------------------------------";
-echo "  directory of script:   $SCRIPT_DIR";
-echo "  directory to analyse:  $WORKING_DIR/$dir";
-echo "  PHP Version:           $phpVersion";
+echo "  directory of script:           $SCRIPT_DIR";
+echo "  directory to analyse:          $WORKING_DIR/$dir";
+echo "---------------------------------";
+echo "  PHP Version:                   $phpVersion";
+echo "  Also Check:                    $also";
 echo "---------------------------------";
 echo ""
 echo ""
@@ -51,6 +55,13 @@ $SCRIPT_DIR/phpcs --config-set colors 1
 $SCRIPT_DIR/phpcs --config-set severity 1
 $SCRIPT_DIR/phpcs --config-show
 $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion
+if test -f "$WORKING_DIR/$also"; then
+    $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
+    $SCRIPT_DIR/phpcs --config-set colors 1
+    $SCRIPT_DIR/phpcs --config-set severity 1
+    $SCRIPT_DIR/phpcs --config-show
+    $SCRIPT_DIR/phpcs -p $WORKING_DIR/$also --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion
+fi
 
 echo "################################################"
 echo "################################################"

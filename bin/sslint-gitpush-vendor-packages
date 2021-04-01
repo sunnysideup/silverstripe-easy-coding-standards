@@ -12,14 +12,13 @@ help_and_exit() {
     echo "---------------------------------";
     echo "  Available settings:";
     echo "---------------------------------";
-    echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
     echo "  -m, --message                  message - e.g. Lint";
-    echo "  -t, --includes-themes          include themes";
+    echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
     echo ""
     echo "---------------------------------";
     echo "  Example usage:"
     echo "---------------------------------";
-    echo "  sslint-gitpush-vendor-packages    -c yes   -m 'PATCH: lint'   -t yes   vendor/my-vendor-name";
+    echo "  sslint-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes     vendor/my-vendor-name";
     echo "---------------------------------";
     echo ""
     echo ""
@@ -27,13 +26,11 @@ help_and_exit() {
 }
 
 commitAndPush='no'
-message='WIP'
-alsoDoThemes='yes'
+message='PATCH: automated linter'
 while (( $# )); do
   case $1 in
-    -c|--commit-and-push)  commitAndPush=$2;shift ;;
-    -t|--include-themes)   alsoDoThemes=$2;shift ;;
     -m|--message)          message=$2;shift ;;
+    -c|--commit-and-push)  commitAndPush=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
     *)                     dir=$1;;
@@ -51,7 +48,6 @@ echo "  directory to analyse:          $WORKING_DIR/$dir";
 echo "---------------------------------";
 echo "  message:                       $message";
 echo "  also commit?:                  $commitAndPush";
-echo "  also include themes?:          $alsoDoThemes";
 echo ""
 echo ""
 
@@ -68,28 +64,10 @@ if [[ "$commitAndPush" == "yes" ]]; then
     echo "commit in $WORKING_DIR/$dir"
     echo "------------------------------------------"
 
-    find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {}  ;  cd {}  ; $SCRIPT_DIR/sslint-gitpush . -m $message )' \;
+    find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {}  ;  cd {}  ; '$SCRIPT_DIR/sslint-gitpush' . -m "'$message'" )' \;
 
 fi
 
-
-if [[ "$alsoDoThemes" == "yes" ]]; then
-    echo "------------------------------------------"
-    echo "check status of project in themes"
-    echo "------------------------------------------"
-    find themes -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {}  ;  cd {}  ;  git status -s)' \;
-
-    if [[ "$commitAndPush" == "yes" ]]; then
-
-        echo "------------------------------------------"
-        echo "commit themes packages"
-        echo "------------------------------------------"
-
-        find themes -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {}  ;  cd {}  ; $SCRIPT_DIR/sslint-gitpush . -m $message )' \;
-
-    fi
-
-fi
 
 echo "################################################"
 echo "################################################"
