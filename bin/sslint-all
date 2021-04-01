@@ -66,8 +66,8 @@ echo ""
 echo "---------------------------------";
 echo "  Running Lint All";
 echo "---------------------------------";
-echo "  directory of script:           $SCRIPT_DIR";
-echo "  directory to analyse:          $WORKING_DIR/$dir";
+echo "  Directory of script:           $SCRIPT_DIR";
+echo "  Directory to analyse:          $WORKING_DIR/$dir";
 echo "---------------------------------";
 echo "  Full Crazy Works:              $full";
 echo "  Also Check:                    $WORKING_DIR/$also";

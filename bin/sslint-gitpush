@@ -8,7 +8,7 @@ help_and_exit() {
     echo "---------------------------------";
     echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
     echo "  -m, --message                  commit message";
-    echo "  -n, --new-tag                  include folders in themes";
+    echo "  -n, --new-tag                  create new tag?";
     echo "  -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
     echo "  -t, --themes-also              include folders in themes";
     echo ""
@@ -90,16 +90,26 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         echo "# git fetch all"
         git fetch --all
 
+        echo "# get list of tags"
+        git tag
+
         RES=$(git show-ref --tags)
         if [ -z "$RES" ]; then
             NEW_TAG=1.0.0
         else
             NEW_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=1; print $0}')
         fi
-        git tag
+
+
+        echo "# we are creating $NEW_TAG";
         git tag -a $NEW_TAG -m "auto-generated linter tag"
-        git push --tags $NEW_TAG
+
+        echo "# pushing to origins";
+        git push --tags
+
+        echo "# check";
         git tag -n
+
     fi
 
     echo "# check git status"

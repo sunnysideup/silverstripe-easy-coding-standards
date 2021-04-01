@@ -41,11 +41,11 @@ echo ""
 echo "---------------------------------";
 echo "  Running Rector";
 echo "---------------------------------";
-echo "  directory of script:           $SCRIPT_DIR";
-echo "  directory to analyse:          $WORKING_DIR/$dir";
+echo "  Directory of script:           $SCRIPT_DIR";
+echo "  Directory to analyse:          $WORKING_DIR/$dir";
 echo "---------------------------------";
-echo "  also check:                    $WORKING_DIR/$also";
-echo "  rector config file:            $rectorConfig";
+echo "  Also check:                    $WORKING_DIR/$also";
+echo "  Rector config file:            $rectorConfig";
 echo "---------------------------------";
 echo ""
 echo ""

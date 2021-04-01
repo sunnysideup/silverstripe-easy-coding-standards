@@ -47,12 +47,12 @@ echo ""
 echo "---------------------------------";
 echo "  Running PHP STAN";
 echo "---------------------------------";
-echo "  directory of script:              $SCRIPT_DIR";
-echo "  directory to analyse:             $WORKING_DIR/$dir";
+echo "  Directory of script:              $SCRIPT_DIR";
+echo "  Directory to analyse:             $WORKING_DIR/$dir";
 echo "---------------------------------";
-echo "  also check:                       $WORKING_DIR/$also";
-echo "  level:                            $level (1/6)";
-echo "  php stan config file:             $stanConfig";
+echo "  Also check:                       $WORKING_DIR/$also";
+echo "  Level:                            $level (1/6)";
+echo "  Php stan config file:             $stanConfig";
 echo "---------------------------------";
 echo ""
 echo ""

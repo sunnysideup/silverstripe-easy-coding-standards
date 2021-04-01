@@ -49,8 +49,9 @@ echo "  Running JS Standard";
 echo "---------------------------------";
 echo ""
 echo ""
-echo "  Make sure you have run:
-        sudo npm install standard --global'";
+echo "  Make sure you have intalled and updated:";
+echo "";
+echo "  sudo npm install standard --global'";
 echo ""
 echo ""
 echo "---------------------------------";
