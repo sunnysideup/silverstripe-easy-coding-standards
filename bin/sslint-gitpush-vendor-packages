@@ -58,14 +58,13 @@ echo ""
 if [[ "$commitAndPush" == "yes" ]]; then
 
     echo "------------------------------------------"
-    echo "going to look for folders in $WORKING_DIR/$dir"
+    echo "  going to look for folders in $WORKING_DIR/$dir"
     echo "------------------------------------------"
 
     find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         while IFS= read -r -d '' line; do
-
             echo "------------------------------------------"
-            echo "$line"  ;
+            echo "  DOING: $line"  ;
             echo "------------------------------------------"
             cd "$line";
             $SCRIPT_DIR/sslint-gitpush . -m "$message" -c $commitAndPush -n $newTag ;

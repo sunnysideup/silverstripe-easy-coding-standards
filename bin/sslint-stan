@@ -28,15 +28,15 @@ exit;
 
 also='app/_config.php'
 stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
-level=4
+level=2
 while (( $# )); do
   case $1 in
-    -a|--also)        also=$2;shift ;;
-    -l|--level)       level=$2;shift ;;
+    -a|--also)         also=$2;shift ;;
+    -l|--level)        level=$2;shift ;;
     -s|--stan-config)  stanConfig=$2;shift ;;
-    -*)               printf 'Unknown option: %q\n\n' "$1";
-                      help_and_exit 1 ;;
-    *) dir=$1;;
+    -*)                printf 'Unknown option: %q\n\n' "$1";
+                       help_and_exit 1 ;;
+    *)                 dir=$1;;
   esac
   shift
 done

@@ -54,10 +54,7 @@ if test -f "$WORKING_DIR/$also"; then
 fi
 
 
-
 $SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
-
-
 
 echo "################################################"
 echo "################################################"

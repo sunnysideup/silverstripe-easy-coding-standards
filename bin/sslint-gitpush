@@ -116,7 +116,7 @@ else
     echo ""
     echo "---------------------------------";
     echo "  ===  ERROR - NOT A GIT REPO ===";
-    echo "  " $WORKING_DIR/$dir;
+    echo "  "$WORKING_DIR/$dir;
     echo "  === IS NOT A GIT REPO       ===";
     echo "---------------------------------";
 fi

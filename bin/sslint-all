@@ -142,14 +142,13 @@ if [ -z "$(git status --porcelain)" ]; then
 
     echo "
 ---------------------------
-DONE
+  DONE
 ---------------------------
     "
 else
-    cd -
     echo "
 ---------------------------
-Sorry, can not run, there are uncommitted changes
+  Sorry, can not run, there are uncommitted changes
 ---------------------------
     "
 fi
