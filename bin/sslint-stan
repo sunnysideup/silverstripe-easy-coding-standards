@@ -9,22 +9,23 @@ else
     dir='app/src'
 fi
 
-echo "---------------------------------";
-echo "  Available settings:";
-echo "---------------------------------";
-echo "  -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-echo "  -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
-echo "  -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
-echo " "
-echo "---------------------------------";
-echo "  Example usage:"
-echo "---------------------------------";
-echo "  sslint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
-echo "---------------------------------";
-echo ""
-echo ""
-exit;
-
+help_and_exit() {
+    echo "---------------------------------";
+    echo "  Available settings:";
+    echo "---------------------------------";
+    echo "  -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    echo "  -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
+    echo "  -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
+    echo " "
+    echo "---------------------------------";
+    echo "  Example usage:"
+    echo "---------------------------------";
+    echo "  sslint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
+    echo "---------------------------------";
+    echo ""
+    echo ""
+    exit;
+}
 
 also='app/_config.php'
 stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
@@ -57,6 +58,6 @@ echo ""
 echo ""
 
 if test -f "$WORKING_DIR/$also"; then
-    $$SCRIPT_DIR/sslint-rector -a 'nothing-here-hopefully' -l $level -s $stanConfig $WORKING_DIR/$alsoo
+    $SCRIPT_DIR/sslint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also
 fi
 $SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$dir
