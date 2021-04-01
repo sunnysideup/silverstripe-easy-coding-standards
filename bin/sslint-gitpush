@@ -7,14 +7,14 @@ help_and_exit() {
     echo "  Available settings:";
     echo "---------------------------------";
     echo "  -m, --message                  commit message";
-    echo "  -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
     echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
-    echo "  -t, --includes-themes          include themes";
+    echo "  -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
+    echo "  -t, --themes-also              include folders in themes";
     echo ""
     echo "---------------------------------";
     echo "  Example usage:"
     echo "---------------------------------";
-    echo "  e.g. sslint-gitpush   -m 'PATCH'  -a 'vendor/silverstripe'  -c yes   -t yes  app/src ";
+    echo "  e.g. sslint-gitpush   -m 'PATCH'   -c yes  -a 'vendor/silverstripe'   -t yes  app/src ";
     echo "---------------------------------";
     echo ""
     echo ""
@@ -28,9 +28,9 @@ also='vendor/nothing'
 while (( $# )); do
   case $1 in
     -m|--message)          message=$2;shift ;;
-    -a|--also)             also=$2;shift ;;
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
-    -t|--include-themes)   alsoDoThemes=$2;shift ;;
+    -a|--also)             also=$2;shift ;;
+    -t|--themes-also)      alsoDoThemes=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
     *)                     dir=$1;;
@@ -47,8 +47,8 @@ echo "  directory of script:           $SCRIPT_DIR";
 echo "  directory to commit:           $WORKING_DIR/$dir";
 echo "---------------------------------";
 echo "  message:                       $message";
-echo "  also check:                    $WORKING_DIR/$also";
 echo "  also commit?:                  $commitAndPush";
+echo "  also check:                    $WORKING_DIR/$also";
 echo "  also include themes?:          $alsoDoThemes";
 echo "---------------------------------";
 echo ""
@@ -90,7 +90,7 @@ if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'"  -c $commitAndPush -t $alsoDoThemes $WORKING_DIR/$also
 fi
 
-if [[ "$commitAndPush" == "yes" ]]; then
+if [[ "$alsoDoThemes" == "yes" ]]; then
     $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'"  -c $commitAndPush -t $alsoDoThemes $WORKING_DIR/themes
 fi
 

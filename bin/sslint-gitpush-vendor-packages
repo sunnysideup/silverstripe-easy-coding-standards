@@ -56,9 +56,7 @@ echo "check status of project in vendor"
 echo "------------------------------------------"
 find $WORKING_DIR/$dir -maxdepth 1 -mindepth 1 -type d -exec sh -c '(echo {}  ;  cd {}  ;  git status -s)' \;
 
-
 if [[ "$commitAndPush" == "yes" ]]; then
-
 
     echo "------------------------------------------"
     echo "commit in $WORKING_DIR/$dir"

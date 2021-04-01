@@ -7,10 +7,14 @@ help_and_exit() {
     echo "---------------------------------";
     echo "  Available settings:";
     echo "---------------------------------";
+    echo "  -f, --full-crazy-works         do it all (excluding javascript!)";
     echo "  -a, --also                     also lint, e.g. app/_config.php or app/";
-    echo "  -p, --php-version              php version - e.g. 7.4";
     echo "  -c, --commit-and-push          also commit and push - set to yes to enable";
+    echo "  -m, --message                  commit message";
+    echo "  -t, --themes-also              include folders in themes";
     echo "  -j, --javascript-also          include javascript linting"
+    echo "  -p, --php-version              php version - e.g. 7.4";
+    echo "  -n, --create-new-version       create patch tag - e.g. increment from version 6.0.1 to 6.0.2";
     echo " "
     echo "---------------------------------";
     echo "  Example usage:"
@@ -22,23 +26,40 @@ help_and_exit() {
     exit;
 }
 
-also='app/_config.php'
 dir='app/src'
-phpVersion='7.4'
-commitAndPush='yes'
+
+full='no'
+also='app/_config.php'
+alsoDoThemes='no'
+commitAndPush='no'
+message='PATCH: linter'
+createTag='no'
 javascriptAlso='no'
+phpVersion='7.4'
 while (( $# )); do
   case $1 in
-    -a|--also)            also=$2;shift ;;
-    -c|--commit-and-push) commitAndPush=$2;shift ;;
-    -j|--javascript-also) javascriptAlso=$2;shift ;;
-    -p|--php-version)     phpVersion=$2;shift ;;
-    -*)                   printf 'Unknown option: %q\n\n' "$1";
-                          help_and_exit 1 ;;
-    *)                    dir=$1;;
+    -f|--full-crazy-works)   full=$2;shift ;;
+    -a|--also)               also=$2;shift ;;
+    -t|--themes-also)        alsoDoThemes=$2;shift ;;
+    -c|--commit-and-push)    commitAndPush=$2;shift ;;
+    -m|--message)            message=$2;shift ;;
+    -n|--create-new-version) createTag=$2;shift ;;
+    -j|--javascript-also)    javascriptAlso=$2;shift ;;
+    -p|--php-version)        phpVersion=$2;shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       dir=$1;;
   esac
   shift
 done
+
+if [[ "$full" == "yes" ]]; then
+    full='no'
+    alsoDoThemes='yes'
+    commitAndPush='yes'
+    createTag='yes'
+    message='PATCH: linter'
+fi
 
 echo ""
 echo ""
@@ -48,8 +69,11 @@ echo "---------------------------------";
 echo "  directory of script:           $SCRIPT_DIR";
 echo "  directory to analyse:          $WORKING_DIR/$dir";
 echo "---------------------------------";
-echo "  Also Check:                    $also";
+echo "  Full Crazy Works:              $full";
+echo "  Also Check:                    $WORKING_DIR/$also";
+echo "  Also include themes?:          $alsoDoThemes";
 echo "  Commit And Push:               $commitAndPush";
+echo "  Message:                       $message";
 echo "  Javascript Also:               $javascriptAlso";
 echo "  PHP Version:                   $phpVersion";
 echo "---------------------------------";
@@ -62,29 +86,58 @@ echo "---------------------------"
 cd $dir
 echo "---------------------------"
 
+
+
 if [ -z "$(git status --porcelain)" ]; then
     cd -
 
     echo "# run php check"
-    $SCRIPT_DIR/sslint-compat -a $also -p $phpVersion $dir
+    $SCRIPT_DIR/sslint-compat -a $also -p $phpVersion $dir 2>&1 | tee $WORKING_DIR/KNOWN_ISSUES_PHP_COMPAT
 
     echo "# run linter ecs #1"
-    $SCRIPT_DIR/sslint-ecs -a $also $dir
+    $SCRIPT_DIR/sslint-ecs -a $also $dir 2>&1 | tee $WORKING_DIR/KNOWN_ISSUES_PHP_ECS
 
     echo "# run rector #1"
-    $SCRIPT_DIR/sslint-rector -a $also $dir
+    $SCRIPT_DIR/sslint-rector -a $also $dir 2>&1 | tee $WORKING_DIR/KNOWN_ISSUES_PHP_RECTOR
 
     echo "# run ecs #2"
-    $SCRIPT_DIR/sslint-ecs -a $also $dir
+    $SCRIPT_DIR/sslint-ecs -a $also $dir 2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_PHP_ECS
 
     echo "# run rector #2"
-    $SCRIPT_DIR/sslint-rector -a $also $dir
+    $SCRIPT_DIR/sslint-rector -a $also $dir 2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_PHP_RECTOR
 
     echo "# run ecs #3"
-    $SCRIPT_DIR/sslint-ecs -a $also $dir
+    $SCRIPT_DIR/sslint-ecs -a $also $dir 2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_PHP_ECS
 
     echo "# run stan"
-    $SCRIPT_DIR/sslint-stan -a $also -l 2 $dir > KNOWN_ISSUES_AUTOMATED_FILE
+    $SCRIPT_DIR/sslint-stan -a $also -l 2 $dir  2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_PHP_STAN
+
+    if test -f "$WORKING_DIR/$also"; then
+        echo "#########################"
+        echo "# run the above on $also"
+        echo "#########################"
+        $SCRIPT_DIR/sslint-all -m ""  -c no -t no -j $javascriptAlso -p $phpVersion $WORKING_DIR/$also
+    fi
+
+    if [[ "$alsoDoThemes" == "yes" ]]; then
+        echo "#########################"
+        echo "# run the above on themes"
+        echo "#########################"
+        $SCRIPT_DIR/sslint-all -m ""  -c no  -j $javascriptAlso $WORKING_DIR/themes
+    fi
+
+
+    if [[ "$javascriptAlso" == "yes" ]]; then
+        echo "#########################"
+        echo "# run javascript linter"
+        echo "#########################"
+        $SCRIPT_DIR/sslint-js $WORKING_DIR  2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_JS_STANDARD
+    fi
+
+    echo "------------------------------------------"
+    echo "commit in $WORKING_DIR/$dir and other places"
+    echo "------------------------------------------"
+    $SCRIPT_DIR/sslint-gitpush -m $message  -c $commitAndPush -a $WORKING_DIR/$also -t $alsoDoThemes $WORKING_DIR
 
     echo "
 ---------------------------
