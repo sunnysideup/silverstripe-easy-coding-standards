@@ -37,6 +37,8 @@ use Rector\DeadCode\Rector\If_\RemoveDeadInstanceOfRector;
 
 use Rector\DeadCode\Rector\FunctionLike\RemoveCodeAfterReturnRector;
 
+use Rector\DeadCode\Rector\Cast\RecastingRemovalRector;
+
 return static function (ContainerConfigurator $containerConfigurator): void {
     // get parameters
     $parameters = $containerConfigurator->parameters();
@@ -66,6 +68,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         RemoveDeadInstanceOfRector::class,
         SimplifyBoolIdenticalTrueRector::class,
         RemoveCodeAfterReturnRector::class,
+        RecastingRemovalRector::class,
     ]);
     $parameters->set(Option::AUTOLOAD_PATHS, [
             getcwd(),
