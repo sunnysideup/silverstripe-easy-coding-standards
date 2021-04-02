@@ -1,16 +1,26 @@
 parameters:
 
+    excludePaths:
+        - /tests/*
+        - */tests/*
+        - */_dev/*
+
     inferPrivatePropertyTypeFromConstructor: true
 
     ignoreErrors:
         - '#Access to an undefined property#'
         - '#Call to an undefined method#'
         - '#on an unknown class [a-zA-Z0-9\\_]+#'
-        - '#with incorrect case:#'
+        - '#PHPUnit_Framework_TestCase#'
+
+#        - '#with incorrect case:#'
 
 #    autoload_directories:
 #        - %currentWorkingDirectory%/app/src
 
-    excludes_analyse:
-        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
-        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
+#    excludes_analyse:
+#        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
+#        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
+
+    scanDirectories:
+      - %currentWorkingDirectory%

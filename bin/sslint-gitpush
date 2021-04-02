@@ -15,7 +15,7 @@ help_and_exit() {
     echo "---------------------------------";
     echo "  Example usage:"
     echo "---------------------------------";
-    echo "  e.g. sslint-gitpush   -m 'PATCH'   -c yes  -a 'vendor/silverstripe'   -t yes  app/src ";
+    echo "  e.g. sslint-gitpush  -m 'PATCH'   -c yes  -a 'vendor/silverstripe'   -t yes  app/src ";
     echo "---------------------------------";
     echo ""
     echo ""
@@ -25,8 +25,9 @@ help_and_exit() {
 
 message="PATCH: automated linter"
 dir='./'
-also='nothing-here-hopefully'
 newTag='no'
+also='nothing-here-hopefully'
+alsoDoThemes='no'
 while (( $# )); do
   case $1 in
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
