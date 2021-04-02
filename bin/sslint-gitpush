@@ -112,8 +112,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
     fi
 
+    echo "---------------------------------";
     echo "# check git status"
+    echo "---------------------------------";
     git status
+    echo "---------------------------------";
 
     if test -f "$WORKING_DIR/$also"; then
         $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'" -a 'nothing-here-hopefully' -c $commitAndPush -n $newTag $WORKING_DIR/$also
