@@ -24,8 +24,8 @@ help_and_exit() {
 }
 
 message="PATCH: automated linter"
-dir='app/src'
-also='vendor/nothing'
+dir='./'
+also='nothing-here-hopefully'
 newTag='no'
 while (( $# )); do
   case $1 in
