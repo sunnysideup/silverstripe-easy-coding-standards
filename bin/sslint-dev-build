@@ -47,7 +47,7 @@ echo "---------------------------"
 cd $dir
 echo "---------------------------"
 
-
+sudo ls
 composer install
 composer vendor-expose
 composer dumpautoload
