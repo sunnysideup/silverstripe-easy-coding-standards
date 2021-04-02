@@ -112,6 +112,8 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
     fi
 
+    echo "";
+    echo "";
     echo "---------------------------------";
     echo "# check git status"
     echo "---------------------------------";
