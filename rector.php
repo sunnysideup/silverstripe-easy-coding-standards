@@ -29,7 +29,13 @@ use PhpCsFixer\Fixer\Operator\NotOperatorWithSuccessorSpaceFixer;
 
 use Rector\CodeQuality\Rector\If_\ExplicitBoolCompareRector;
 
+use Rector\CodeQuality\Rector\Identical\SimplifyBoolIdenticalTrueRector;
+
 use Rector\CodingStyle\Rector\If_\NullableCompareToNullRector;
+
+use Rector\DeadCode\Rector\If_\RemoveDeadInstanceOfRector;
+
+use Rector\DeadCode\Rector\FunctionLike\RemoveCodeAfterReturnRector;
 
 return static function (ContainerConfigurator $containerConfigurator): void {
     // get parameters
@@ -57,6 +63,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         EncapsedStringsToSprintfRector::class,
         ExplicitBoolCompareRector::class,
         NullableCompareToNullRector::class,
+        RemoveDeadInstanceOfRector::class,
+        SimplifyBoolIdenticalTrueRector::class,
+        RemoveCodeAfterReturnRector::class,
     ]);
     $parameters->set(Option::AUTOLOAD_PATHS, [
             getcwd(),
