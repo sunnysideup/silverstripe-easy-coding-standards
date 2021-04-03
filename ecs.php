@@ -43,8 +43,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         // SetList::CONTROL_STRUCTURES,
         SetList::CLEAN_CODE,
         // SetList::PSR_1,
+        SetList::PHP_CS_FIXER,
         SetList::PSR_12,
-        // SetList::PHP_CS_FIXER,
         // SetList::PHP_CS_FIXER_RISKY,
         // SetList::PHPUNIT,
     ]);
