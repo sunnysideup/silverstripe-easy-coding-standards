@@ -15,6 +15,8 @@ use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer;
 use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer;
 use PhpCsFixer\Fixer\Basic\Psr4Fixer;
 
+use PhpCsFixer\Fixer\Import\OrderedImportsFixer;
+
 return static function (ContainerConfigurator $containerConfigurator): void {
     $services = $containerConfigurator->services();
 
@@ -22,14 +24,20 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->call('configure', [[
             'syntax' => 'short',
         ]]);
-
+    $services->set(Psr4Fixer::class);
+    $services->set(OrderedImportsFixer::class)
+        ->call(
+            'configure', [[
+                'imports_order' => ['class', 'const', 'function'],
+                'sort_algorithm' => 'alpha', // possible values ['alpha', 'length', 'none']
+            ]]
+        );
     $parameters = $containerConfigurator->parameters();
 
     $parameters->set(Option::PATHS, [
         __DIR__ . '/src',
         __DIR__ . '/tests',
     ]);
-    $services->set(Psr4Fixer::class);
     $parameters->set(
         Option::SETS, [
         // run and fix, one by one
