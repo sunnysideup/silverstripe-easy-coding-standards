@@ -13,6 +13,7 @@ use Symplify\EasyCodingStandard\ValueObject\Set\SetList;
 
 use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer;
 use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer;
+use PhpCsFixer\Fixer\Basic\Psr4Fixer;
 
 return static function (ContainerConfigurator $containerConfigurator): void {
     $services = $containerConfigurator->services();
@@ -28,8 +29,9 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         __DIR__ . '/src',
         __DIR__ . '/tests',
     ]);
-
-    $parameters->set(Option::SETS, [
+    $services->set(Psr4Fixer::class);
+    $parameters->set(
+        Option::SETS, [
         // run and fix, one by one
         // SetList::SPACES,
         // SetList::ARRAY,
@@ -47,7 +49,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         SetList::PSR_12,
         // SetList::PHP_CS_FIXER_RISKY,
         // SetList::PHPUNIT,
-    ]);
+        ]
+    );
     $parameters->set(Option::SKIP, [
         SelfAccessorFixer::class,
         ArrayOpenerAndCloserNewlineFixer::class,
