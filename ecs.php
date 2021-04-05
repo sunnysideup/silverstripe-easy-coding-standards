@@ -3,22 +3,16 @@
 declare(strict_types=1);
 
 use PhpCsFixer\Fixer\ArrayNotation\ArraySyntaxFixer;
-
+use PhpCsFixer\Fixer\Basic\Psr4Fixer;
 use PhpCsFixer\Fixer\ClassNotation\SelfAccessorFixer;
-
-use PhpCsFixer\Fixer\Phpdoc\NoSuperfluousPhpdocTagsFixer;
+use PhpCsFixer\Fixer\Import\OrderedImportsFixer;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer;
+use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer;
 use Symplify\EasyCodingStandard\ValueObject\Option;
 use Symplify\EasyCodingStandard\ValueObject\Set\SetList;
 
-use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer;
-use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer;
-use PhpCsFixer\Fixer\Basic\Psr4Fixer;
-
-use PhpCsFixer\Fixer\Import\OrderedImportsFixer;
-
 return static function (ContainerConfigurator $containerConfigurator): void {
-    
     $services = $containerConfigurator->services();
 
     $services->set(ArraySyntaxFixer::class)
@@ -26,33 +20,35 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             'syntax' => 'short',
         ]])
     ;
-    
+
     $services->set(Psr4Fixer::class);
-    
+
     $services->set(OrderedImportsFixer::class)
         ->call(
-            'configure', [[
+            'configure',
+            [[
                 'imports_order' => ['class', 'const', 'function'],
                 'sort_algorithm' => 'alpha', // possible values ['alpha', 'length', 'none']
             ]]
         )
     ;
-    
+
     // parameters ...
-    
+
     $parameters = $containerConfigurator->parameters();
 
     $parameters->set(
-        Option::PATHS, [
+        Option::PATHS,
+        [
             __DIR__ . '/src',
             __DIR__ . '/tests',
         ]
     );
-    
+
     $parameters->set(Option::LINE_ENDING, "\n");
-    
+
     $parameters->set(
-        Option::SETS, 
+        Option::SETS,
         [
             // run and fix, one by one
             // SetList::SPACES,
@@ -73,14 +69,14 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             // SetList::PHPUNIT,
         ]
     );
-    
+
     $parameters->set(
-        Option::SKIP, [
+        Option::SKIP,
+        [
             SelfAccessorFixer::class,
             ArrayOpenerAndCloserNewlineFixer::class,
             ArrayListItemNewlineFixer::class,
             OrderedClassElementsFixer::class,
         ]
     );
-
 };
