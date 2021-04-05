@@ -23,8 +23,11 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $services->set(ArraySyntaxFixer::class)
         ->call('configure', [[
             'syntax' => 'short',
-        ]]);
+        ]])
+    ;
+    
     $services->set(Psr4Fixer::class);
+    
     $services->set(OrderedImportsFixer::class)
         ->call(
             'configure', [[
@@ -32,12 +35,18 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                 'sort_algorithm' => 'alpha', // possible values ['alpha', 'length', 'none']
             ]]
         );
+    
+    // parameters ...
+    
     $parameters = $containerConfigurator->parameters();
 
     $parameters->set(Option::PATHS, [
         __DIR__ . '/src',
         __DIR__ . '/tests',
     ]);
+    
+    $parameters->set(Option::LINE_ENDING, "\n");
+    
     $parameters->set(
         Option::SETS, [
         // run and fix, one by one
@@ -59,6 +68,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         // SetList::PHPUNIT,
         ]
     );
+    
     $parameters->set(Option::SKIP, [
         SelfAccessorFixer::class,
         ArrayOpenerAndCloserNewlineFixer::class,
