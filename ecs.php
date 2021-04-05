@@ -18,6 +18,7 @@ use PhpCsFixer\Fixer\Basic\Psr4Fixer;
 use PhpCsFixer\Fixer\Import\OrderedImportsFixer;
 
 return static function (ContainerConfigurator $containerConfigurator): void {
+    
     $services = $containerConfigurator->services();
 
     $services->set(ArraySyntaxFixer::class)
@@ -34,16 +35,19 @@ return static function (ContainerConfigurator $containerConfigurator): void {
                 'imports_order' => ['class', 'const', 'function'],
                 'sort_algorithm' => 'alpha', // possible values ['alpha', 'length', 'none']
             ]]
-        );
+        )
+    ;
     
     // parameters ...
     
     $parameters = $containerConfigurator->parameters();
 
-    $parameters->set(Option::PATHS, [
-        __DIR__ . '/src',
-        __DIR__ . '/tests',
-    ]);
+    $parameters->set(
+        Option::PATHS, [
+            __DIR__ . '/src',
+            __DIR__ . '/tests',
+        ]
+    );
     
     $parameters->set(Option::LINE_ENDING, "\n");
     
