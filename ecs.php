@@ -48,32 +48,35 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $parameters->set(Option::LINE_ENDING, "\n");
     
     $parameters->set(
-        Option::SETS, [
-        // run and fix, one by one
-        // SetList::SPACES,
-        // SetList::ARRAY,
-        // SetList::STRICT,
-        // SetList::SYMFONY,
-        SetList::DOCBLOCK,
-        SetList::NAMESPACES,
-        // SetList::SYMPLIFY,
-        SetList::COMMON,
-        SetList::COMMENTS,
-        // SetList::CONTROL_STRUCTURES,
-        SetList::CLEAN_CODE,
-        // SetList::PSR_1,
-        SetList::PHP_CS_FIXER,
-        SetList::PSR_12,
-        // SetList::PHP_CS_FIXER_RISKY,
-        // SetList::PHPUNIT,
+        Option::SETS, 
+        [
+            // run and fix, one by one
+            // SetList::SPACES,
+            // SetList::ARRAY,
+            // SetList::STRICT,
+            // SetList::SYMFONY,
+            SetList::DOCBLOCK,
+            SetList::NAMESPACES,
+            // SetList::SYMPLIFY,
+            SetList::COMMON,
+            SetList::COMMENTS,
+            // SetList::CONTROL_STRUCTURES,
+            SetList::CLEAN_CODE,
+            // SetList::PSR_1,
+            SetList::PHP_CS_FIXER,
+            SetList::PSR_12,
+            // SetList::PHP_CS_FIXER_RISKY,
+            // SetList::PHPUNIT,
         ]
     );
     
-    $parameters->set(Option::SKIP, [
-        SelfAccessorFixer::class,
-        ArrayOpenerAndCloserNewlineFixer::class,
-        ArrayListItemNewlineFixer::class,
-        OrderedClassElementsFixer::class,
-    ]);
+    $parameters->set(
+        Option::SKIP, [
+            SelfAccessorFixer::class,
+            ArrayOpenerAndCloserNewlineFixer::class,
+            ArrayListItemNewlineFixer::class,
+            OrderedClassElementsFixer::class,
+        ]
+    );
 
 };
