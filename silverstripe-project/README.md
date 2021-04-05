@@ -12,6 +12,10 @@ The background is that I did around five hours worth of work on Silverstripe Fra
 
 There are a couple of things I can see already (e.g. changing `==` to `===` is obviously TOO MUCH).
 
+# Starting point:
+_You can copy it's structure for Silverstripe, as it's a package that focuses purely on 1-framework upgrade_ said https://github.com/TomasVotruba
+https://github.com/rectorphp/rector-nette/blob/main/src/Set/NetteSetList.php
+
 # Rules applied:
 
  * https://github.com/sunnysideup/silverstripe-easy-coding-standards/blob/master/rector.php
