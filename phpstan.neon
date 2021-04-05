@@ -11,8 +11,7 @@ parameters:
         - '#Access to an undefined property#'
         - '#Call to an undefined method#'
         - '#on an unknown class [a-zA-Z0-9\\_]+#'
-        - '#PHPUnit_Framework_TestCase#'
-
+	
 #        - '#with incorrect case:#'
 
 #    autoload_directories:
