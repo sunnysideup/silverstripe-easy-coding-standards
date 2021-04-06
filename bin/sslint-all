@@ -82,10 +82,10 @@ echo ""
 echo ""
 
 echo "---------------------------"
-echo "# changing directory to $dir "
+echo "  changing directory to $dir "
 echo "---------------------------"
 cd $dir
-echo "---------------------------"
+echo ""
 
 
 
@@ -93,38 +93,46 @@ if [ -z "$(git status --porcelain)" ]; then
     cd -
 
     echo "# run php check"
-    $SCRIPT_DIR/sslint-compat -a $also -p $phpVersion $dir 2>&1 | tee $WORKING_DIR/KNOWN_ISSUES_PHP_COMPAT
+    $SCRIPT_DIR/sslint-compat -p $phpVersion $dir
+    cd $WORKING_DIR
 
     echo "# run linter ecs #1"
-    $SCRIPT_DIR/sslint-ecs -a $also $dir 2>&1 | tee $WORKING_DIR/KNOWN_ISSUES_PHP_ECS
+    $SCRIPT_DIR/sslint-ecs -a $also $dir
 
     echo "# run rector #1"
-    $SCRIPT_DIR/sslint-rector -a $also $dir 2>&1 | tee $WORKING_DIR/KNOWN_ISSUES_PHP_RECTOR
+    $SCRIPT_DIR/sslint-rector -a $also $dir
+    cd $WORKING_DIR
 
     echo "# run ecs #2"
-    $SCRIPT_DIR/sslint-ecs -a $also $dir 2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_PHP_ECS
+    $SCRIPT_DIR/sslint-ecs -a $also $dir
+    cd $WORKING_DIR
 
     echo "# run rector #2"
-    $SCRIPT_DIR/sslint-rector -a $also $dir 2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_PHP_RECTOR
+    $SCRIPT_DIR/sslint-rector -a $also $dir
+    cd $WORKING_DIR
 
     echo "# run ecs #3"
-    $SCRIPT_DIR/sslint-ecs -a $also $dir 2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_PHP_ECS
+    $SCRIPT_DIR/sslint-ecs -a $also $dir
+    cd $WORKING_DIR
 
     echo "# run stan"
-    $SCRIPT_DIR/sslint-stan -a $also -l 2 $dir  2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_PHP_STAN
+    $SCRIPT_DIR/sslint-stan -a $also -l 2 $dir
+    cd $WORKING_DIR
 
     if test -f "$WORKING_DIR/$also"; then
         echo "#########################"
         echo "# run the above on $also"
         echo "#########################"
-        $SCRIPT_DIR/sslint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $WORKING_DIR/$also
+        $SCRIPT_DIR/sslint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
+        cd $WORKING_DIR
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
         echo "#########################"
         echo "# run the above on themes"
         echo "#########################"
-        $SCRIPT_DIR/sslint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso $WORKING_DIR/themes
+        $SCRIPT_DIR/sslint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso themes
+        cd $WORKING_DIR
     fi
 
 
@@ -132,13 +140,15 @@ if [ -z "$(git status --porcelain)" ]; then
         echo "#########################"
         echo "# run javascript linter"
         echo "#########################"
-        $SCRIPT_DIR/sslint-js $WORKING_DIR  2>&1 | tee -a $WORKING_DIR/KNOWN_ISSUES_JS_STANDARD
+        $SCRIPT_DIR/sslint-js $WORKING_DIR
+        cd $WORKING_DIR
     fi
 
     echo "------------------------------------------"
-    echo "commit in $WORKING_DIR/$dir and other places"
+    echo "  commit in $WORKING_DIR/$dir and $also"
     echo "------------------------------------------"
-    $SCRIPT_DIR/sslint-gitpush -m $message  -c $commitAndPush -n $newTag -a $WORKING_DIR/$also -t $alsoDoThemes $WORKING_DIR
+    $SCRIPT_DIR/sslint-gitpush -m $message  -c $commitAndPush -n $newTag -a $also -t $alsoDoThemes $dir
+    cd $WORKING_DIR
 
     echo "
 ---------------------------

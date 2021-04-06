@@ -37,15 +37,14 @@ echo "---------------------------------";
 echo "  Directory of script:           $SCRIPT_DIR";
 echo "  Directory to analyse:          $WORKING_DIR/$dir";
 echo "---------------------------------";
-echo "---------------------------------";
 echo ""
 echo ""
 
 echo "---------------------------"
-echo "# changing directory to $dir "
+echo "  Changing directory to $dir "
 echo "---------------------------"
 cd $dir
-echo "---------------------------"
+echo ""
 
 sudo ls
 composer install

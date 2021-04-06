@@ -59,7 +59,7 @@ echo "---------------------------------";
 echo ""
 echo ""
 
-echo "# going to right directory: $WORKING_DIR/$dir"
+echo "  going to right directory: $WORKING_DIR/$dir"
 cd $WORKING_DIR/$dir
 
 if test -f "$WORKING_DIR/$dir/.git/config"; then

@@ -28,7 +28,6 @@ dir='app/src'
 while (( $# )); do
   case $1 in
     -p|--php-version)  phpVersion=$2;shift ;;
-    -a|--also)         also=$2;shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -50,9 +49,6 @@ echo "---------------------------------";
 echo ""
 echo ""
 
-if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sslint-compat -p  -a 'nothing-here-hopefully' $phpVersion $WORKING_DIR/$also
-fi
 
 $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
 $SCRIPT_DIR/phpcs --config-set colors 1
