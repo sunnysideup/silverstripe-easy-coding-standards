@@ -8,14 +8,14 @@ help_and_exit() {
     echo "---------------------------------";
     echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
     echo "  -m, --message                  commit message";
-    echo "  -n, --new-tag                  create new tag?";
+    echo "  -v, --new-version              create new tag? options are no|patch|minor|major";
     echo "  -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
     echo "  -t, --themes-also              include folders in themes";
     echo ""
     echo "---------------------------------";
     echo "  Example usage:"
     echo "---------------------------------";
-    echo "  e.g. sslint-gitpush  -m 'PATCH'   -c yes  -a 'vendor/silverstripe'   -t yes  app/src ";
+    echo "  e.g. sslint-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
     echo "---------------------------------";
     echo ""
     echo ""
@@ -25,14 +25,14 @@ help_and_exit() {
 
 message="PATCH: automated linter"
 dir='./'
-newTag='no'
+newVersion='no'
 also='nothing-here-hopefully'
 alsoDoThemes='no'
 while (( $# )); do
   case $1 in
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
     -m|--message)          message=$2;shift ;;
-    -n|--new-tag)          newTag=$2;shift ;;
+    -n|--new-version)      newVersion=$2;shift ;;
     -a|--also)             also=$2;shift ;;
     -t|--themes-also)      alsoDoThemes=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
@@ -52,7 +52,7 @@ echo "  directory to commit:           $WORKING_DIR/$dir";
 echo "---------------------------------";
 echo "  Commit and Push?:              $commitAndPush";
 echo "  Message:                       $message";
-echo "  Create New Tag?:               $newTag";
+echo "  Create New Tag?:               $newVersion";
 echo "  Also check:                    $WORKING_DIR/$also";
 echo "  Also include themes?:          $alsoDoThemes";
 echo "---------------------------------";
@@ -87,29 +87,8 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     fi
 
 
-    if [[ "$newTag" == "yes" ]]; then
-        echo "# git fetch all"
-        git fetch --all
-
-        echo "# get list of tags"
-        git tag
-
-        RES=$(git show-ref --tags)
-        if [ -z "$RES" ]; then
-            NEW_TAG=1.0.0
-        else
-            NEW_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=1; print $0}')
-        fi
-
-
-        echo "# we are creating $NEW_TAG";
-        git tag -a $NEW_TAG -m "auto-generated linter tag"
-
-        echo "# pushing to origins";
-        git push --tags
-
-        echo "# check";
-        git tag -n
+    if [[ "$newVersion" == "patch" || "$newVersion" == "minor" || "$newVersion" == "major" ]]; then
+        increaseVersion $newVersion
 
     fi
 
@@ -122,11 +101,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     echo "---------------------------------";
 
     if test -f "$WORKING_DIR/$also"; then
-        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'" -a 'nothing-here-hopefully' -c $commitAndPush -n $newTag $WORKING_DIR/$also
+        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'" -a 'nothing-here-hopefully' -c $commitAndPush -v $newVersion $WORKING_DIR/$also
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
-        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'"  -a 'nothing-here-hopefully' -t no -c $commitAndPush -n $newTag $WORKING_DIR/themes
+        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'"  -a 'nothing-here-hopefully' -t no -c $commitAndPush -v $newVersion $WORKING_DIR/themes
     fi
 else
     echo ""
@@ -145,51 +124,66 @@ echo "################################################"
 
 increaseVersion() {
 
-    while getopts ":Mmp" Option
-    do
-      case $Option in
-        M ) major=true;;
-        m ) minor=true;;
-        p ) patch=true;;
-      esac
-    done
+    echo "################################################"
 
-    shift $(($OPTIND - 1))
+    git fetch --all
 
-    version=$1
+    git tag
+
+    RES=$(git show-ref --tags)
+    if [ -z "$RES" ]; then
+        OLD_TAG=1.0.0
+    else
+        OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
+    fi
+
+    echo "---------------------------------";
+    echo "  Found old Tag";
+    echo "---------------------------------";
+    echo "  $OLD_TAG";
+    echo "---------------------------------";
+
 
     # Build array from version string.
+    a=( ${OLD_TAG//./ } )
 
-    a=( ${version//./ } )
-
-    # If version string is missing or has the wrong number of members, show usage message.
-
-    if [ ${#a[@]} -ne 3 ]
-    then
-      echo "usage: $(basename $0) [-Mmp] major.minor.patch"
-      exit 1
-    fi
 
     # Increment version numbers as requested.
 
-    if [ ! -z $major ]
-    then
+    if [[ "$1" == "major" ]]; then
       ((a[0]++))
       a[1]=0
       a[2]=0
     fi
 
-    if [ ! -z $minor ]
-    then
+    if [[ "$1" == "minor" ]]; then
       ((a[1]++))
       a[2]=0
     fi
 
-    if [ ! -z $patch ]
+    if [[ "$1" == "patch" ]]; then
     then
       ((a[2]++))
     fi
 
-    return "${a[0]}.${a[1]}.${a[2]}"
+
+    $NEW_TAG "${a[0]}.${a[1]}.${a[2]}";
+
+    echo "---------------------------------";
+    echo "  Found new Tag ($1)";
+    echo "---------------------------------";
+    echo "  $NEW_TAG";
+    echo "---------------------------------";
+
+
+    git tag -a $NEW_TAG -m "auto-generated linter tag"
+
+    git push --tags
+
+    git tag -n
+
+
+    echo "################################################"
+
 
 }

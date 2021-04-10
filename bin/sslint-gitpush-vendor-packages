@@ -14,12 +14,12 @@ help_and_exit() {
     echo "---------------------------------";
     echo "  -m, --message                  message - e.g. Lint";
     echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
-    echo "  -n, --new-tag                  create new tag";
+    echo "  -v, --new-version              create new tag? options are no|patch|minor|major";
     echo ""
     echo "---------------------------------";
     echo "  Example usage:"
     echo "---------------------------------";
-    echo "  sslint-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes     vendor/my-vendor-name";
+    echo "  sslint-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
     echo "---------------------------------";
     echo ""
     echo ""
@@ -28,12 +28,12 @@ help_and_exit() {
 
 commitAndPush='no'
 message='PATCH: automated linter'
-newTag='no'
+newVersion='no'
 while (( $# )); do
   case $1 in
     -m|--message)          message=$2;shift ;;
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
-    -n|--newTag)           newTag=$2;shift ;;
+    -n|--new-version)      newVersion=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
     *)                     dir=$1;;
@@ -51,7 +51,7 @@ echo "  Directory to analyse:          $WORKING_DIR/$dir";
 echo "---------------------------------";
 echo "  Message:                       $message";
 echo "  Commit and Push?:              $commitAndPush";
-echo "  Create New tag?:               $newTag";
+echo "  Create New tag?:               $newVersion";
 echo "---------------------------------";
 echo ""
 echo ""
@@ -67,7 +67,7 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         echo "  DOING: $line"  ;
         echo "------------------------------------------"
         cd "$line";
-        $SCRIPT_DIR/sslint-gitpush . -m "$message" -c $commitAndPush -n $newTag ;
+        $SCRIPT_DIR/sslint-gitpush . -m "$message" -c $commitAndPush -v $newVersion ;
     done
 
 

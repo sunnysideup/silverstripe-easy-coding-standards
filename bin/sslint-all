@@ -10,7 +10,7 @@ help_and_exit() {
     echo "  -f, --full-crazy-works         do it all (excluding javascript!)";
     echo "  -a, --also                     also lint, e.g. app/_config.php or app/";
     echo "  -c, --commit-and-push          also commit and push - set to yes to enable";
-    echo "  -n, --new-tag                  create patch tag - e.g. increment from version 6.0.1 to 6.0.2";
+    echo "  -v, --new-version              create tag - values can be no|patch|minor|major";
     echo "  -m, --message                  commit message";
     echo "  -t, --themes-also              include folders in themes";
     echo "  -j, --javascript-also          include javascript linting"
@@ -32,7 +32,7 @@ full='no'
 also='app/_config.php'
 alsoDoThemes='no'
 commitAndPush='no'
-newTag='no'
+newVersion='no'
 message='PATCH: linter'
 javascriptAlso='no'
 phpVersion='7.4'
@@ -42,7 +42,7 @@ while (( $# )); do
     -a|--also)               also=$2;shift ;;
     -t|--themes-also)        alsoDoThemes=$2;shift ;;
     -c|--commit-and-push)    commitAndPush=$2;shift ;;
-    -n|--new-tag)            newTag=$2;shift ;;
+    -v|--new-version)        newVersion=$2;shift ;;
     -m|--message)            message=$2;shift ;;
     -j|--javascript-also)    javascriptAlso=$2;shift ;;
     -p|--php-version)        phpVersion=$2;shift ;;
@@ -57,7 +57,7 @@ if [[ "$full" == "yes" ]]; then
     full='no'
     alsoDoThemes='yes'
     commitAndPush='yes'
-    newTag='yes'
+    newVersion='yes'
     message='PATCH: linter'
 fi
 
@@ -73,7 +73,7 @@ echo "  Full Crazy Works:              $full";
 echo "  Also Check:                    $WORKING_DIR/$also";
 echo "  Also include themes?:          $alsoDoThemes";
 echo "  Commit And Push:               $commitAndPush";
-echo "  New Tag:                       $newTag";
+echo "  New Tag:                       $newVersion";
 echo "  Message:                       $message";
 echo "  Javascript Also:               $javascriptAlso";
 echo "  PHP Version:                   $phpVersion";
@@ -91,6 +91,10 @@ echo ""
 
 if [ -z "$(git status --porcelain)" ]; then
     cd -
+
+    echo "# remove origs"
+    $SCRIPT_DIR/sslint-remove-origs -a $also $dir
+    cd $WORKING_DIR
 
     echo "# run php check"
     $SCRIPT_DIR/sslint-compat -p $phpVersion $dir
@@ -147,7 +151,7 @@ if [ -z "$(git status --porcelain)" ]; then
     echo "------------------------------------------"
     echo "  commit in $WORKING_DIR/$dir and $also"
     echo "------------------------------------------"
-    $SCRIPT_DIR/sslint-gitpush -m $message  -c $commitAndPush -n $newTag -a $also -t $alsoDoThemes $dir
+    $SCRIPT_DIR/sslint-gitpush -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
     cd $WORKING_DIR
 
     echo "
