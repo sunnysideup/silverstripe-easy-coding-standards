@@ -33,7 +33,7 @@ while (( $# )); do
   case $1 in
     -m|--message)          message=$2;shift ;;
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
-    -n|--new-version)      newVersion=$2;shift ;;
+    -v|--new-version)      newVersion=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
     *)                     dir=$1;;
