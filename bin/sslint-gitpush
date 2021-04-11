@@ -23,6 +23,7 @@ help_and_exit() {
     exit;
 }
 
+commitAndPush="yes"
 message="PATCH: automated linter"
 dir='./'
 newVersion='no'
@@ -88,7 +89,66 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
 
     if [[ "$newVersion" == "patch" || "$newVersion" == "minor" || "$newVersion" == "major" ]]; then
-        increaseVersion $newVersion
+
+        git fetch --all
+
+        git tag -l | sort -V
+
+        RES=$(git show-ref --tags)
+        if [ -z "$RES" ]; then
+            OLD_TAG=1.0.0
+        else
+            OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
+        fi
+
+        echo "---------------------------------";
+        echo "  Found old Tag";
+        echo "---------------------------------";
+        echo "  $OLD_TAG";
+        echo "---------------------------------";
+
+
+        # Build array from version string.
+        a=( ${OLD_TAG//./ } )
+
+
+        # Increment version numbers as requested.
+        if [ ${#a[@]} -ne 3 ]
+        then
+          echo "ERROR $OLD_TAG (current tag) can not be parsed!"
+          exit 1
+        fi
+
+        if [[ "$newVersion" == "major" ]]; then
+          ((a[0]++))
+          a[1]=0
+          a[2]=0
+        fi
+
+        if [[ "$newVersion" == "minor" ]]; then
+          ((a[1]++))
+          a[2]=0
+        fi
+
+        if [[ "$newVersion" == "patch" ]]; then
+          ((a[2]++))
+        fi
+
+        NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
+
+        echo "---------------------------------";
+        echo "  Found new Tag ($newVersion)";
+        echo "---------------------------------";
+        echo "  $NEW_TAG";
+        echo "---------------------------------";
+
+
+        git tag -a $NEW_TAG -m "auto-generated linter tag"
+
+        git push
+
+        git tag -v
+
 
     fi
 
@@ -120,70 +180,3 @@ fi
 echo "################################################"
 echo "################################################"
 echo "################################################"
-
-
-increaseVersion() {
-
-    echo "################################################"
-
-    git fetch --all
-
-    git tag
-
-    RES=$(git show-ref --tags)
-    if [ -z "$RES" ]; then
-        OLD_TAG=1.0.0
-    else
-        OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
-    fi
-
-    echo "---------------------------------";
-    echo "  Found old Tag";
-    echo "---------------------------------";
-    echo "  $OLD_TAG";
-    echo "---------------------------------";
-
-
-    # Build array from version string.
-    a=( ${OLD_TAG//./ } )
-
-
-    # Increment version numbers as requested.
-
-    if [[ "$1" == "major" ]]; then
-      ((a[0]++))
-      a[1]=0
-      a[2]=0
-    fi
-
-    if [[ "$1" == "minor" ]]; then
-      ((a[1]++))
-      a[2]=0
-    fi
-
-    if [[ "$1" == "patch" ]]; then
-    then
-      ((a[2]++))
-    fi
-
-
-    $NEW_TAG "${a[0]}.${a[1]}.${a[2]}";
-
-    echo "---------------------------------";
-    echo "  Found new Tag ($1)";
-    echo "---------------------------------";
-    echo "  $NEW_TAG";
-    echo "---------------------------------";
-
-
-    git tag -a $NEW_TAG -m "auto-generated linter tag"
-
-    git push --tags
-
-    git tag -n
-
-
-    echo "################################################"
-
-
-}
