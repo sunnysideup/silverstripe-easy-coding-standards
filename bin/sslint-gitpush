@@ -3,22 +3,22 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 
 help_and_exit() {
-    echo "---------------------------------";
-    echo "  Available settings:";
-    echo "---------------------------------";
-    echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
-    echo "  -m, --message                  commit message";
-    echo "  -v, --new-version              create new tag? options are no|patch|minor|major";
-    echo "  -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
-    echo "  -t, --themes-also              include folders in themes";
-    echo ""
-    echo "---------------------------------";
-    echo "  Example usage:"
-    echo "---------------------------------";
-    echo "  e.g. sslint-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
-    echo "---------------------------------";
-    echo ""
-    echo ""
+    echo " ---------------------------------";
+    echo "   Available settings:";
+    echo " ---------------------------------";
+    echo "   -c, --commit-and-push          commit and push also? enter yes to execute";
+    echo "   -m, --message                  commit message";
+    echo "   -v, --new-version              create new tag? options are no|patch|minor|major";
+    echo "   -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
+    echo "   -t, --themes-also              include folders in themes";
+    echo " "
+    echo " ---------------------------------";
+    echo "   Example usage:"
+    echo " ---------------------------------";
+    echo "   e.g. sslint-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
+    echo " ---------------------------------";
+    echo " "
+    echo " "
 
     exit;
 }
@@ -43,47 +43,47 @@ while (( $# )); do
   shift
 done
 
-echo ""
-echo ""
-echo "---------------------------------";
-echo "  Running GIT PUSH";
-echo "---------------------------------";
-echo "  directory of script:           $SCRIPT_DIR";
-echo "  directory to commit:           $WORKING_DIR/$dir";
-echo "---------------------------------";
-echo "  Commit and Push?:              $commitAndPush";
-echo "  Message:                       $message";
-echo "  Create New Tag?:               $newVersion";
-echo "  Also check:                    $WORKING_DIR/$also";
-echo "  Also include themes?:          $alsoDoThemes";
-echo "---------------------------------";
-echo ""
-echo ""
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   Running GIT PUSH";
+echo " ---------------------------------";
+echo "   directory of script:           $SCRIPT_DIR";
+echo "   directory to commit:           $WORKING_DIR/$dir";
+echo " ---------------------------------";
+echo "   Commit and Push?:              $commitAndPush";
+echo "   Message:                       $message";
+echo "   Create New Tag?:               $newVersion";
+echo "   Also check:                    $WORKING_DIR/$also";
+echo "   Also include themes?:          $alsoDoThemes";
+echo " ---------------------------------";
+echo " "
+echo " "
 
-echo "  going to right directory: $WORKING_DIR/$dir"
+echo "   # going to right directory: $WORKING_DIR/$dir"
 cd $WORKING_DIR/$dir
 
 if test -f "$WORKING_DIR/$dir/.git/config"; then
-    echo "# check git status"
+    echo "   # check git status"
     git status
 
     if [[ "$commitAndPush" == "yes" ]]; then
-        echo "# adding files to git repo"
+        echo "   # adding files to git repo"
         git add . -A
         #git add $WORKING_DIR/$also
         #git add $WORKING_DIR/$logFile
 
-        echo "# committing files to git repo"
+        echo "   # committing files to git repo"
         git commit . -m "$message"
         #git commit $WORKING_DIR/$also -m "$message"
         #git commit $WORKING_DIR/$logFile -m "$message"
     fi
 
-    echo "# pulling commits from git repo"
+    echo "   # pulling commits from git repo"
     git pull
 
     if [[ "$commitAndPush" == "yes" ]]; then
-        echo "# pushing commits to git repo"
+        echo "   # pushing commits to git repo"
         git push
     fi
 
@@ -92,20 +92,20 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
         git fetch --all
 
-        git tag -l | sort -V
+        git tag --column
+        OLD_TAG=$(git tag | sort -V | tail -1)
+        # RES=$(git show-ref --tags)
+        # if [ -z "$RES" ]; then
+        #     OLD_TAG=1.0.0
+        # else
+        #     OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
+        # fi
 
-        RES=$(git show-ref --tags)
-        if [ -z "$RES" ]; then
-            OLD_TAG=1.0.0
-        else
-            OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
-        fi
-
-        echo "---------------------------------";
-        echo "  Found old Tag";
-        echo "---------------------------------";
-        echo "  $OLD_TAG";
-        echo "---------------------------------";
+        echo " ---------------------------------";
+        echo "   Found old Tag";
+        echo " ---------------------------------";
+        echo "   $OLD_TAG";
+        echo " ---------------------------------";
 
 
         # Build array from version string.
@@ -115,8 +115,10 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         # Increment version numbers as requested.
         if [ ${#a[@]} -ne 3 ]
         then
-          echo "ERROR $OLD_TAG (current tag) can not be parsed!"
-          exit 1
+            echo " ---------------------------------";
+            echo "   ERROR $OLD_TAG (current tag) can not be parsed!"
+            echo " ---------------------------------";
+            exit 1
         fi
 
         if [[ "$newVersion" == "major" ]]; then
@@ -136,12 +138,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
         NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
 
-        echo "---------------------------------";
-        echo "  Found new Tag ($newVersion)";
-        echo "---------------------------------";
-        echo "  $NEW_TAG";
-        echo "---------------------------------";
-
+        echo " ---------------------------------";
+        echo "   Found new Tag ($newVersion)";
+        echo " ---------------------------------";
+        echo "   $NEW_TAG";
+        echo " ---------------------------------";
 
         git tag -a $NEW_TAG -m "auto-generated linter tag"
 
@@ -152,13 +153,13 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
     fi
 
-    echo "";
-    echo "";
-    echo "---------------------------------";
-    echo "# check git status"
-    echo "---------------------------------";
+    echo " ";
+    echo " ";
+    echo " ---------------------------------";
+    echo "   # check git status"
+    echo " ---------------------------------";
     git status
-    echo "---------------------------------";
+    echo " ---------------------------------";
 
     if test -f "$WORKING_DIR/$also"; then
         $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'" -a 'nothing-here-hopefully' -c $commitAndPush -v $newVersion $WORKING_DIR/$also
@@ -168,15 +169,15 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'"  -a 'nothing-here-hopefully' -t no -c $commitAndPush -v $newVersion $WORKING_DIR/themes
     fi
 else
-    echo ""
-    echo ""
-    echo "---------------------------------";
-    echo "  ===  ERROR - NOT A GIT REPO ===";
-    echo "  "$WORKING_DIR/$dir;
-    echo "  === IS NOT A GIT REPO       ===";
-    echo "---------------------------------";
+    echo " "
+    echo " "
+    echo " ---------------------------------";
+    echo "   ===  ERROR - NOT A GIT REPO ===";
+    echo "   "$WORKING_DIR/$dir;
+    echo "   === IS NOT A GIT REPO       ===";
+    echo " ---------------------------------";
 fi
 
-echo "################################################"
-echo "################################################"
-echo "################################################"
+echo " ################################################"
+echo " ################################################"
+echo " ################################################"

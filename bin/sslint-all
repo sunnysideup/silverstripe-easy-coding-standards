@@ -4,25 +4,25 @@ WORKING_DIR=$(pwd)
 
 
 help_and_exit() {
-    echo "---------------------------------";
-    echo "  Available settings:";
-    echo "---------------------------------";
-    echo "  -f, --full-crazy-works         do it all (excluding javascript!)";
-    echo "  -a, --also                     also lint, e.g. app/_config.php or app/";
-    echo "  -c, --commit-and-push          also commit and push - set to yes to enable";
-    echo "  -v, --new-version              create tag - values can be no|patch|minor|major";
-    echo "  -m, --message                  commit message";
-    echo "  -t, --themes-also              include folders in themes";
-    echo "  -j, --javascript-also          include javascript linting"
-    echo "  -p, --php-version              php version - e.g. 7.4";
+    echo " ---------------------------------";
+    echo "   Available settings:";
+    echo " ---------------------------------";
+    echo "   -f, --full-crazy-works         do it all (excluding javascript!)";
+    echo "   -a, --also                     also lint, e.g. app/_config.php or app/";
+    echo "   -c, --commit-and-push          also commit and push - set to yes to enable";
+    echo "   -v, --new-version              create tag - values can be no|patch|minor|major";
+    echo "   -m, --message                  commit message";
+    echo "   -t, --themes-also              include folders in themes";
+    echo "   -j, --javascript-also          include javascript linting"
+    echo "   -p, --php-version              php version - e.g. 7.4";
+    echo "  "
+    echo " ---------------------------------";
+    echo "   Example usage:"
+    echo " ---------------------------------";
+    echo "   sslint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
+    echo " ---------------------------------";
     echo " "
-    echo "---------------------------------";
-    echo "  Example usage:"
-    echo "---------------------------------";
-    echo "  sslint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
-    echo "---------------------------------";
-    echo ""
-    echo ""
+    echo " "
     exit;
 }
 
@@ -61,96 +61,96 @@ if [[ "$full" == "yes" ]]; then
     message='PATCH: linter'
 fi
 
-echo ""
-echo ""
-echo "---------------------------------";
-echo "  Running Lint All";
-echo "---------------------------------";
-echo "  Directory of script:           $SCRIPT_DIR";
-echo "  Directory to analyse:          $WORKING_DIR/$dir";
-echo "---------------------------------";
-echo "  Full Crazy Works:              $full";
-echo "  Also Check:                    $WORKING_DIR/$also";
-echo "  Also include themes?:          $alsoDoThemes";
-echo "  Commit And Push:               $commitAndPush";
-echo "  New Tag:                       $newVersion";
-echo "  Message:                       $message";
-echo "  Javascript Also:               $javascriptAlso";
-echo "  PHP Version:                   $phpVersion";
-echo "---------------------------------";
-echo ""
-echo ""
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   Running Lint All";
+echo " ---------------------------------";
+echo "   Directory of script:           $SCRIPT_DIR";
+echo "   Directory to analyse:          $WORKING_DIR/$dir";
+echo " ---------------------------------";
+echo "   Full Crazy Works:              $full";
+echo "   Also Check:                    $WORKING_DIR/$also";
+echo "   Also include themes?:          $alsoDoThemes";
+echo "   Commit And Push:               $commitAndPush";
+echo "   New Tag:                       $newVersion";
+echo "   Message:                       $message";
+echo "   Javascript Also:               $javascriptAlso";
+echo "   PHP Version:                   $phpVersion";
+echo " ---------------------------------";
+echo " "
+echo " "
 
-echo "---------------------------"
-echo "  changing directory to $dir "
-echo "---------------------------"
+echo " ---------------------------"
+echo "   changing directory to $dir "
+echo " ---------------------------"
 cd $dir
-echo ""
+echo " "
 
 
 
 if [ -z "$(git status --porcelain)" ]; then
     cd -
 
-    echo "# remove origs"
+    echo "   # remove origs"
     $SCRIPT_DIR/sslint-remove-origs -a $also $dir
     cd $WORKING_DIR
 
-    echo "# run php check"
+    echo "   # run php check"
     $SCRIPT_DIR/sslint-compat -p $phpVersion $dir
     cd $WORKING_DIR
 
-    echo "# run linter ecs #1"
+    echo "   # run linter ecs #1"
     $SCRIPT_DIR/sslint-ecs -a $also $dir
 
-    echo "# run rector #1"
+    echo "   # run rector #1"
     $SCRIPT_DIR/sslint-rector -a $also $dir
     cd $WORKING_DIR
 
-    echo "# run ecs #2"
+    echo "   # run ecs #2"
     $SCRIPT_DIR/sslint-ecs -a $also $dir
     cd $WORKING_DIR
 
-    echo "# run rector #2"
+    echo "   # run rector #2"
     $SCRIPT_DIR/sslint-rector -a $also $dir
     cd $WORKING_DIR
 
-    echo "# run ecs #3"
+    echo "   # run ecs #3"
     $SCRIPT_DIR/sslint-ecs -a $also $dir
     cd $WORKING_DIR
 
-    echo "# run stan"
+    echo "   # run stan"
     $SCRIPT_DIR/sslint-stan -a $also -l 2 $dir
     cd $WORKING_DIR
 
     if test -f "$WORKING_DIR/$also"; then
-        echo "#########################"
-        echo "# run the above on $also"
-        echo "#########################"
+        echo " #########################"
+        echo "   # run the above on $also"
+        echo " #########################"
         $SCRIPT_DIR/sslint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
         cd $WORKING_DIR
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
-        echo "#########################"
-        echo "# run the above on themes"
-        echo "#########################"
+        echo " #########################"
+        echo "   # run the above on themes"
+        echo " #########################"
         $SCRIPT_DIR/sslint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso themes
         cd $WORKING_DIR
     fi
 
 
     if [[ "$javascriptAlso" == "yes" ]]; then
-        echo "#########################"
-        echo "# run javascript linter"
-        echo "#########################"
+        echo " #########################"
+        echo "   # run javascript linter"
+        echo " #########################"
         $SCRIPT_DIR/sslint-js $WORKING_DIR
         cd $WORKING_DIR
     fi
 
-    echo "------------------------------------------"
-    echo "  commit in $WORKING_DIR/$dir and $also"
-    echo "------------------------------------------"
+    echo " ------------------------------------------"
+    echo "   commit in $WORKING_DIR/$dir and $also"
+    echo " ------------------------------------------"
     $SCRIPT_DIR/sslint-gitpush -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
     cd $WORKING_DIR
 
@@ -167,6 +167,6 @@ else
     "
 fi
 
-echo "################################################"
-echo "################################################"
-echo "################################################"
+echo " ################################################"
+echo " ################################################"
+echo " ################################################"

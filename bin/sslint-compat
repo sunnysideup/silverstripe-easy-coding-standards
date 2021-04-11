@@ -7,19 +7,19 @@ WORKING_DIR=$(pwd)
 
 
 help_and_exit() {
-    echo "---------------------------------";
-    echo "  Available settings:";
-    echo "---------------------------------";
-    echo "  -p, --php-version              php version (e.g. 7.4)";
-    echo "  -a, --also                     also lint, e.g. app/_config.php or app/";
-    echo "---------------------------------";
-    echo ""
-    echo "---------------------------------";
-    echo "  Example usage:"
-    echo "---------------------------------";
-    echo "  sslint-compat   -p 7.4   foo/bar ";
-    echo ""
-    echo ""
+    echo " ---------------------------------";
+    echo "   Available settings:";
+    echo " ---------------------------------";
+    echo "   -p, --php-version              php version (e.g. 7.4)";
+    echo "   -a, --also                     also lint, e.g. app/_config.php or app/";
+    echo " ---------------------------------";
+    echo " "
+    echo " ---------------------------------";
+    echo "   Example usage:"
+    echo " ---------------------------------";
+    echo "   sslint-compat   -p 7.4   foo/bar ";
+    echo " "
+    echo " "
     exit;
 }
 
@@ -35,19 +35,19 @@ while (( $# )); do
   shift
 done
 
-echo ""
-echo ""
-echo "---------------------------------";
-echo "  Running PHP Compatability";
-echo "---------------------------------";
-echo "  directory of script:           $SCRIPT_DIR";
-echo "  directory to analyse:          $WORKING_DIR/$dir";
-echo "---------------------------------";
-echo "  PHP Version:                   $phpVersion";
-echo "  Also Check:                    $also";
-echo "---------------------------------";
-echo ""
-echo ""
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   Running PHP Compatability";
+echo " ---------------------------------";
+echo "   directory of script:           $SCRIPT_DIR";
+echo "   directory to analyse:          $WORKING_DIR/$dir";
+echo " ---------------------------------";
+echo "   PHP Version:                   $phpVersion";
+echo "   Also Check:                    $also";
+echo " ---------------------------------";
+echo " "
+echo " "
 
 
 $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
@@ -58,6 +58,6 @@ $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime
 
 
 
-echo "################################################"
-echo "################################################"
-echo "################################################"
+echo " ################################################"
+echo " ################################################"
+echo " ################################################"

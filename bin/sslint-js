@@ -17,19 +17,19 @@ do
 done
 
 help_and_exit() {
-    echo "---------------------------------";
-    echo "  Available settings:";
-    echo "---------------------------------";
-    echo "  --NONE--";
-    echo ""
-    echo "---------------------------------";
-    echo "  Example usage:"
-    echo "---------------------------------";
-    echo "  sslint-js .";
-    echo "  sslint-js foo/bar";
-    echo "---------------------------------";
-    echo ""
-    echo ""
+    echo " ---------------------------------";
+    echo "   Available settings:";
+    echo " ---------------------------------";
+    echo "   --NONE--";
+    echo " "
+    echo " ---------------------------------";
+    echo "   Example usage:"
+    echo " ---------------------------------";
+    echo "   sslint-js .";
+    echo "   sslint-js foo/bar";
+    echo " ---------------------------------";
+    echo " "
+    echo " "
     exit;
 }
 
@@ -42,27 +42,27 @@ while (( $# )); do
   shift
 done
 
-echo ""
-echo ""
-echo "---------------------------------";
-echo "  Running JS Standard";
-echo "---------------------------------";
-echo ""
-echo ""
-echo "  Make sure you have intalled and updated:";
-echo "";
-echo "  sudo npm install standard --global'";
-echo ""
-echo ""
-echo "---------------------------------";
-echo "  files to analyse: $WORKING_DIR/$dir/*.js";
-echo "---------------------------------";
-echo "  Example usage:"
-echo "  e.g. sslint-js app/client/javascript";
-echo "  e.g. sslint-js .";
-echo "---------------------------------";
-echo ""
-echo ""
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   Running JS Standard";
+echo " ---------------------------------";
+echo " "
+echo " "
+echo "   Make sure you have intalled and updated:";
+echo " ";
+echo "   sudo npm install standard --global'";
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   files to analyse: $WORKING_DIR/$dir/*.js";
+echo " ---------------------------------";
+echo "   Example usage:"
+echo "   e.g. sslint-js app/client/javascript";
+echo "   e.g. sslint-js .";
+echo " ---------------------------------";
+echo " "
+echo " "
 
 
 standard --fix $dir/*.js

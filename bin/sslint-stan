@@ -10,20 +10,20 @@ else
 fi
 
 help_and_exit() {
-    echo "---------------------------------";
-    echo "  Available settings:";
-    echo "---------------------------------";
-    echo "  -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echo "  -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
-    echo "  -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
+    echo " ---------------------------------";
+    echo "   Available settings:";
+    echo " ---------------------------------";
+    echo "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    echo "   -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
+    echo "   -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
+    echo "  "
+    echo " ---------------------------------";
+    echo "   Example usage:"
+    echo " ---------------------------------";
+    echo "   sslint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
+    echo " ---------------------------------";
     echo " "
-    echo "---------------------------------";
-    echo "  Example usage:"
-    echo "---------------------------------";
-    echo "  sslint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
-    echo "---------------------------------";
-    echo ""
-    echo ""
+    echo " "
     exit;
 }
 
@@ -42,20 +42,20 @@ while (( $# )); do
   shift
 done
 
-echo ""
-echo ""
-echo "---------------------------------";
-echo "  Running PHP STAN";
-echo "---------------------------------";
-echo "  Directory of script:              $SCRIPT_DIR";
-echo "  Directory to analyse:             $WORKING_DIR/$dir";
-echo "---------------------------------";
-echo "  Also check:                       $WORKING_DIR/$also";
-echo "  Level:                            $level (1/6)";
-echo "  Php stan config file:             $stanConfig";
-echo "---------------------------------";
-echo ""
-echo ""
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   Running PHP STAN";
+echo " ---------------------------------";
+echo "   Directory of script:              $SCRIPT_DIR";
+echo "   Directory to analyse:             $WORKING_DIR/$dir";
+echo " ---------------------------------";
+echo "   Also check:                       $WORKING_DIR/$also";
+echo "   Level:                            $level (1/6)";
+echo "   Php stan config file:             $stanConfig";
+echo " ---------------------------------";
+echo " "
+echo " "
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/sslint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also

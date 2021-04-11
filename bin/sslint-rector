@@ -6,19 +6,19 @@ WORKING_DIR=$(pwd)
 
 
 help_and_exit() {
-    echo "---------------------------------";
-    echo "  Available settings:";
-    echo "---------------------------------";
-    echo "  -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echo "  -r, --rector-config            rector config file locaton e.g. ../rector.php";
+    echo " ---------------------------------";
+    echo "   Available settings:";
+    echo " ---------------------------------";
+    echo "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    echo "   -r, --rector-config            rector config file locaton e.g. ../rector.php";
+    echo "  "
+    echo " ---------------------------------";
+    echo "   Example usage:"
+    echo " ---------------------------------";
+    echo "   sslint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
+    echo " ---------------------------------";
     echo " "
-    echo "---------------------------------";
-    echo "  Example usage:"
-    echo "---------------------------------";
-    echo "  sslint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
-    echo "---------------------------------";
-    echo ""
-    echo ""
+    echo " "
     exit;
 }
 
@@ -36,19 +36,19 @@ while (( $# )); do
   shift
 done
 
-echo ""
-echo ""
-echo "---------------------------------";
-echo "  Running Rector";
-echo "---------------------------------";
-echo "  Directory of script:           $SCRIPT_DIR";
-echo "  Directory to analyse:          $WORKING_DIR/$dir";
-echo "---------------------------------";
-echo "  Also check:                    $WORKING_DIR/$also";
-echo "  Rector config file:            $rectorConfig";
-echo "---------------------------------";
-echo ""
-echo ""
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   Running Rector";
+echo " ---------------------------------";
+echo "   Directory of script:           $SCRIPT_DIR";
+echo "   Directory to analyse:          $WORKING_DIR/$dir";
+echo " ---------------------------------";
+echo "   Also check:                    $WORKING_DIR/$also";
+echo "   Rector config file:            $rectorConfig";
+echo " ---------------------------------";
+echo " "
+echo " "
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/sslint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also

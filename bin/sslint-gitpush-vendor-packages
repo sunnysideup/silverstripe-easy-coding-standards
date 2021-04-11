@@ -9,20 +9,20 @@ else
 fi
 
 help_and_exit() {
-    echo "---------------------------------";
-    echo "  Available settings:";
-    echo "---------------------------------";
-    echo "  -m, --message                  message - e.g. Lint";
-    echo "  -c, --commit-and-push          commit and push also? enter yes to execute";
-    echo "  -v, --new-version              create new tag? options are no|patch|minor|major";
-    echo ""
-    echo "---------------------------------";
-    echo "  Example usage:"
-    echo "---------------------------------";
-    echo "  sslint-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
-    echo "---------------------------------";
-    echo ""
-    echo ""
+    echo " ---------------------------------";
+    echo "   Available settings:";
+    echo " ---------------------------------";
+    echo "   -m, --message                  message - e.g. Lint";
+    echo "   -c, --commit-and-push          commit and push also? enter yes to execute";
+    echo "   -v, --new-version              create new tag? options are no|patch|minor|major";
+    echo " "
+    echo " ---------------------------------";
+    echo "   Example usage:"
+    echo " ---------------------------------";
+    echo "   sslint-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
+    echo " ---------------------------------";
+    echo " "
+    echo " "
     exit;
 }
 
@@ -41,37 +41,37 @@ while (( $# )); do
   shift
 done
 
-echo ""
-echo ""
-echo "---------------------------------";
-echo "  Checking Vendor Packages for Changes";
-echo "---------------------------------";
-echo "  Directory of script:           $SCRIPT_DIR";
-echo "  Directory to analyse:          $WORKING_DIR/$dir";
-echo "---------------------------------";
-echo "  Message:                       $message";
-echo "  Commit and Push?:              $commitAndPush";
-echo "  Create New tag?:               $newVersion";
-echo "---------------------------------";
-echo ""
-echo ""
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   Checking Vendor Packages for Changes";
+echo " ---------------------------------";
+echo "   Directory of script:           $SCRIPT_DIR";
+echo "   Directory to analyse:          $WORKING_DIR/$dir";
+echo " ---------------------------------";
+echo "   Message:                       $message";
+echo "   Commit and Push?:              $commitAndPush";
+echo "   Create New tag?:               $newVersion";
+echo " ---------------------------------";
+echo " "
+echo " "
 
 
-echo "------------------------------------------"
-echo "  going to look for folders in $WORKING_DIR/$dir"
-echo "------------------------------------------"
+echo " ------------------------------------------"
+echo "   going to look for folders in $WORKING_DIR/$dir"
+echo " ------------------------------------------"
 
 find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
     while IFS= read -r -d '' line; do
-        echo "------------------------------------------"
-        echo "  DOING: $line"  ;
-        echo "------------------------------------------"
+        echo " ------------------------------------------"
+        echo "   DOING: $line"  ;
+        echo " ------------------------------------------"
         cd "$line";
         $SCRIPT_DIR/sslint-gitpush . -m "$message" -c $commitAndPush -v $newVersion ;
     done
 
 
 
-echo "################################################"
-echo "################################################"
-echo "################################################"
+echo " ################################################"
+echo " ################################################"
+echo " ################################################"
