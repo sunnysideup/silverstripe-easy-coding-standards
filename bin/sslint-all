@@ -57,7 +57,7 @@ if [[ "$full" == "yes" ]]; then
     full='no'
     alsoDoThemes='yes'
     commitAndPush='yes'
-    newVersion='yes'
+    newVersion='patch'
     message='PATCH: linter'
 fi
 
