@@ -26,7 +26,7 @@ help_and_exit() {
     exit;
 }
 
-commitAndPush='no'
+commitAndPush='yes'
 message='PATCH: automated linter'
 newVersion='no'
 while (( $# )); do
