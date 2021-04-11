@@ -10,12 +10,12 @@ help_and_exit() {
     echo "   Available settings:";
     echo " ---------------------------------";
     echo "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echo "   -t, --test                     is test only (default NO!)"
+    echo "   -d, --dry-run                  is test only (default NO!)"
     echo "  "
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-remove-origs  -a other/dir -t yes";
+    echo "   sslint-remove-origs  -a other/dir -d yes";
     echo " ---------------------------------";
     echo " "
     echo " "
@@ -23,12 +23,12 @@ help_and_exit() {
 }
 
 also=''
-isTest='no'
+dryRun='no'
 dir='app/src'
 while (( $# )); do
   case $1 in
     -a|--also)         also=$2;shift ;;
-    -t|--test-only)    isTest=$2;shift ;;
+    -d|--dry-run)      dryRun=$2;shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -45,18 +45,18 @@ echo "   Directory of script:           $SCRIPT_DIR";
 echo "   Directory to analyse:          $WORKING_DIR/$dir";
 echo " ---------------------------------";
 echo "   Also check:                    $WORKING_DIR/$also";
-echo "   Is test only:                  $isTest";
+echo "   Is test only (-d|--dry-run):   $dryRun";
 echo " ---------------------------------";
 echo " "
 echo " "
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sslint-remove-origs -a 'nothing-here-hopefully' -t $isTest
+    $SCRIPT_DIR/sslint-remove-origs -a 'nothing-here-hopefully' -d $dryRun
 fi
 
 find $WORKING_DIR/$dir -name "*.orig"
 
-if [[ "$isTest" == "no" ]]; then
+if [[ "$dryRun" == "no" ]]; then
     find $WORKING_DIR/$dir -name "*.orig" -exec rm "{}" \;
 fi
 
