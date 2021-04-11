@@ -145,7 +145,7 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
         git tag -a $NEW_TAG -m "auto-generated linter tag"
 
-        git push
+        git push --tags
 
         git tag -v
 
