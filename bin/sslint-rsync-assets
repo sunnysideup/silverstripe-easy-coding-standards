@@ -1,0 +1,73 @@
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+WORKING_DIR=$(pwd)
+
+
+help_and_exit() {
+    echo " ---------------------------------";
+    echo "   Available settings:";
+    echo " ---------------------------------";
+    echo "   -w, --www-data-user             the name of the apache user - e.g. www-data"
+    echo "  "
+    echo " ---------------------------------";
+    echo "   Example usage:"
+    echo " ---------------------------------";
+    echo "   sslint-rsync-assets my-server:/var/www/website-root";
+    echo " ---------------------------------";
+    echo " "
+    echo " "
+    exit;
+}
+
+server=''
+wwwDataUser='www-data'
+
+while (( $# )); do
+  case $1 in
+    -w|--www-data-user)      wwwDataUser=$2;shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       server=$1;;
+  esac
+  shift
+done
+
+echo " "
+echo " "
+echo " ---------------------------------";
+echo "   Running Rsync from Server";
+echo " ---------------------------------";
+echo "   Directory of script:           $SCRIPT_DIR";
+echo "   Directory to copy from:        $server/public/assets";
+echo "   Directory to copy to:          $WORKING_DIR/public/assets";
+echo " ---------------------------------";
+echo "   Apache user:                   $wwwDataUser";
+echo " ---------------------------------";
+echo " "
+echo " "
+
+echo " ---------------------------"
+echo "   Rsync assets from $server "
+echo " ---------------------------"
+echo " "
+if [-n "$server"]; then
+    if test -f "$WORKING_DIR/public/assets"; then
+        sudo chown $USER public/assets -R
+        rsync --stats -chavzPr $server/public/assets ./public/assets
+        sudo chown $wwwDataUser public/assets -R
+    else
+        echo " ---------------------------"
+        echo "   Error, could not find  $WORKING_DIR/public/assets"
+        echo " ---------------------------"
+        echo " "
+    fi
+else
+    echo " ---------------------------"
+    echo "   Error, no server specified $server"
+    echo " ---------------------------"
+    echo " "
+fi
+
+echo " ################################################"
+echo " ################################################"
+echo " ################################################"

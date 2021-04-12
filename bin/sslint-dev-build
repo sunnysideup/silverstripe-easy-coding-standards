@@ -32,7 +32,7 @@ done
 echo " "
 echo " "
 echo " ---------------------------------";
-echo "   Running Lint All";
+echo "   Running Dev/Build";
 echo " ---------------------------------";
 echo "   Directory of script:           $SCRIPT_DIR";
 echo "   Directory to analyse:          $WORKING_DIR/$dir";
