@@ -15,7 +15,7 @@ help_and_exit() {
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
+    echo "   ssu-lint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
     echo " ---------------------------------";
     echo " "
     echo " "
@@ -51,7 +51,7 @@ echo " "
 echo " "
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sslint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also
+    $SCRIPT_DIR/ssu-lint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also
 fi
 
 $SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig

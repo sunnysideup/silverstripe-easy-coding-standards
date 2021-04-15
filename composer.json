@@ -31,15 +31,15 @@
     "rector/rector": "^0.10.3"
   },
   "bin": [
-    "bin/sslint-all",
-    "bin/sslint-compat",
-    "bin/sslint-dev-build",
-    "bin/sslint-ecs",
-    "bin/sslint-gitpush",
-    "bin/sslint-gitpush-vendor-packages",
-    "bin/sslint-js",
-    "bin/sslint-rector",
-    "bin/sslint-remove-origs",
-    "bin/sslint-stan"
+    "bin/ssu-dev-build",
+    "bin/ssu-elint-cs",
+    "bin/ssu-gitpush",
+    "bin/ssu-gitpush-vendor-packages",
+    "bin/ssu-lint-all",
+    "bin/ssu-lint-compat",
+    "bin/ssu-lint-js",
+    "bin/ssu-lint-rector",
+    "bin/ssu-lint-stan",
+    "bin/ssu-remove-origs"
   ]
 }

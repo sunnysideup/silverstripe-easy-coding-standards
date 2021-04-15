@@ -11,7 +11,7 @@ help_and_exit() {
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-dev-build .";
+    echo "   ssu-dev-build .";
     echo " ---------------------------------";
     echo " "
     echo " "

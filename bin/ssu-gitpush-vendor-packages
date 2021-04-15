@@ -19,7 +19,7 @@ help_and_exit() {
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
+    echo "   ssu-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
     echo " ---------------------------------";
     echo " "
     echo " "
@@ -27,7 +27,7 @@ help_and_exit() {
 }
 
 commitAndPush='yes'
-message='PATCH: automated linter'
+message='WIP'
 newVersion='no'
 while (( $# )); do
   case $1 in
@@ -67,7 +67,7 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         echo "   DOING: $line"  ;
         echo " ------------------------------------------"
         cd "$line";
-        $SCRIPT_DIR/sslint-gitpush . -m "$message" -c $commitAndPush -v $newVersion ;
+        $SCRIPT_DIR/ssu-gitpush . -m "$message" -c $commitAndPush -v $newVersion ;
     done
 
 

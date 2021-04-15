@@ -10,25 +10,25 @@ help_and_exit() {
     echo "   Available settings:";
     echo " ---------------------------------";
     echo "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echo "   -d, --dry-run                  is test only (default NO!)"
+    echo "   -e, --ecs-config               ecs config file locaton";
     echo "  "
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-remove-origs  -a other/dir -d yes";
+    echo "   ssu-lint-ecs   -a app_more/_config.php   -e ./ecs.php   foo/bar ";
     echo " ---------------------------------";
     echo " "
     echo " "
     exit;
 }
 
-also=''
-dryRun='no'
+also='app/_config.php'
+ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.php"
 dir='app/src'
 while (( $# )); do
   case $1 in
     -a|--also)         also=$2;shift ;;
-    -d|--dry-run)      dryRun=$2;shift ;;
+    -e|--ecs-config)   ecsConfig=$2;shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -39,26 +39,24 @@ done
 echo " "
 echo " "
 echo " ---------------------------------";
-echo "   Running Remove Origs";
+echo "   Running Easy Conding Standards";
 echo " ---------------------------------";
 echo "   Directory of script:           $SCRIPT_DIR";
 echo "   Directory to analyse:          $WORKING_DIR/$dir";
 echo " ---------------------------------";
 echo "   Also check:                    $WORKING_DIR/$also";
-echo "   Is test only (-d|--dry-run):   $dryRun";
+echo "   Ecs config file:               $ecsConfig";
 echo " ---------------------------------";
 echo " "
 echo " "
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sslint-remove-origs -a 'nothing-here-hopefully' -d $dryRun
+    $SCRIPT_DIR/ssu-lint-ecs -a 'nothing-here-hopefully' -e $ecsConfig $also
 fi
 
-find $WORKING_DIR/$dir -name "*.orig"
 
-if [[ "$dryRun" == "no" ]]; then
-    find $WORKING_DIR/$dir -name "*.orig" -exec rm "{}" \;
-fi
+$SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
+$SCRIPT_DIR/ecs check-markdown $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
 
 echo " ################################################"
 echo " ################################################"

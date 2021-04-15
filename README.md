@@ -2,7 +2,7 @@
 
 Lints your silverstripe php code, checks for potential bugs.
 
-# How to install
+# How to install (may not work!)
 
 1. open your terminal
 2. browse to root folder of your project and type:
@@ -25,110 +25,179 @@ PATH=~/.config/composer/vendor/bin:$PATH
 ```
 To make the composer `vendor/bin` available anywhere
 
+To enable it, run:
+```shell
+source ~/.bashrc
+```
+
 now you should be able to run it from anywhere like this:
 ```shell
-sslint-ecs [dir]
+ssu-lint-ecs [dir]
 ```
 
 
 # How to use:
 Once intalled you can run some simple commands to lint your Silverstripe (and other) code.
 Make sure to always run from root of project, even if you are linting a vendor module.
-All commands take one parameter: the dir you wan to lint.
+In general commands take one parameter: the dir you wan to lint and a number of flags.
 
-The default is `app/src`.
+
+The default is `app`.
 
 
 ### apply easy coding standards:
 ```shell
-vendor/bin/sslint-ecs [dir]
+vendor/bin/ssu-lint-ecs [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-ecs [dir]
+ssu-lint-ecs [dir]
 ```
+
+
+### apply php rector:
+```shell
+vendor/bin/ssu-lint-rector [dir]
+```
+
+If installed globally:
+```shell
+ssu-lint-rector [dir]
+```
+
 
 ### lint your code for bugs:
 ```shell
-vendor/bin/sslint-stan [dir]
+vendor/bin/ssu-lint-stan [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-stan [dir]
+ssu-lint-stan [dir]
 ```
 
 ### check for outdated code
 ```shell
-vendor/bin/sslint-compat [dir]
+vendor/bin/ssu-lint-compat [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-compat [dir]
+ssu-lint-compat [dir]
 ```
 
 ### lint, git and push:
 ```shell
-vendor/bin/sslint-all [dir]
+vendor/bin/ssu-lint-all [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-all [dir]
+ssu-lint-all [dir]
 ```
 
-### bonus - lint your javascript:
+### lint your javascript:
 If you install js standards, like this (you may need to use `sudo`):
 ```shell
 npm install standard --global
+sudo npm install standard --global
 ```
 
 Then you can the following command to fix your js:
 ```shell
-vendor/bin/sslint-js [dir]
+vendor/bin/ssu-lint-js [dir]
 ```
 
 If installed globally:
 ```shell
-sslint-js [dir]
+ssu-lint-js [dir]
 ```
 You may need to set the right directory - e.g.
 
+
+
+### git push:
+
+Do a quick git push
+```shell
+vendor/bin/ssu-gitpush [dir]
+```
+
+If installed globally:
+```shell
+ssu-gitpush [dir]
+```
+
+### git push vendor packages
+
+Do a quick git push
+```shell
+vendor/bin/ssu-gitpush-vendor-packages vendor/[vendorName]
+```
+
+If installed globally:
+```shell
+ssu-gitpush-vendor-packages vendor/[vendorName]
+```
+
+e.g.
+```shell
+ssu-gitpush-vendor-packages vendor/silverstripe
+```
+will git commit and git push ALL SilverStripe vendor packages.
+
+
+### resync assets from server
+
+Get all the assets from a website server
+```shell
+vendor/bin/ssu-rsync-assets [webserver:/var/www/websiteroot]
+```
+
+If installed globally:
+```shell
+ssu-rsync-assets [webserver:/var/www/websiteroot]
+```
+
+e.g. browse to your local webroot dir and run:
+```shell
+ssu-rsync-assets my-ssh-login@123.123.123.123:/var/www/html
+```
+will git commit and git push ALL SilverStripe vendor packages.
+
+
+### remove *.orig files:
+
+Do a quick git push
+```shell
+vendor/bin/ssu-origs [dir]
+```
+
+If installed globally:
+```shell
+ssu-origs [dir]
+```
+
+### dev/build
+
+Do a quick git push
+```shell
+vendor/bin/ssu-dev-build [dir]
+```
+
+If installed globally:
+```shell
+ssu-dev-build [dir]
+```
+
+
 # available flags
 
-### -a (also)
-On top of your code dir you can add one config file:
+
+### -h|--help
+Find out all your options for any of the functions.
 ```shell
-sslint-ecs -a myproject/_config.php foo/bar
+ssu-lint-ecs -h
 ```
-default: `app/_config.php`
-
-### -l (level)
-This is only relevant for `sslint-stan`.
-1 = only show serious worries,
-6 = show all issues.
-default: `4`
-```shell
-sslint-stan -l 2 foo/bar
-```
-
-
-### -p (level)
-This is only relevant for `sslint-compat`.
-default: `7.4`
-```shell
-sslint-compat -p 7.3 foo/bar
-```
-
-### -m (message)
-Git commit message. This is used by the `sslint-all` command.
-
-### -e (ecsConfig)
-This is used by the `sslint-ecs` command.
-Set an alternative location for the Easy Coding Standards config file.
-
-### -s (stanConfig)
-This is used by the `sslint-stan` command.
-Set an alternative location for the PHP Stan config file.
+default: `false`

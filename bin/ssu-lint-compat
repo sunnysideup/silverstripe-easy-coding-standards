@@ -17,7 +17,7 @@ help_and_exit() {
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-compat   -p 7.4   foo/bar ";
+    echo "   ssu-lint-compat   -p 7.4   foo/bar ";
     echo " "
     echo " "
     exit;

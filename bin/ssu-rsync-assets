@@ -12,7 +12,7 @@ help_and_exit() {
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-rsync-assets my-server:/var/www/website-root";
+    echo "   ssu-rsync-assets my-server:/var/www/website-root";
     echo " ---------------------------------";
     echo " "
     echo " "

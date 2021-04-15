@@ -46,9 +46,9 @@ cd [REPO]
 composer install
 echo "/vendor/" >> .gitignore
 echo "/resources/" >> .gitignore
-sslint-ecs src/ > TMP_LINTING_NOTES_ECS
-sslint-rector src/ > TMP_LINTING_NOTES_RECTOR
-sslint-stan -l 2 src/ > TMP_LINTING_NOTES_STAN
+ssu-lint-ecs src/ > TMP_LINTING_NOTES_ECS
+ssu-lint-rector src/ > TMP_LINTING_NOTES_RECTOR
+ssu-lint-stan -l 2 src/ > TMP_LINTING_NOTES_STAN
 git add .  -A
 git commit . -m "MY TEST"
 ```

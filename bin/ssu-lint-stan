@@ -20,7 +20,7 @@ help_and_exit() {
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
+    echo "   ssu-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
     echo " ---------------------------------";
     echo " "
     echo " "
@@ -58,6 +58,6 @@ echo " "
 echo " "
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sslint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also
+    $SCRIPT_DIR/ssu-lint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also
 fi
 $SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$dir

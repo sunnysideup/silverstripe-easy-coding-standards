@@ -15,7 +15,7 @@ help_and_exit() {
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   e.g. sslint-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
+    echo "   e.g. ssu-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
     echo " ---------------------------------";
     echo " "
     echo " "
@@ -24,7 +24,7 @@ help_and_exit() {
 }
 
 commitAndPush="yes"
-message="PATCH: automated linter"
+message="WIP"
 dir='./'
 newVersion='no'
 also='nothing-here-hopefully'
@@ -162,11 +162,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     echo " ---------------------------------";
 
     if test -f "$WORKING_DIR/$also"; then
-        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/$also
+        $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/$also
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
-        $SCRIPT_DIR/sslint-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/themes
+        $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/themes
     fi
 else
     echo " "

@@ -25,8 +25,8 @@ help_and_exit() {
     echo " ---------------------------------";
     echo "   Example usage:"
     echo " ---------------------------------";
-    echo "   sslint-js .";
-    echo "   sslint-js foo/bar";
+    echo "   ssu-lint-js .";
+    echo "   ssu-lint-js foo/bar";
     echo " ---------------------------------";
     echo " "
     echo " "
@@ -58,8 +58,8 @@ echo " ---------------------------------";
 echo "   files to analyse: $WORKING_DIR/$dir/*.js";
 echo " ---------------------------------";
 echo "   Example usage:"
-echo "   e.g. sslint-js app/client/javascript";
-echo "   e.g. sslint-js .";
+echo "   e.g. ssu-lint-js app/client/javascript";
+echo "   e.g. ssu-lint-js .";
 echo " ---------------------------------";
 echo " "
 echo " "
