@@ -32,7 +32,7 @@
   },
   "bin": [
     "bin/ssu-dev-build",
-    "bin/ssu-elint-cs",
+    "bin/ssu-lint-ecs",
     "bin/ssu-gitpush",
     "bin/ssu-gitpush-vendor-packages",
     "bin/ssu-lint-all",
