@@ -40,6 +40,7 @@
     "bin/ssu-lint-js",
     "bin/ssu-lint-rector",
     "bin/ssu-lint-stan",
+    "bin/ssu-npm-install",
     "bin/ssu-remove-origs"
   ]
 }
