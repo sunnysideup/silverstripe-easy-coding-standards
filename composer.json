@@ -28,7 +28,8 @@
     "symplify/easy-coding-standard": "^9.0",
     "squizlabs/php_codesniffer": "^3.5",
     "phpcompatibility/php-compatibility": "^9.3",
-    "rector/rector": "^0.10.3"
+    "rector/rector": "^0.10.3",
+    "symplify/symplify": "^9.3"
   },
   "bin": [
     "bin/ssu-dev-build",
