@@ -55,8 +55,8 @@ if test -f "$WORKING_DIR/$also"; then
 fi
 
 
-$SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
-$SCRIPT_DIR/ecs check-markdown $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
+$SCRIPT_DIR/ssu-lint-ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
+$SCRIPT_DIR/ssu-lint-ecs check-markdown $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
 
 echo " ################################################"
 echo " ################################################"
