@@ -1,6 +1,37 @@
 # What it does
 
-Lints your silverstripe php code, checks for potential bugs.
+Lints your silverstripe php code, checks for potential bugs, and other helpful commands.
+
+# tl;dr version:
+
+Install as global composer package and then try to access the commands, starting with `ssu-` from the command line. 
+
+# commands available:
+
+```shell
+
+# silverstripe
+ssu-dev-build
+
+# linting
+ssu-lint-all
+ssu-lint-compat
+ssu-lint-ecs
+ssu-lint-js
+ssu-lint-rector
+ssu-lint-stan
+
+# git
+ssu-gitpush
+ssu-gitpush-vendor-packages  
+ssu-remove-origs
+
+# webpack
+ssu-npm-install
+ssu-npm-build
+ssu-npm-watch    
+
+```
 
 # How to install (may not work!)
 
@@ -25,16 +56,18 @@ PATH=~/.config/composer/vendor/bin:$PATH
 ```
 To make the composer `vendor/bin` available anywhere
 
-To enable it, run:
+3. To enable it, run:
 ```shell
 source ~/.bashrc
 ```
+or restart your computer. 
 
-now you should be able to run it from anywhere like this:
+4. Now you should be able to run it from anywhere like this:
+
 ```shell
 ssu-lint-ecs [dir]
 ```
-
+and all the other commands.
 
 # How to use:
 Once intalled you can run some simple commands to lint your Silverstripe (and other) code.
