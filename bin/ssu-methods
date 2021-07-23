@@ -23,7 +23,7 @@ echoend() {
     echoline;
     echoline;
     echoline;
-    echo 'END'
+    echonice 'END'
     echo "";
     echo "";
 }
