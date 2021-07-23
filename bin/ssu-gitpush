@@ -1,9 +1,10 @@
 #!/bin/bash
 
-source ./ssu-methods
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
+
+source $SCRIPT_DIR/ssu-methods
 
 help_and_exit() {
     echonice " ---------------------------------";
