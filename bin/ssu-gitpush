@@ -166,15 +166,13 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     echoline;
     if output=$(git status --porcelain) && [ -z "$output" ]; then
         echoline;
-        echogood "\033[0;32m   # ALL DONE";
-        echogood "\033[0;32m ---------------------------------";
+        echogood " # ALL DONE";
+        echoline;
     else
         echobad "!"
         echobad "!"
         echoline;
-        echoline;
         echobad " Not all Code is Committed and Pushed";
-        echoline;
         echoline;
         echobad "!"
         echobad "!"
