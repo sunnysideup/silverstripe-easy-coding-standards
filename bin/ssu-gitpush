@@ -55,11 +55,11 @@ echoline;
 echonice "   directory of script:           $SCRIPT_DIR";
 echonice "   directory to commit:           $WORKING_DIR/$dir";
 echoline;
-echonice "   Commit and Push?:              $commitAndPush";
+echonice "   Commit and Push:               $commitAndPush";
 echonice "   Message:                       $message";
-echonice "   Create New Tag?:               $newVersion";
+echonice "   Create New Tag:                $newVersion";
 echonice "   Also check:                    $WORKING_DIR/$also";
-echonice "   Also include themes?:          $alsoDoThemes";
+echonice "   Also include themes:           $alsoDoThemes";
 echoline;
 echonice " "
 echonice " "
