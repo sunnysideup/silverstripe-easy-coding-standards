@@ -18,8 +18,6 @@ echoline() {
 }
 
 echoend() {
-    echo "";
-    echo "";
     echoline;
     echoline;
     echoline;
