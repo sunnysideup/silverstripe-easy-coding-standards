@@ -40,6 +40,7 @@
     "bin/ssu-lint-js",
     "bin/ssu-lint-rector",
     "bin/ssu-lint-stan",
+    "bin/ssu-methods",
     "bin/ssu-npm-build",
     "bin/ssu-npm-install",
     "bin/ssu-npm-watch",

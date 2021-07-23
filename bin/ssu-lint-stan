@@ -1,8 +1,11 @@
 #!/bin/bash
+
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
+source $SCRIPT_DIR/ssu-methods
 
+# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 if [ "$1" != "" ]; then
     dir=$1;
 else
@@ -10,20 +13,20 @@ else
 fi
 
 help_and_exit() {
-    echo " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echo "   -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
-    echo "   -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
-    echo "  "
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   ssu-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
-    echo " ---------------------------------";
-    echo " "
-    echo " "
+    echonice " ---------------------------------";
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    echonice "   -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
+    echonice "   -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
+    echonice "  "
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   ssu-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " "
     exit;
 }
 
@@ -42,20 +45,20 @@ while (( $# )); do
   shift
 done
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running PHP STAN";
-echo " ---------------------------------";
-echo "   Directory of script:              $SCRIPT_DIR";
-echo "   Directory to analyse:             $WORKING_DIR/$dir";
-echo " ---------------------------------";
-echo "   Also check:                       $WORKING_DIR/$also";
-echo "   Level:                            $level (1/6)";
-echo "   Php stan config file:             $stanConfig";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running PHP STAN";
+echonice " ---------------------------------";
+echonice "   Directory of script:              $SCRIPT_DIR";
+echonice "   Directory to analyse:             $WORKING_DIR/$dir";
+echonice " ---------------------------------";
+echonice "   Also check:                       $WORKING_DIR/$also";
+echonice "   Level:                            $level (1/6)";
+echonice "   Php stan config file:             $stanConfig";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/ssu-lint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also

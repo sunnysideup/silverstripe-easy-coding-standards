@@ -1,24 +1,26 @@
 #!/bin/bash
+
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 # : ${rectorConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rector.php}
 
-
+source $SCRIPT_DIR/ssu-methods
 
 help_and_exit() {
-    echo " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echo "   -r, --rector-config            rector config file locaton e.g. ../rector.php";
-    echo "  "
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   ssu-lint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
-    echo " ---------------------------------";
-    echo " "
-    echo " "
+    echonice " ---------------------------------";
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    echonice "   -r, --rector-config            rector config file locaton e.g. ../rector.php";
+    echonice "  "
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   ssu-lint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " "
     exit;
 }
 
@@ -36,19 +38,19 @@ while (( $# )); do
   shift
 done
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running Rector";
-echo " ---------------------------------";
-echo "   Directory of script:           $SCRIPT_DIR";
-echo "   Directory to analyse:          $WORKING_DIR/$dir";
-echo " ---------------------------------";
-echo "   Also check:                    $WORKING_DIR/$also";
-echo "   Rector config file:            $rectorConfig";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running Rector";
+echonice " ---------------------------------";
+echonice "   Directory of script:           $SCRIPT_DIR";
+echonice "   Directory to analyse:          $WORKING_DIR/$dir";
+echonice " ---------------------------------";
+echonice "   Also check:                    $WORKING_DIR/$also";
+echonice "   Rector config file:            $rectorConfig";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/ssu-lint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also

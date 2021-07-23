@@ -1,7 +1,9 @@
 #!/bin/bash
+
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-
+source $SCRIPT_DIR/ssu-methods
 
 if [ "$1" != "" ]; then
     dir=$1;
@@ -17,19 +19,19 @@ do
 done
 
 help_and_exit() {
-    echo " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "   --NONE--";
-    echo " "
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   ssu-lint-js .";
-    echo "   ssu-lint-js foo/bar";
-    echo " ---------------------------------";
-    echo " "
-    echo " "
+    echonice " ---------------------------------";
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "   --NONE--";
+    echonice " "
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   ssu-lint-js .";
+    echonice "   ssu-lint-js foo/bar";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " "
     exit;
 }
 
@@ -42,27 +44,27 @@ while (( $# )); do
   shift
 done
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running JS Standard";
-echo " ---------------------------------";
-echo " "
-echo " "
-echo "   Make sure you have intalled and updated:";
-echo " ";
-echo "   sudo npm install standard --global'";
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   files to analyse: $WORKING_DIR/$dir/*.js";
-echo " ---------------------------------";
-echo "   Example usage:"
-echo "   e.g. ssu-lint-js app/client/javascript";
-echo "   e.g. ssu-lint-js .";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running JS Standard";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
+echonice "   Make sure you have intalled and updated:";
+echonice " ";
+echonice "   sudo npm install standard --global'";
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   files to analyse: $WORKING_DIR/$dir/*.js";
+echonice " ---------------------------------";
+echonice "   Example usage:"
+echonice "   e.g. ssu-lint-js app/client/javascript";
+echonice "   e.g. ssu-lint-js .";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
 
 standard --fix $dir/*.js

@@ -1,24 +1,27 @@
 #!/bin/bash
+
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/ssu-methods
 # : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 
 
 help_and_exit() {
-    echo " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echo "   -e, --ecs-config               ecs config file locaton";
-    echo "  "
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   ssu-lint-ecs   -a app_more/_config.php   -e ./ecs.php   foo/bar ";
-    echo " ---------------------------------";
-    echo " "
-    echo " "
+    echonice " ---------------------------------";
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    echonice "   -e, --ecs-config               ecs config file locaton";
+    echonice "  "
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   ssu-lint-ecs   -a app_more/_config.php   -e ./ecs.php   foo/bar ";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " "
     exit;
 }
 
@@ -36,19 +39,19 @@ while (( $# )); do
   shift
 done
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running Easy Conding Standards";
-echo " ---------------------------------";
-echo "   Directory of script:           $SCRIPT_DIR";
-echo "   Directory to analyse:          $WORKING_DIR/$dir";
-echo " ---------------------------------";
-echo "   Also check:                    $WORKING_DIR/$also";
-echo "   Ecs config file:               $ecsConfig";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running Easy Conding Standards";
+echonice " ---------------------------------";
+echonice "   Directory of script:           $SCRIPT_DIR";
+echonice "   Directory to analyse:          $WORKING_DIR/$dir";
+echonice " ---------------------------------";
+echonice "   Also check:                    $WORKING_DIR/$also";
+echonice "   Ecs config file:               $ecsConfig";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/ssu-lint-ecs -a 'nothing-here-hopefully' -e $ecsConfig $also
@@ -58,6 +61,6 @@ fi
 $SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
 $SCRIPT_DIR/ecs check-markdown $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
 
-echo " ################################################"
-echo " ################################################"
-echo " ################################################"
+echonice " ################################################"
+echonice " ################################################"
+echonice " ################################################"

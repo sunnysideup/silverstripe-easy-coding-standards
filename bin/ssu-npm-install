@@ -1,6 +1,8 @@
 #!/bin/bash
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/ssu-methods
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
 if [ "$1" != "" ]; then
@@ -10,17 +12,17 @@ else
 fi
 
 help_and_exit() {
-    echo " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "   none"
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   ssu-npm-install themes/client";
-    echo " ---------------------------------";
-    echo " "
-    echo " "
+    echonice " ---------------------------------";
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "   none"
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   ssu-npm-install themes/client";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " "
     exit;
 }
 
@@ -33,16 +35,16 @@ while (( $# )); do
   shift
 done
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running NPM INSTALL";
-echo " ---------------------------------";
-echo "   Directory of script:              $SCRIPT_DIR";
-echo "   Directory to install:             $WORKING_DIR/$dir";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running NPM INSTALL";
+echonice " ---------------------------------";
+echonice "   Directory of script:              $SCRIPT_DIR";
+echonice "   Directory to install:             $WORKING_DIR/$dir";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
 echo ''
 echo '--------------------------------'

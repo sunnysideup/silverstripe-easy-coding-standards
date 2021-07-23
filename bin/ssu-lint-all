@@ -1,28 +1,30 @@
 #!/bin/bash
+
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-
+source $SCRIPT_DIR/ssu-methods
 
 help_and_exit() {
-    echo " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "   -f, --just-do-it                 do it all (excluding javascript!)";
-    echo "   -a, --also                     also lint, e.g. app/_config.php or app/";
-    echo "   -c, --commit-and-push          also commit and push - set to yes to enable";
-    echo "   -v, --new-version              create tag - values can be no|patch|minor|major";
-    echo "   -m, --message                  commit message";
-    echo "   -t, --themes-also              include folders in themes";
-    echo "   -j, --javascript-also          include javascript linting"
-    echo "   -p, --php-version              php version - e.g. 7.4";
-    echo "  "
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   ssu-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
-    echo " ---------------------------------";
-    echo " "
-    echo " "
+    echonice " ---------------------------------";
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "   -f, --just-do-it                 do it all (excluding javascript!)";
+    echonice "   -a, --also                     also lint, e.g. app/_config.php or app/";
+    echonice "   -c, --commit-and-push          also commit and push - set to yes to enable";
+    echonice "   -v, --new-version              create tag - values can be no|patch|minor|major";
+    echonice "   -m, --message                  commit message";
+    echonice "   -t, --themes-also              include folders in themes";
+    echonice "   -j, --javascript-also          include javascript linting"
+    echonice "   -p, --php-version              php version - e.g. 7.4";
+    echonice "  "
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   ssu-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " "
     exit;
 }
 
@@ -61,112 +63,112 @@ if [[ "$justDoIt" == "yes" ]]; then
     message='PATCH: linter'
 fi
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running Lint All";
-echo " ---------------------------------";
-echo "   Directory of script:           $SCRIPT_DIR";
-echo "   Directory to analyse:          $WORKING_DIR/$dir";
-echo " ---------------------------------";
-echo "   Just do all of it:             $justDoIt";
-echo "   Also Check:                    $WORKING_DIR/$also";
-echo "   Also include themes?:          $alsoDoThemes";
-echo "   Commit And Push:               $commitAndPush";
-echo "   New Tag:                       $newVersion";
-echo "   Message:                       $message";
-echo "   Javascript Also:               $javascriptAlso";
-echo "   PHP Version:                   $phpVersion";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running Lint All";
+echonice " ---------------------------------";
+echonice "   Directory of script:           $SCRIPT_DIR";
+echonice "   Directory to analyse:          $WORKING_DIR/$dir";
+echonice " ---------------------------------";
+echonice "   Just do all of it:             $justDoIt";
+echonice "   Also Check:                    $WORKING_DIR/$also";
+echonice "   Also include themes?:          $alsoDoThemes";
+echonice "   Commit And Push:               $commitAndPush";
+echonice "   New Tag:                       $newVersion";
+echonice "   Message:                       $message";
+echonice "   Javascript Also:               $javascriptAlso";
+echonice "   PHP Version:                   $phpVersion";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
-echo " ---------------------------"
-echo "   changing directory to $dir "
-echo " ---------------------------"
+echonice " ---------------------------"
+echonice "   changing directory to $dir "
+echonice " ---------------------------"
 cd $dir
-echo " "
+echonice " "
 
 
 
 if [ -z "$(git status --porcelain)" ]; then
     cd -
 
-    echo "   # remove origs"
+    echonice "   # remove origs"
     $SCRIPT_DIR/ssu-remove-origs -a $also $dir
     cd $WORKING_DIR
 
-    echo "   # run php check"
+    echonice "   # run php check"
     $SCRIPT_DIR/ssu-lint-compat -p $phpVersion $dir
     cd $WORKING_DIR
 
-    echo "   # run linter ecs #1"
+    echonice "   # run linter ecs #1"
     $SCRIPT_DIR/ssu-lint-ecs -a $also $dir
 
-    echo "   # run rector #1"
+    echonice "   # run rector #1"
     $SCRIPT_DIR/ssu-lint-rector -a $also $dir
     cd $WORKING_DIR
 
-    echo "   # run ecs #2"
+    echonice "   # run ecs #2"
     $SCRIPT_DIR/ssu-lint-ecs -a $also $dir
     cd $WORKING_DIR
 
-    echo "   # run rector #2"
+    echonice "   # run rector #2"
     $SCRIPT_DIR/ssu-lint-rector -a $also $dir
     cd $WORKING_DIR
 
-    echo "   # run ecs #3"
+    echonice "   # run ecs #3"
     $SCRIPT_DIR/ssu-lint-ecs -a $also $dir
     cd $WORKING_DIR
 
-    echo "   # run stan"
+    echonice "   # run stan"
     $SCRIPT_DIR/ssu-lint-stan -a $also -l 2 $dir
     cd $WORKING_DIR
 
     if test -f "$WORKING_DIR/$also"; then
-        echo " #########################"
-        echo "   # run the above on $also"
-        echo " #########################"
+        echonice " #########################"
+        echonice "   # run the above on $also"
+        echonice " #########################"
         $SCRIPT_DIR/ssu-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
         cd $WORKING_DIR
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
-        echo " #########################"
-        echo "   # run the above on themes"
-        echo " #########################"
+        echonice " #########################"
+        echonice "   # run the above on themes"
+        echonice " #########################"
         $SCRIPT_DIR/ssu-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso themes
         cd $WORKING_DIR
     fi
 
 
     if [[ "$javascriptAlso" == "yes" ]]; then
-        echo " #########################"
-        echo "   # run javascript linter"
-        echo " #########################"
+        echonice " #########################"
+        echonice "   # run javascript linter"
+        echonice " #########################"
         $SCRIPT_DIR/ssu-lint-js $WORKING_DIR
         cd $WORKING_DIR
     fi
 
-    echo " ------------------------------------------"
-    echo "   commit in $WORKING_DIR/$dir and $also"
-    echo " ------------------------------------------"
+    echonice " ------------------------------------------"
+    echonice "   commit in $WORKING_DIR/$dir and $also"
+    echonice " ------------------------------------------"
     $SCRIPT_DIR/ssu-gitpush -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
     cd $WORKING_DIR
 
-    echo "
+    echonice "
 ---------------------------
   DONE
 ---------------------------
     "
 else
-    echo "
+    echonice "
 ---------------------------
   Sorry, can not run, there are uncommitted changes
 ---------------------------
     "
 fi
 
-echo " ################################################"
-echo " ################################################"
-echo " ################################################"
+echonice " ################################################"
+echonice " ################################################"
+echonice " ################################################"

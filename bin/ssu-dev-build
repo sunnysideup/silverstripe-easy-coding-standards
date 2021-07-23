@@ -1,20 +1,22 @@
 #!/bin/bash
+
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-
+source $SCRIPT_DIR/ssu-methods
 
 help_and_exit() {
-    echo " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "  NONE"
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   ssu-dev-build .";
-    echo " ---------------------------------";
-    echo " "
-    echo " "
+    echonice " ---------------------------------";
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "  NONE"
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   ssu-dev-build .";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " "
     exit;
 }
 
@@ -29,22 +31,22 @@ while (( $# )); do
   shift
 done
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running Dev/Build";
-echo " ---------------------------------";
-echo "   Directory of script:           $SCRIPT_DIR";
-echo "   Directory to analyse:          $WORKING_DIR/$dir";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running Dev/Build";
+echonice " ---------------------------------";
+echonice "   Directory of script:           $SCRIPT_DIR";
+echonice "   Directory to analyse:          $WORKING_DIR/$dir";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
-echo " ---------------------------"
-echo "   Changing directory to $dir "
-echo " ---------------------------"
+echonice " ---------------------------"
+echonice "   Changing directory to $dir "
+echonice " ---------------------------"
 cd $dir
-echo " "
+echonice " "
 
 sudo ls
 composer install
@@ -53,6 +55,6 @@ composer dumpautoload
 sudo chown www-data public/assets -R
 sudo -u www-data vendor/bin/sake dev/build flush=all
 
-echo " ################################################"
-echo " ################################################"
-echo " ################################################"
+echonice " ################################################"
+echonice " ################################################"
+echonice " ################################################"

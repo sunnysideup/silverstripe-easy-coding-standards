@@ -3,21 +3,8 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/ssu-methods
 
-source $SCRIPT_DIR/../sunnysideup/easy-coding-standards/bin/ssu-methods
-
-pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo $pathvar
-echo $pathvar
-echo $pathvar
-echo $pathvar
-echo $pathvar
-echo $pathvar
-echo $pathvar
-echo $pathvar
-echo $pathvar
-echo $pathvar
-echo $pathvar
 
 help_and_exit() {
     echonice " ---------------------------------";

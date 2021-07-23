@@ -1,25 +1,27 @@
 #!/bin/bash
+
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-
+source $SCRIPT_DIR/ssu-methods
 # composer global require squizlabs/php_codesniffer --dev
 # composer global require phpcompatibility/php-compatibility --dev
 
 
 help_and_exit() {
-    echo " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "   -p, --php-version              php version (e.g. 7.4)";
-    echo "   -a, --also                     also lint, e.g. app/_config.php or app/";
-    echo " ---------------------------------";
-    echo " "
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   ssu-lint-compat   -p 7.4   foo/bar ";
-    echo " "
-    echo " "
+    echonice " ---------------------------------";
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "   -p, --php-version              php version (e.g. 7.4)";
+    echonice "   -a, --also                     also lint, e.g. app/_config.php or app/";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   ssu-lint-compat   -p 7.4   foo/bar ";
+    echonice " "
+    echonice " "
     exit;
 }
 
@@ -35,19 +37,19 @@ while (( $# )); do
   shift
 done
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running PHP Compatability";
-echo " ---------------------------------";
-echo "   directory of script:           $SCRIPT_DIR";
-echo "   directory to analyse:          $WORKING_DIR/$dir";
-echo " ---------------------------------";
-echo "   PHP Version:                   $phpVersion";
-echo "   Also Check:                    $also";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running PHP Compatability";
+echonice " ---------------------------------";
+echonice "   directory of script:           $SCRIPT_DIR";
+echonice "   directory to analyse:          $WORKING_DIR/$dir";
+echonice " ---------------------------------";
+echonice "   PHP Version:                   $phpVersion";
+echonice "   Also Check:                    $also";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
 
 $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
@@ -58,6 +60,6 @@ $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime
 
 
 
-echo " ################################################"
-echo " ################################################"
-echo " ################################################"
+echonice " ################################################"
+echonice " ################################################"
+echonice " ################################################"
