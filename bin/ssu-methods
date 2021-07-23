@@ -1,1 +1,6 @@
 #!/bin/bash
+
+echonice() {
+   message="$1"
+   echo -e "\033[0;33m $message \033[0m";
+}
