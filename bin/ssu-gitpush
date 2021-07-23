@@ -72,22 +72,28 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     git status
 
     if [[ "$commitAndPush" == "yes" ]]; then
+        echoline;
         echonice "   # adding files to git repo"
+        echoline;
         git add . -A
         #git add $WORKING_DIR/$also
         #git add $WORKING_DIR/$logFile
-
+        echoline;
         echonice "   # committing files to git repo"
+        echoline;
         git commit . -m "$message"
         #git commit $WORKING_DIR/$also -m "$message"
         #git commit $WORKING_DIR/$logFile -m "$message"
     fi
-
+    echoline;
     echonice "   # pulling commits from git repo"
+    echoline;
     git pull
 
     if [[ "$commitAndPush" == "yes" ]]; then
+        echoline;
         echonice "   # pushing commits to git repo"
+        echoline;
         git push
     fi
 
