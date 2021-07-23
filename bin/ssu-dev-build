@@ -42,9 +42,9 @@ echoline;
 echonice " "
 echonice " "
 
-echonice " ---------------------------"
+echoline
 echonice "   Changing directory to $dir "
-echonice " ---------------------------"
+echoline
 cd $dir
 echonice " "
 
@@ -55,6 +55,4 @@ composer dumpautoload
 sudo chown www-data public/assets -R
 sudo -u www-data vendor/bin/sake dev/build flush=all
 
-echonice " ################################################"
-echonice " ################################################"
-echonice " ################################################"
+echoend;

@@ -64,3 +64,4 @@ if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/ssu-lint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also
 fi
 $SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$dir
+echoend;

@@ -48,3 +48,6 @@ echonice " "
 
 cd themes/sswebpack_engine_only/
 npm run build --theme_dir=$dir
+
+
+echoend;

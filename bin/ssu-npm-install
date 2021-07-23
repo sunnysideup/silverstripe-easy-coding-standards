@@ -47,9 +47,9 @@ echonice " "
 echonice " "
 
 echo ''
-echo '--------------------------------'
+echoline
 echo 'installing webpack'
-echo '--------------------------------'
+echoline
 echo ''
 
 cd themes/sswebpack_engine_only/
@@ -62,11 +62,14 @@ npm rebuild node-sass
 cd -
 
 echo ''
-echo '--------------------------------'
+echoline
 echo 'installing application packages'
-echo '--------------------------------'
+echoline
 echo ''
 
 cd $WORKING_DIR/$dir/my_node_modules/
 npm i
 cd -
+
+
+echoend;

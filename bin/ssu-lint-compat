@@ -58,8 +58,4 @@ $SCRIPT_DIR/phpcs --config-set severity 1
 $SCRIPT_DIR/phpcs --config-show
 $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion
 
-
-
-echonice " ################################################"
-echonice " ################################################"
-echonice " ################################################"
+echoend;

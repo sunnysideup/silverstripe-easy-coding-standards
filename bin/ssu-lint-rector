@@ -57,3 +57,5 @@ if test -f "$WORKING_DIR/$also"; then
 fi
 
 $SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig
+
+echoend;

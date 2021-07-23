@@ -83,9 +83,9 @@ echoline;
 echonice " "
 echonice " "
 
-echonice " ---------------------------"
+echoline
 echonice "   changing directory to $dir "
-echonice " ---------------------------"
+echoline
 cd $dir
 echonice " "
 
@@ -150,25 +150,19 @@ if [ -z "$(git status --porcelain)" ]; then
         cd $WORKING_DIR
     fi
 
-    echonice " ------------------------------------------"
+    echoline
     echonice "   commit in $WORKING_DIR/$dir and $also"
-    echonice " ------------------------------------------"
+    echoline
     $SCRIPT_DIR/ssu-gitpush -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
     cd $WORKING_DIR
 
-    echonice "
----------------------------
-  DONE
----------------------------
-    "
+    echoline
+    echonice "  DONE"
+    echoline
 else
-    echonice "
----------------------------
-  Sorry, can not run, there are uncommitted changes
----------------------------
-    "
+    echoline
+    echonice "  Sorry, can not run, there are uncommitted changes"
+    echoline
 fi
 
-echonice " ################################################"
-echonice " ################################################"
-echonice " ################################################"
+echoend;

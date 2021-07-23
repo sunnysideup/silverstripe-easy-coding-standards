@@ -1,18 +1,29 @@
 #!/bin/bash
 
 echonice() {
-   message="$1"
+   message="$1";
    echo -e "\033[0;33m$message \033[0m";
 }
 echogood() {
-   message="$1"
+   message="$1";
    echo -e "\033[0;32m$message \033[0m";
 }
 echobad() {
-   message="$1"
+   message="$1";
    echo -e "\033[1;32;41m$message \033[0m";
 }
 
 echoline() {
-    echonice " ---------------------------"
+    echonice '----------------------------------------';
+}
+
+echoend() {
+    echo "";
+    echo "";
+    echoline;
+    echoline;
+    echoline;
+    echo 'END'
+    echo "";
+    echo "";
 }

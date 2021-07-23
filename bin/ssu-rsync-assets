@@ -48,9 +48,9 @@ echoline;
 echonice " "
 echonice " "
 
-echonice " ---------------------------"
+echoline
 echonice "   Rsync assets from $server "
-echonice " ---------------------------"
+echoline
 echonice " "
 if [-n "$server"]; then
     if test -f "$WORKING_DIR/public/assets"; then
@@ -70,6 +70,4 @@ else
     echobad " "
 fi
 
-echonice " ################################################"
-echonice " ################################################"
-echonice " ################################################"
+echoend;
