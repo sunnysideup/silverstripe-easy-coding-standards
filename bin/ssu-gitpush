@@ -6,18 +6,18 @@ WORKING_DIR=$(pwd)
 
 source ./ssu-methods
 
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
-echo pathvar="$( cd "$( dirname $0 )" && pwd )"
+pathvar="$( cd "$( dirname $0 )" && pwd )"
+echo $pathvar
+echo $pathvar
+echo $pathvar
+echo $pathvar
+echo $pathvar
+echo $pathvar
+echo $pathvar
+echo $pathvar
+echo $pathvar
+echo $pathvar
+echo $pathvar
 
 help_and_exit() {
     echonice " ---------------------------------";
