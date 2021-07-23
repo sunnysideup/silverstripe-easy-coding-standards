@@ -58,16 +58,16 @@ if [-n "$server"]; then
         rsync --stats -chavzPr $server/public/assets ./public/assets
         sudo chown $wwwDataUser public/assets -R
     else
-        echonice " ---------------------------"
-        echonice "   Error, could not find  $WORKING_DIR/public/assets"
-        echonice " ---------------------------"
-        echonice " "
+        echobad " ---------------------------"
+        echobad "   Error, could not find  $WORKING_DIR/public/assets"
+        echobad " ---------------------------"
+        echobad " "
     fi
 else
-    echonice " ---------------------------"
-    echonice "   Error, no server specified $server"
-    echonice " ---------------------------"
-    echonice " "
+    echobad " ---------------------------"
+    echobad "   Error, no server specified $server"
+    echobad " ---------------------------"
+    echobad " "
 fi
 
 echonice " ################################################"

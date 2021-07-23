@@ -119,9 +119,9 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         # Increment version numbers as requested.
         if [ ${#a[@]} -ne 3 ]
         then
-            echonice " ---------------------------------";
-            echonice "   ERROR $OLD_TAG (current tag) can not be parsed!"
-            echonice " ---------------------------------";
+            echobad " ---------------------------------";
+            echobad "   ERROR $OLD_TAG (current tag) can not be parsed!"
+            echobad " ---------------------------------";
             exit 1
         fi
 
@@ -189,13 +189,13 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/themes
     fi
 else
-    echonice " "
-    echonice " "
-    echonice " ---------------------------------";
-    echonice "   ===  ERROR - NOT A GIT REPO ===";
-    echonice "   "$WORKING_DIR/$dir;
-    echonice "   === IS NOT A GIT REPO       ===";
-    echonice " ---------------------------------";
+    echobad " "
+    echobad " "
+    echobad " ---------------------------------";
+    echobad "   ===  ERROR - NOT A GIT REPO ===";
+    echobad "   "$WORKING_DIR/$dir;
+    echobad "   === IS NOT A GIT REPO       ===";
+    echobad " ---------------------------------";
 fi
 
 echonice " ################################################"
