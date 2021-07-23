@@ -1,0 +1,4 @@
+echonice {
+   message="$1"
+   printf "\033[0;33m $message \033[0m"
+}
