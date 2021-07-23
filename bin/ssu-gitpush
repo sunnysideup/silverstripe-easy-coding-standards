@@ -119,9 +119,9 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         # Increment version numbers as requested.
         if [ ${#a[@]} -ne 3 ]
         then
-            echobad " ---------------------------------";
+            echoline;
             echobad "   ERROR $OLD_TAG (current tag) can not be parsed!"
-            echobad " ---------------------------------";
+            echoline;
             exit 1
         fi
 
@@ -165,17 +165,17 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     git status
     echoline;
     if output=$(git status --porcelain) && [ -z "$output" ]; then
-        echogood " ---------------------------------";
+        echoline;
         echogood "\033[0;32m   # ALL DONE";
         echogood "\033[0;32m ---------------------------------";
     else
         echobad "!"
         echobad "!"
-        echobad " ---------------------------------";
-        echobad " ---------------------------------";
+        echoline;
+        echoline;
         echobad " Not all Code is Committed and Pushed";
-        echobad " ---------------------------------";
-        echobad " ---------------------------------";
+        echoline;
+        echoline;
         echobad "!"
         echobad "!"
     fi
@@ -191,11 +191,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 else
     echobad " "
     echobad " "
-    echobad " ---------------------------------";
+    echoline;
     echobad "   ===  ERROR - NOT A GIT REPO ===";
     echobad "   "$WORKING_DIR/$dir;
     echobad "   === IS NOT A GIT REPO       ===";
-    echobad " ---------------------------------";
+    echoline;
 fi
 
 echonice " ################################################"
