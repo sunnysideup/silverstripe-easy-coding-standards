@@ -12,15 +12,15 @@ else
 fi
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   none"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-npm-build themes/client";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -37,12 +37,12 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running NPM build";
-echonice " ---------------------------------";
+echoline;
 echonice "   Directory of script:              $SCRIPT_DIR";
 echonice "   Directory to install:             $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

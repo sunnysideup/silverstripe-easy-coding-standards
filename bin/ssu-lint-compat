@@ -9,16 +9,16 @@ source $SCRIPT_DIR/ssu-methods
 
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   -p, --php-version              php version (e.g. 7.4)";
     echonice "   -a, --also                     also lint, e.g. app/_config.php or app/";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-lint-compat   -p 7.4   foo/bar ";
     echonice " "
     echonice " "
@@ -39,15 +39,15 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running PHP Compatability";
-echonice " ---------------------------------";
+echoline;
 echonice "   directory of script:           $SCRIPT_DIR";
 echonice "   directory to analyse:          $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice "   PHP Version:                   $phpVersion";
 echonice "   Also Check:                    $also";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

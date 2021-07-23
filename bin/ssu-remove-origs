@@ -8,17 +8,17 @@ source $SCRIPT_DIR/ssu-methods
 
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
     echonice "   -d, --dry-run                  is test only (default NO!)"
     echonice "  "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-remove-origs  -a other/dir -d yes";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -40,15 +40,15 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running Remove Origs";
-echonice " ---------------------------------";
+echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice "   Also check:                    $WORKING_DIR/$also";
 echonice "   Is test only (-d|--dry-run):   $dryRun";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

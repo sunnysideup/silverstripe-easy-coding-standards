@@ -9,17 +9,17 @@ source $SCRIPT_DIR/ssu-methods
 
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
     echonice "   -e, --ecs-config               ecs config file locaton";
     echonice "  "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-lint-ecs   -a app_more/_config.php   -e ./ecs.php   foo/bar ";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -41,15 +41,15 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running Easy Conding Standards";
-echonice " ---------------------------------";
+echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice "   Also check:                    $WORKING_DIR/$also";
 echonice "   Ecs config file:               $ecsConfig";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

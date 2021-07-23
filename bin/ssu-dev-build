@@ -6,15 +6,15 @@ WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/ssu-methods
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "  NONE"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-dev-build .";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -33,12 +33,12 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running Dev/Build";
-echonice " ---------------------------------";
+echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

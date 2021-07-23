@@ -7,20 +7,20 @@ source $SCRIPT_DIR/ssu-methods
 
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   -c, --commit-and-push          commit and push also? enter yes to execute";
     echonice "   -m, --message                  commit message";
     echonice "   -v, --new-version              create new tag? options are no|patch|minor|major";
     echonice "   -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
     echonice "   -t, --themes-also              include folders in themes";
     echonice " "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   e.g. ssu-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
 
@@ -49,18 +49,18 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running GIT PUSH";
-echonice " ---------------------------------";
+echoline;
 echonice "   directory of script:           $SCRIPT_DIR";
 echonice "   directory to commit:           $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice "   Commit and Push?:              $commitAndPush";
 echonice "   Message:                       $message";
 echonice "   Create New Tag?:               $newVersion";
 echonice "   Also check:                    $WORKING_DIR/$also";
 echonice "   Also include themes?:          $alsoDoThemes";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 
@@ -105,11 +105,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         #     OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
         # fi
 
-        echonice " ---------------------------------";
+        echoline;
         echonice "   Found old Tag";
-        echonice " ---------------------------------";
+        echoline;
         echonice "   $OLD_TAG";
-        echonice " ---------------------------------";
+        echoline;
 
 
         # Build array from version string.
@@ -142,11 +142,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
         NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
 
-        echonice " ---------------------------------";
+        echoline;
         echonice "   Found new Tag ($newVersion)";
-        echonice " ---------------------------------";
+        echoline;
         echonice "   $NEW_TAG";
-        echonice " ---------------------------------";
+        echoline;
 
         git tag -a $NEW_TAG -m "auto-generated linter tag"
 
@@ -159,11 +159,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
     echonice " ";
     echonice " ";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   # check git status"
-    echonice " ---------------------------------";
+    echoline;
     git status
-    echonice " ---------------------------------";
+    echoline;
     if output=$(git status --porcelain) && [ -z "$output" ]; then
         echogood " ---------------------------------";
         echogood "\033[0;32m   # ALL DONE";

@@ -6,9 +6,9 @@ WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/ssu-methods
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   -f, --just-do-it                 do it all (excluding javascript!)";
     echonice "   -a, --also                     also lint, e.g. app/_config.php or app/";
     echonice "   -c, --commit-and-push          also commit and push - set to yes to enable";
@@ -18,11 +18,11 @@ help_and_exit() {
     echonice "   -j, --javascript-also          include javascript linting"
     echonice "   -p, --php-version              php version - e.g. 7.4";
     echonice "  "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -65,12 +65,12 @@ fi
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running Lint All";
-echonice " ---------------------------------";
+echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice "   Just do all of it:             $justDoIt";
 echonice "   Also Check:                    $WORKING_DIR/$also";
 echonice "   Also include themes?:          $alsoDoThemes";
@@ -79,7 +79,7 @@ echonice "   New Tag:                       $newVersion";
 echonice "   Message:                       $message";
 echonice "   Javascript Also:               $javascriptAlso";
 echonice "   PHP Version:                   $phpVersion";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

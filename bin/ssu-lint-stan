@@ -13,18 +13,18 @@ else
 fi
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
     echonice "   -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
     echonice "   -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
     echonice "  "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -47,16 +47,16 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running PHP STAN";
-echonice " ---------------------------------";
+echoline;
 echonice "   Directory of script:              $SCRIPT_DIR";
 echonice "   Directory to analyse:             $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice "   Also check:                       $WORKING_DIR/$also";
 echonice "   Level:                            $level (1/6)";
 echonice "   Php stan config file:             $stanConfig";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

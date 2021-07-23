@@ -8,17 +8,17 @@ WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/ssu-methods
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
     echonice "   -r, --rector-config            rector config file locaton e.g. ../rector.php";
     echonice "  "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-lint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -40,15 +40,15 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running Rector";
-echonice " ---------------------------------";
+echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice "   Also check:                    $WORKING_DIR/$also";
 echonice "   Rector config file:            $rectorConfig";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

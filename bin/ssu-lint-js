@@ -19,17 +19,17 @@ do
 done
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   --NONE--";
     echonice " "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-lint-js .";
     echonice "   ssu-lint-js foo/bar";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -46,9 +46,9 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Running JS Standard";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 echonice "   Make sure you have intalled and updated:";
@@ -56,13 +56,13 @@ echonice " ";
 echonice "   sudo npm install standard --global'";
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   files to analyse: $WORKING_DIR/$dir/*.js";
-echonice " ---------------------------------";
+echoline;
 echonice "   Example usage:"
 echonice "   e.g. ssu-lint-js app/client/javascript";
 echonice "   e.g. ssu-lint-js .";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 

@@ -12,18 +12,18 @@ else
 fi
 
 help_and_exit() {
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Available settings:";
-    echonice " ---------------------------------";
+    echoline;
     echonice "   -m, --message                  message - e.g. Lint";
     echonice "   -c, --commit-and-push          commit and push also? enter yes to execute";
     echonice "   -v, --new-version              create new tag? options are no|patch|minor|major";
     echonice " "
-    echonice " ---------------------------------";
+    echoline;
     echonice "   Example usage:"
-    echonice " ---------------------------------";
+    echoline;
     echonice "   ssu-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
-    echonice " ---------------------------------";
+    echoline;
     echonice " "
     echonice " "
     exit;
@@ -46,16 +46,16 @@ done
 
 echonice " "
 echonice " "
-echonice " ---------------------------------";
+echoline;
 echonice "   Checking Vendor Packages for Changes";
-echonice " ---------------------------------";
+echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
-echonice " ---------------------------------";
+echoline;
 echonice "   Message:                       $message";
 echonice "   Commit and Push?:              $commitAndPush";
 echonice "   Create New tag?:               $newVersion";
-echonice " ---------------------------------";
+echoline;
 echonice " "
 echonice " "
 
