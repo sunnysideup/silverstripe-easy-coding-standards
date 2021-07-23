@@ -7,7 +7,7 @@ WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/ssu-methods
 echonice() {
    message="$1"
-   echo "\033[0;33m $message \033[0m";
+   echo -e "\033[0;33m $message \033[0m";
    echo ""
 }
 
