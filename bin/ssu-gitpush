@@ -178,19 +178,19 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     git status
     echonice " ---------------------------------";
     if output=$(git status --porcelain) && [ -z "$output" ]; then
-        echonice -e "\033[0;32m ---------------------------------\e[0m";
-        echonice -e "\033[0;32m   # ALL DONE\e[0m";
-        echonice -e "\033[0;32m ---------------------------------\e[0m";
+        echogood -e " ---------------------------------";
+        echogood -e "\033[0;32m   # ALL DONE";
+        echogood -e "\033[0;32m ---------------------------------";
     else
-        echonice "!"
-        echonice "!"
-        echonice -e "\033[1;32;41m ---------------------------------\e[0m";
-        echonice -e "\033[1;32;41m ---------------------------------\e[0m";
-        echonice -e "\033[1;32;41m Not all Code is Committed and Pushed\e[0m";
-        echonice -e "\033[1;32;41m ---------------------------------\e[0m";
-        echonice -e "\033[1;32;41m ---------------------------------\e[0m";
-        echonice "!"
-        echonice "!"
+        echobad "!"
+        echobad "!"
+        echobad -e " ---------------------------------";
+        echobad -e " ---------------------------------";
+        echobad -e " Not all Code is Committed and Pushed";
+        echobad -e " ---------------------------------";
+        echobad -e " ---------------------------------";
+        echobad "!"
+        echobad "!"
     fi
 
 
