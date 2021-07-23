@@ -7,21 +7,21 @@ WORKING_DIR=$(pwd)
 
 help_and_exit() {
     echonice " ---------------------------------";
-    echo "   Available settings:";
-    echo " ---------------------------------";
-    echo "   -c, --commit-and-push          commit and push also? enter yes to execute";
-    echo "   -m, --message                  commit message";
-    echo "   -v, --new-version              create new tag? options are no|patch|minor|major";
-    echo "   -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
-    echo "   -t, --themes-also              include folders in themes";
-    echo " "
-    echo " ---------------------------------";
-    echo "   Example usage:"
-    echo " ---------------------------------";
-    echo "   e.g. ssu-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
-    echo " ---------------------------------";
-    echo " "
-    echo " "
+    echonice "   Available settings:";
+    echonice " ---------------------------------";
+    echonice "   -c, --commit-and-push          commit and push also? enter yes to execute";
+    echonice "   -m, --message                  commit message";
+    echonice "   -v, --new-version              create new tag? options are no|patch|minor|major";
+    echonice "   -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
+    echonice "   -t, --themes-also              include folders in themes";
+    echonice " "
+    echonice " ---------------------------------";
+    echonice "   Example usage:"
+    echonice " ---------------------------------";
+    echonice "   e.g. ssu-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
+    echonice " ---------------------------------";
+    echonice " "
+    echonice " "
 
     exit;
 }
@@ -46,47 +46,47 @@ while (( $# )); do
   shift
 done
 
-echo " "
-echo " "
-echo " ---------------------------------";
-echo "   Running GIT PUSH";
-echo " ---------------------------------";
-echo "   directory of script:           $SCRIPT_DIR";
-echo "   directory to commit:           $WORKING_DIR/$dir";
-echo " ---------------------------------";
-echo "   Commit and Push?:              $commitAndPush";
-echo "   Message:                       $message";
-echo "   Create New Tag?:               $newVersion";
-echo "   Also check:                    $WORKING_DIR/$also";
-echo "   Also include themes?:          $alsoDoThemes";
-echo " ---------------------------------";
-echo " "
-echo " "
+echonice " "
+echonice " "
+echonice " ---------------------------------";
+echonice "   Running GIT PUSH";
+echonice " ---------------------------------";
+echonice "   directory of script:           $SCRIPT_DIR";
+echonice "   directory to commit:           $WORKING_DIR/$dir";
+echonice " ---------------------------------";
+echonice "   Commit and Push?:              $commitAndPush";
+echonice "   Message:                       $message";
+echonice "   Create New Tag?:               $newVersion";
+echonice "   Also check:                    $WORKING_DIR/$also";
+echonice "   Also include themes?:          $alsoDoThemes";
+echonice " ---------------------------------";
+echonice " "
+echonice " "
 
-echo "   # going to right directory: $WORKING_DIR/$dir"
+echonice "   # going to right directory: $WORKING_DIR/$dir"
 cd $WORKING_DIR/$dir
 
 if test -f "$WORKING_DIR/$dir/.git/config"; then
-    echo "   # check git status"
+    echonice "   # check git status"
     git status
 
     if [[ "$commitAndPush" == "yes" ]]; then
-        echo "   # adding files to git repo"
+        echonice "   # adding files to git repo"
         git add . -A
         #git add $WORKING_DIR/$also
         #git add $WORKING_DIR/$logFile
 
-        echo "   # committing files to git repo"
+        echonice "   # committing files to git repo"
         git commit . -m "$message"
         #git commit $WORKING_DIR/$also -m "$message"
         #git commit $WORKING_DIR/$logFile -m "$message"
     fi
 
-    echo "   # pulling commits from git repo"
+    echonice "   # pulling commits from git repo"
     git pull
 
     if [[ "$commitAndPush" == "yes" ]]; then
-        echo "   # pushing commits to git repo"
+        echonice "   # pushing commits to git repo"
         git push
     fi
 
@@ -104,11 +104,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         #     OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
         # fi
 
-        echo " ---------------------------------";
-        echo "   Found old Tag";
-        echo " ---------------------------------";
-        echo "   $OLD_TAG";
-        echo " ---------------------------------";
+        echonice " ---------------------------------";
+        echonice "   Found old Tag";
+        echonice " ---------------------------------";
+        echonice "   $OLD_TAG";
+        echonice " ---------------------------------";
 
 
         # Build array from version string.
@@ -118,9 +118,9 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         # Increment version numbers as requested.
         if [ ${#a[@]} -ne 3 ]
         then
-            echo " ---------------------------------";
-            echo "   ERROR $OLD_TAG (current tag) can not be parsed!"
-            echo " ---------------------------------";
+            echonice " ---------------------------------";
+            echonice "   ERROR $OLD_TAG (current tag) can not be parsed!"
+            echonice " ---------------------------------";
             exit 1
         fi
 
@@ -141,11 +141,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
         NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
 
-        echo " ---------------------------------";
-        echo "   Found new Tag ($newVersion)";
-        echo " ---------------------------------";
-        echo "   $NEW_TAG";
-        echo " ---------------------------------";
+        echonice " ---------------------------------";
+        echonice "   Found new Tag ($newVersion)";
+        echonice " ---------------------------------";
+        echonice "   $NEW_TAG";
+        echonice " ---------------------------------";
 
         git tag -a $NEW_TAG -m "auto-generated linter tag"
 
@@ -156,27 +156,27 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
     fi
 
-    echo " ";
-    echo " ";
-    echo " ---------------------------------";
-    echo "   # check git status"
-    echo " ---------------------------------";
+    echonice " ";
+    echonice " ";
+    echonice " ---------------------------------";
+    echonice "   # check git status"
+    echonice " ---------------------------------";
     git status
-    echo " ---------------------------------";
+    echonice " ---------------------------------";
     if output=$(git status --porcelain) && [ -z "$output" ]; then
-        echo -e "\033[0;32m ---------------------------------\e[0m";
-        echo -e "\033[0;32m   # ALL DONE\e[0m";
-        echo -e "\033[0;32m ---------------------------------\e[0m";
+        echonice -e "\033[0;32m ---------------------------------\e[0m";
+        echonice -e "\033[0;32m   # ALL DONE\e[0m";
+        echonice -e "\033[0;32m ---------------------------------\e[0m";
     else
-        echo "!"
-        echo "!"
-        echo -e "\033[1;32;41m ---------------------------------\e[0m";
-        echo -e "\033[1;32;41m ---------------------------------\e[0m";
-        echo -e "\033[1;32;41m Not all Code is Committed and Pushed\e[0m";
-        echo -e "\033[1;32;41m ---------------------------------\e[0m";
-        echo -e "\033[1;32;41m ---------------------------------\e[0m";
-        echo "!"
-        echo "!"
+        echonice "!"
+        echonice "!"
+        echonice -e "\033[1;32;41m ---------------------------------\e[0m";
+        echonice -e "\033[1;32;41m ---------------------------------\e[0m";
+        echonice -e "\033[1;32;41m Not all Code is Committed and Pushed\e[0m";
+        echonice -e "\033[1;32;41m ---------------------------------\e[0m";
+        echonice -e "\033[1;32;41m ---------------------------------\e[0m";
+        echonice "!"
+        echonice "!"
     fi
 
 
@@ -188,18 +188,18 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/themes
     fi
 else
-    echo " "
-    echo " "
-    echo " ---------------------------------";
-    echo "   ===  ERROR - NOT A GIT REPO ===";
-    echo "   "$WORKING_DIR/$dir;
-    echo "   === IS NOT A GIT REPO       ===";
-    echo " ---------------------------------";
+    echonice " "
+    echonice " "
+    echonice " ---------------------------------";
+    echonice "   ===  ERROR - NOT A GIT REPO ===";
+    echonice "   "$WORKING_DIR/$dir;
+    echonice "   === IS NOT A GIT REPO       ===";
+    echonice " ---------------------------------";
 fi
 
-echo " ################################################"
-echo " ################################################"
-echo " ################################################"
+echonice " ################################################"
+echonice " ################################################"
+echonice " ################################################"
 
 
-echo
+echonice
