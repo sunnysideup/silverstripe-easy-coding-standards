@@ -161,8 +161,7 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     git status
     echo " ---------------------------------";
     if output=$(git status --porcelain) && [ -z "$output" ]; then
-        echo -e "\033[1;32;41m---ok---\e[0m";
-        echo -e "\033[1;32;41m---ok---\e[0m";
+        echo -e "\033[0;32m---ALL DONE---\e[0m";
     else
       echo -e "\033[1;32;41m---error---\e[0m";
       echo -e "\033[1;32;41m---error---\e[0m";
