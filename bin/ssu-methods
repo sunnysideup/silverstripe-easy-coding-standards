@@ -1,16 +1,13 @@
 #!/bin/bash
 
 echonice() {
-   message="$1";
-   echo -e "\033[0;33m$message \033[0m";
+   echo -e "\033[0;33m"$1" \033[0m";
 }
 echogood() {
-   message="$1";
-   echo -e "\033[0;32m$message \033[0m";
+   echo -e "\033[0;32m"$1" \033[0m";
 }
 echobad() {
-   message="$1";
-   echo -e "\033[1;32;41m$message \033[0m";
+   echo -e "\033[1;32;41m"$1" \033[0m";
 }
 
 echoline() {
