@@ -171,19 +171,16 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     git status
     echoline;
     if output=$(git status --porcelain) && [ -z "$output" ]; then
-        echoline;
-        echogood " # ALL DONE";
-        echoline;
+        echogood " # ALL COMMITTED";
     else
-        echobad "!"
-        echobad "!"
-        echoline;
-        echobad " Not all Code is Committed and Pushed";
-        echoline;
-        echobad "!"
-        echobad "!"
+        echobad " Not all Code is Committed";
     fi
-
+    if git diff-index --quiet HEAD --; then
+        echogood " # ALL PUSHED";
+    else
+        echobad " There are changes to push";
+    fi
+    echoline;
 
     if test -f "$WORKING_DIR/$also"; then
         $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/$also
