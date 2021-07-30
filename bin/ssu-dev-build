@@ -53,6 +53,7 @@ composer install
 composer vendor-expose
 composer dumpautoload
 sudo chown www-data public/assets -R
+sudo chown www-data .graphql/ public/assets/ public/admin.types.graphql -R
 sudo -u www-data vendor/bin/sake dev/build flush=all
 
 echoend;
