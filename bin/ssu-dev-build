@@ -48,13 +48,17 @@ echoline
 cd $dir
 echonice " "
 
-sudo ls
-composer install
-composer vendor-expose
-composer dumpautoload
+# cleanup ownership
 sudo chown $(whoami):www-data . -R
 sudo chown www-data public/assets -R
 sudo chown www-data .graphql/ public/assets/ public/admin.types.graphql -R
+
+# composer install
+composer install --prefer-source
+composer vendor-expose
+composer dumpautoload
+
+# dev-build
 sudo -u www-data vendor/bin/sake dev/build flush=all
 
 echoend;
