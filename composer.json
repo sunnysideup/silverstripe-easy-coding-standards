@@ -35,6 +35,7 @@
     "bin/ssu-lint-ecs",
     "bin/ssu-gitpush",
     "bin/ssu-gitpush-vendor-packages",
+    "bin/ssu-large-files",
     "bin/ssu-lint-all",
     "bin/ssu-lint-compat",
     "bin/ssu-lint-js",
