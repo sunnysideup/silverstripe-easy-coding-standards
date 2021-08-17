@@ -70,6 +70,7 @@ cd $WORKING_DIR/$dir
 if test -f "$WORKING_DIR/$dir/.git/config"; then
     echonice "   # check git status"
     git status
+    git config push.default matching
 
     if [[ "$commitAndPush" == "yes" ]]; then
         echoline;
