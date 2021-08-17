@@ -87,9 +87,9 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
         #git commit $WORKING_DIR/$logFile -m "$message"
     fi
     echoline;
-    echonice "   # pulling commits from git repo"
+    echonice "   # pulling commits for the current branch from git repo"
     echoline;
-    git pull
+    git pull origin $(git rev-parse --abbrev-ref HEAD)
 
     if [[ "$commitAndPush" == "yes" ]]; then
         echoline;
