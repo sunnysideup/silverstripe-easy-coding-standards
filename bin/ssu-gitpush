@@ -92,10 +92,11 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     git pull origin $(git rev-parse --abbrev-ref HEAD)
 
     if [[ "$commitAndPush" == "yes" ]]; then
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
         echoline;
-        echonice "   # pushing commits to git repo"
+        echonice "   # pushing commits to git repo, branch: $BRANCH" 
         echoline;
-        git push
+        git push origin $(git rev-parse --abbrev-ref HEAD)
     fi
 
 
