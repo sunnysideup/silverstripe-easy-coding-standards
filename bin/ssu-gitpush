@@ -68,9 +68,20 @@ echonice "   # going to right directory: $WORKING_DIR/$dir"
 cd $WORKING_DIR/$dir
 
 if test -f "$WORKING_DIR/$dir/.git/config"; then
-    echonice "   # check git status"
-    git status
+    # set the right way to look at branches
     git config push.default matching
+
+    echoline;
+    echonice "   # check git status"
+    echoline;
+    git status
+    
+    echoline;
+    echonice "   # current commit"
+    echoline;
+    git rev-parse --short --verify HEAD
+
+    echoline;
 
     if [[ "$commitAndPush" == "yes" ]]; then
         echoline;
@@ -89,13 +100,13 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     echoline;
     echonice "   # pulling commits for the current branch from git repo"
     echoline;
-    git pull origin $(git rev-parse --abbrev-ref HEAD)
-
+    git pull origin $(git rev-parse --abbrev-ref HEAD) --ipv4
+    git fetch all --ipv4
     if [[ "$commitAndPush" == "yes" ]]; then
         echoline;
         echonice "   # pushing commits to git repo"
         echoline;
-        git push
+        git push origin $(git rev-parse --abbrev-ref HEAD)  --ipv4
     fi
 
 
@@ -157,7 +168,7 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
 
         git tag -a $NEW_TAG -m "auto-generated linter tag"
 
-        git push --tags
+        git push --tags --ipv4
 
         git tag -v
 
