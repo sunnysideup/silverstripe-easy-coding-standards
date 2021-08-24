@@ -101,7 +101,7 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     echonice "   # pulling commits for the current branch from git repo"
     echoline;
     git pull origin $(git rev-parse --abbrev-ref HEAD) --ipv4
-    git fetch all --ipv4
+    git fetch --all --ipv4
     if [[ "$commitAndPush" == "yes" ]]; then
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
         echoline;
