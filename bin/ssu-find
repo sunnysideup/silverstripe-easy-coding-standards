@@ -1,0 +1,56 @@
+#!/bin/bash
+
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/ssu-methods
+
+help_and_exit() {
+    echoline;
+    echonice "   Available settings:";
+    echoline;
+    echonice "   -f, --find          string you are looking for"
+    echonice " "
+    echoline;
+    echonice "   Example usage:"
+    echoline;
+    echonice "   e.g. ssu-find app/src -f 'piece of code'";
+    echoline;
+    echonice " "
+    echonice " "
+    exit;
+}
+
+dir='./'
+
+while (( $# )); do
+  case $1 in
+    -f|--find)               find=$2;shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       dir=$1;;
+  esac
+  shift
+done
+
+echonice " "
+echonice " "
+echoline;
+echonice "   Running grep search";
+echoline;
+echonice "   Directory of script:           $SCRIPT_DIR";
+echonice "   Directory to analyse:          $WORKING_DIR/$dir";
+echoline;
+echonice " "
+echonice " "
+
+echoline
+echonice "   Changing directory to $dir "
+echoline
+cd $dir
+echonice " "
+
+# dev-build
+grep -rnw ./ -e "'$find'"
+
+echoend;
