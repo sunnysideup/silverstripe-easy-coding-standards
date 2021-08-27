@@ -31,6 +31,7 @@
     "rector/rector": "^0.10.3"
   },
   "bin": [
+    "bin/ssu-add-site",
     "bin/ssu-dev-build",
     "bin/ssu-find",
     "bin/ssu-lint-ecs",
