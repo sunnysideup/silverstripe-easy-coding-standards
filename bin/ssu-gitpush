@@ -26,7 +26,6 @@ help_and_exit() {
 
     exit;
 }
-
 commitAndPush="yes"
 message="WIP"
 dir='./'
@@ -66,8 +65,10 @@ echonice " "
 
 echonice "   # going to right directory: $WORKING_DIR/$dir"
 cd $WORKING_DIR/$dir
+GIT_DIR=$(git rev-parse --show-toplevel)
 
-if test -f "$WORKING_DIR/$dir/.git/config"; then
+
+if test -f "$GIT_DIR/.git/config"; then
     # set the right way to look at branches
     git config push.default matching
 
@@ -75,7 +76,7 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     echonice "   # check git status"
     echoline;
     git status
-    
+
     echoline;
     echonice "   # current commit"
     echoline;
@@ -105,7 +106,7 @@ if test -f "$WORKING_DIR/$dir/.git/config"; then
     if [[ "$commitAndPush" == "yes" ]]; then
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
         echoline;
-        echonice "   # pushing commits to git repo, branch: $BRANCH" 
+        echonice "   # pushing commits to git repo, branch: $BRANCH"
         echoline;
         git push origin $(git rev-parse --abbrev-ref HEAD)  --ipv4
     fi
@@ -208,6 +209,8 @@ else
     echoline;
     echobad "   ===  ERROR - NOT A GIT REPO ===";
     echobad "   "$WORKING_DIR/$dir;
+    echobad "   "we tried to find the git dir: $GIT_DIR but that could not be found.;
+    echobad "   "But that did not work.;
     echobad "   === IS NOT A GIT REPO       ===";
     echoline;
 fi
