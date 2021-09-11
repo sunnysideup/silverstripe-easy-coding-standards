@@ -59,10 +59,18 @@ echoline;
 echonice " "
 echonice " "
 
+echoline
+echonice "   Removing folders that do not need to be there ..."
+echoline
+
+find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"
+find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"  -exec rm "{}" -rf  \;
+ssu-remove-origs $WORKING_DIR/$dir
 
 echoline
 echonice "   going to look for folders in $WORKING_DIR/$dir"
 echoline
+
 
 find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
     while IFS= read -r -d '' line; do

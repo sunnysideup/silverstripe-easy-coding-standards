@@ -17,7 +17,7 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-remove-origs  -a other/dir -d yes";
+    echonice "   ssu-remove-origs app -a other/dir -d yes";
     echoline;
     echonice " "
     echonice " "
