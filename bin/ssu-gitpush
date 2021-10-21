@@ -46,6 +46,8 @@ while (( $# )); do
   shift
 done
 
+$newVesion = "$newVersion" | tr '[:upper:]' '[:lower:]'
+
 echonice " "
 echonice " "
 echoline;
