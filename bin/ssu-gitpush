@@ -46,7 +46,9 @@ while (( $# )); do
   shift
 done
 
-$newVesion = "$newVersion" | tr '[:upper:]' '[:lower:]'
+newVersionLowerCase=$(echo ${newVersion} | tr '[:upper:]' '[:lower:]')
+
+exit 1
 
 echonice " "
 echonice " "
@@ -58,7 +60,7 @@ echonice "   directory to commit:           $WORKING_DIR/$dir";
 echoline;
 echonice "   Commit and Push:               $commitAndPush";
 echonice "   Message:                       $message";
-echonice "   Create New Tag:                $newVersion";
+echonice "   Create New Tag:                $newVersionLowercase";
 echonice "   Also check:                    $WORKING_DIR/$also";
 echonice "   Also include themes:           $alsoDoThemes";
 echoline;
@@ -114,7 +116,7 @@ if test -f "$GIT_DIR/.git/config"; then
     fi
 
 
-    if [[ "$newVersion" == "patch" || "$newVersion" == "minor" || "$newVersion" == "major" ]]; then
+    if [[ "$newVersionLowerCase" == "patch" || "$newVersionLowerCase" == "minor" || "$newVersionLowerCase" == "major" ]]; then
 
         git fetch --all --ipv4
 
