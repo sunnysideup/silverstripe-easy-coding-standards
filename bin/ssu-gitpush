@@ -48,8 +48,6 @@ done
 
 newVersionLowerCase=$(echo ${newVersion} | tr '[:upper:]' '[:lower:]')
 
-exit 1
-
 echonice " "
 echonice " "
 echoline;
