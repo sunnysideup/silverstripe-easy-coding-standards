@@ -38,7 +38,7 @@ echoline;
 echonice "   Directory of script:                    $SCRIPT_DIR";
 echonice "   Directory to analyse:                   $WORKING_DIR/$dir";
 echoline;
-echonice "   Force (rm vendor first) (-f|--force):   $dryRun";
+echonice "   Force (rm vendor first) (-f|--force):   $force";
 echoline;
 
 cd $WORKING_DIR/$dir
