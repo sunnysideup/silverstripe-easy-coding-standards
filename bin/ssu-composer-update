@@ -32,25 +32,19 @@ while (( $# )); do
   shift
 done
 
-echonice " "
-echonice " "
 echoline;
 echonice "   Running Remove Origs";
 echoline;
-echonice "   Directory of script:           $SCRIPT_DIR";
-echonice "   Directory to analyse:          $WORKING_DIR/$dir";
+echonice "   Directory of script:                    $SCRIPT_DIR";
+echonice "   Directory to analyse:                   $WORKING_DIR/$dir";
 echoline;
-echonice "   Also check:                    $WORKING_DIR/$also";
-echonice "   Is safe only (-d|--dry-run):   $dryRun";
+echonice "   Force (rm vendor first) (-f|--force):   $dryRun";
 echoline;
-echonice " "
-echonice " "
 
-
+cd $WORKING_DIR/$dir
 if [[ "$force" == "yes" ]]; then
     rm vendor -rf
 fi
-
 composer update --prefer-source
 ssu-gitpush . -m "MINOR: composer update"
 
