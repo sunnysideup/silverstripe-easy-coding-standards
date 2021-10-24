@@ -32,6 +32,7 @@
   },
   "bin": [
     "bin/ssu-add-site",
+    "bin/ssu-composer-update",
     "bin/ssu-dev-build",
     "bin/ssu-find",
     "bin/ssu-lint-ecs",
