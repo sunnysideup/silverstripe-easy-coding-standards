@@ -68,7 +68,7 @@ echoline
 
 find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"
 find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"  -exec rm "{}" -rf  \;
-ssu-remove-origs $WORKING_DIR/$dir
+ssu-remove-origs $dir
 
 echoline
 echonice "   going to look for folders in $WORKING_DIR/$dir"
@@ -83,10 +83,7 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         echoline
         cd "$line";
         if [[ "$statusOnly" == "yes" ]]; then
-            echoline;
-            echonice "   # check git status"
-            echoline;
-            git status
+            git status -s
         else
             $SCRIPT_DIR/ssu-gitpush . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
         fi
