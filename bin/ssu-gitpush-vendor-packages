@@ -32,11 +32,13 @@ help_and_exit() {
 commitAndPush='yes'
 message='WIP'
 newVersion='no'
+statusOnly='no'
 while (( $# )); do
   case $1 in
     -m|--message)          message=$2;shift ;;
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
     -v|--new-version)      newVersion=$2;shift ;;
+    -s|--status-only)      statusOnly=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
     *)                     dir=$1;;
@@ -55,6 +57,7 @@ echoline;
 echonice "   Message:                       $message";
 echonice "   Commit and Push?:              $commitAndPush";
 echonice "   Create New tag?:               $newVersion";
+echonice "   Status Only?:                  $statusOnly";
 echoline;
 echonice " "
 echonice " "
@@ -72,13 +75,21 @@ echonice "   going to look for folders in $WORKING_DIR/$dir"
 echoline
 
 
+
 find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
     while IFS= read -r -d '' line; do
         echoline
         echonice "   DOING: $line"  ;
         echoline
         cd "$line";
-        $SCRIPT_DIR/ssu-gitpush . -m "$message" -c $commitAndPush -v $newVersion ;
+        if [[ "$statusOnly" == "yes" ]]; then
+            echoline;
+            echonice "   # check git status"
+            echoline;
+            git status
+        else
+            $SCRIPT_DIR/ssu-gitpush . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
+        fi
     done
 
 

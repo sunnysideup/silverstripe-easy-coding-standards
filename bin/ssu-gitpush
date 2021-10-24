@@ -14,6 +14,7 @@ help_and_exit() {
     echonice "   -m, --message                  commit message";
     echonice "   -v, --new-version              create new tag? options are no|patch|minor|major";
     echonice "   -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
+    echonice "   -s, --status-only              include folders in themes";
     echonice "   -t, --themes-also              include folders in themes";
     echonice " "
     echoline;
@@ -32,12 +33,14 @@ dir='./'
 newVersion='no'
 also='nothing-here-hopefully'
 alsoDoThemes='no'
+statusOnly='no'
 while (( $# )); do
   case $1 in
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
     -m|--message)          message=$2;shift ;;
     -v|--new-version)      newVersion=$2;shift ;;
     -a|--also)             also=$2;shift ;;
+    -s|--status-only)      statusOnly=$2;shift ;;
     -t|--themes-also)      alsoDoThemes=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
@@ -60,6 +63,7 @@ echonice "   Commit and Push:               $commitAndPush";
 echonice "   Message:                       $message";
 echonice "   Create New Tag:                $newVersionLowercase";
 echonice "   Also check:                    $WORKING_DIR/$also";
+echonice "   Status Only:                   $statusOnly";
 echonice "   Also include themes:           $alsoDoThemes";
 echoline;
 echonice " "
@@ -87,6 +91,10 @@ if test -f "$GIT_DIR/.git/config"; then
     git rev-parse --short --verify HEAD
 
     echoline;
+
+    if [[ "$statusOnly" == "yes" ]]; then
+        exit 0
+    fi
 
     if [[ "$commitAndPush" == "yes" ]]; then
         echoline;
