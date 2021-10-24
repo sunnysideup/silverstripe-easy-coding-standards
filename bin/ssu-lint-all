@@ -161,7 +161,7 @@ if [ -z "$(git status --porcelain)" ]; then
     echoline
 else
     echoline
-    echonice "  Sorry, can not run, there are uncommitted changes"
+    echobad "  Sorry, can not run, there are uncommitted changes"
     echoline
 fi
 
