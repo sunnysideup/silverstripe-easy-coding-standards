@@ -12,14 +12,11 @@ help_and_exit() {
     echonice "   Available settings:";
     echoline;
     echonice "   -f, --force                  delete vendor folder first!"
-    echonice "  "
     echoline;
     echonice "   Example usage:"
     echoline;
     echonice "   ssu-composer-update . -f 'yes'";
     echoline;
-    echonice " "
-    echonice " "
     exit;
 }
 
