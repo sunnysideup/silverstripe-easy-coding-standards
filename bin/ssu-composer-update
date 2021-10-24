@@ -1,0 +1,60 @@
+#!/bin/bash
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/ssu-methods
+# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+
+
+
+help_and_exit() {
+    echoline;
+    echonice "   Available settings:";
+    echoline;
+    echonice "   -f, --force                  delete vendor folder first!"
+    echonice "  "
+    echoline;
+    echonice "   Example usage:"
+    echoline;
+    echonice "   ssu-composer-update . -f 'yes'";
+    echoline;
+    echonice " "
+    echonice " "
+    exit;
+}
+
+force='no'
+dir='./'
+while (( $# )); do
+  case $1 in
+    -f|--force)        force=$2;shift ;;
+    -*)                printf 'Unknown option: %q\n\n' "$1";
+                       help_and_exit 1 ;;
+    *)                 dir=$1;;
+  esac
+  shift
+done
+
+echonice " "
+echonice " "
+echoline;
+echonice "   Running Remove Origs";
+echoline;
+echonice "   Directory of script:           $SCRIPT_DIR";
+echonice "   Directory to analyse:          $WORKING_DIR/$dir";
+echoline;
+echonice "   Also check:                    $WORKING_DIR/$also";
+echonice "   Is safe only (-d|--dry-run):   $dryRun";
+echoline;
+echonice " "
+echonice " "
+
+
+if [[ "$force" == "yes" ]]; then
+    rm vendor -rf
+fi
+
+composer update --prefer-source
+ssu-gitpush . -m "MINOR: composer update"
+
+echoend;
