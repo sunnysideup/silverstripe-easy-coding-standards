@@ -2,7 +2,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 # : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 
@@ -11,11 +11,13 @@ help_and_exit() {
     echoline;
     echonice "   Available settings:";
     echoline;
+    echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    echonice "   -d, --dry-run                  is test only (default NO!)"
     echonice "  "
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-large-files ./";
+    echonice "   sake-remove-origs app -a other/dir -d yes";
     echoline;
     echonice " "
     echonice " "
@@ -27,6 +29,8 @@ dryRun='no'
 dir='app/src'
 while (( $# )); do
   case $1 in
+    -a|--also)         also=$2;shift ;;
+    -d|--dry-run)      dryRun=$2;shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -37,14 +41,25 @@ done
 echonice " "
 echonice " "
 echoline;
-echonice "   Find Large Files";
+echonice "   Running Remove Origs";
 echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
 echoline;
+echonice "   Also check:                    $WORKING_DIR/$also";
+echonice "   Is test only (-d|--dry-run):   $dryRun";
+echoline;
 echonice " "
 echonice " "
 
-find $WORKING_DIR/$dir -xdev -type f -size +100M -exec du -sh {} ';' | sort -rh | head -n50
+if test -f "$WORKING_DIR/$also"; then
+    $SCRIPT_DIR/sake-remove-origs -a 'nothing-here-hopefully' -d $dryRun
+fi
+
+find $WORKING_DIR/$dir -name "*.orig"
+
+if [[ "$dryRun" == "no" ]]; then
+    find $WORKING_DIR/$dir -name "*.orig" -exec rm "{}" \;
+fi
 
 echoend;

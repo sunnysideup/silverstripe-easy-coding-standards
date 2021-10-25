@@ -3,7 +3,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 
 if [ "$1" != "" ]; then
     dir=$1;
@@ -22,7 +22,7 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
+    echonice "   sake-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
     echoline;
     echonice " "
     echonice " "
@@ -68,7 +68,7 @@ echoline
 
 find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"
 find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"  -exec rm "{}" -rf  \;
-ssu-remove-origs $dir
+sake-remove-origs $dir
 
 echoline
 echonice "   going to look for folders in $WORKING_DIR/$dir"
@@ -85,7 +85,7 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         if [[ "$statusOnly" == "yes" ]]; then
             git status -s
         else
-            $SCRIPT_DIR/ssu-gitpush . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
+            $SCRIPT_DIR/sake-gitpush . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
         fi
     done
 

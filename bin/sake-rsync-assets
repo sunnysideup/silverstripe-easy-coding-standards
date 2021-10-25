@@ -2,7 +2,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 
 
 help_and_exit() {
@@ -14,7 +14,7 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-rsync-assets my-server:/var/www/website-root";
+    echonice "   sake-rsync-assets my-server:/var/www/website-root";
     echoline;
     echonice " "
     echonice " "

@@ -3,7 +3,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 
 help_and_exit() {
     echoline;
@@ -21,7 +21,7 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
+    echonice "   sake-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
     echoline;
     echonice " "
     echonice " "
@@ -95,41 +95,41 @@ if [ -z "$(git status --porcelain)" ]; then
     cd -
 
     echonice "   # remove origs"
-    $SCRIPT_DIR/ssu-remove-origs -a $also $dir
+    $SCRIPT_DIR/sake-remove-origs -a $also $dir
     cd $WORKING_DIR
 
     echonice "   # run php check"
-    $SCRIPT_DIR/ssu-lint-compat -p $phpVersion $dir
+    $SCRIPT_DIR/sake-lint-compat -p $phpVersion $dir
     cd $WORKING_DIR
 
     echonice "   # run linter ecs #1"
-    $SCRIPT_DIR/ssu-lint-ecs -a $also $dir
+    $SCRIPT_DIR/sake-lint-ecs -a $also $dir
 
     echonice "   # run rector #1"
-    $SCRIPT_DIR/ssu-lint-rector -a $also $dir
+    $SCRIPT_DIR/sake-lint-rector -a $also $dir
     cd $WORKING_DIR
 
     echonice "   # run ecs #2"
-    $SCRIPT_DIR/ssu-lint-ecs -a $also $dir
+    $SCRIPT_DIR/sake-lint-ecs -a $also $dir
     cd $WORKING_DIR
 
     echonice "   # run rector #2"
-    $SCRIPT_DIR/ssu-lint-rector -a $also $dir
+    $SCRIPT_DIR/sake-lint-rector -a $also $dir
     cd $WORKING_DIR
 
     echonice "   # run ecs #3"
-    $SCRIPT_DIR/ssu-lint-ecs -a $also $dir
+    $SCRIPT_DIR/sake-lint-ecs -a $also $dir
     cd $WORKING_DIR
 
     echonice "   # run stan"
-    $SCRIPT_DIR/ssu-lint-stan -a $also -l 2 $dir
+    $SCRIPT_DIR/sake-lint-stan -a $also -l 2 $dir
     cd $WORKING_DIR
 
     if test -f "$WORKING_DIR/$also"; then
         echonice " #########################"
         echonice "   # run the above on $also"
         echonice " #########################"
-        $SCRIPT_DIR/ssu-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
+        $SCRIPT_DIR/sake-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
         cd $WORKING_DIR
     fi
 
@@ -137,7 +137,7 @@ if [ -z "$(git status --porcelain)" ]; then
         echonice " #########################"
         echonice "   # run the above on themes"
         echonice " #########################"
-        $SCRIPT_DIR/ssu-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso themes
+        $SCRIPT_DIR/sake-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso themes
         cd $WORKING_DIR
     fi
 
@@ -146,14 +146,14 @@ if [ -z "$(git status --porcelain)" ]; then
         echonice " #########################"
         echonice "   # run javascript linter"
         echonice " #########################"
-        $SCRIPT_DIR/ssu-lint-js $WORKING_DIR
+        $SCRIPT_DIR/sake-lint-js $WORKING_DIR
         cd $WORKING_DIR
     fi
 
     echoline
     echonice "   commit in $WORKING_DIR/$dir and $also"
     echoline
-    $SCRIPT_DIR/ssu-gitpush -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
+    $SCRIPT_DIR/sake-gitpush -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
     cd $WORKING_DIR
 
     echoline

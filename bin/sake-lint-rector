@@ -5,7 +5,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 # : ${rectorConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rector.php}
 
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 
 help_and_exit() {
     echoline;
@@ -17,7 +17,7 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-lint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
+    echonice "   sake-lint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
     echoline;
     echonice " "
     echonice " "
@@ -53,7 +53,7 @@ echonice " "
 echonice " "
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/ssu-lint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also
+    $SCRIPT_DIR/sake-lint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also
 fi
 
 $SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig

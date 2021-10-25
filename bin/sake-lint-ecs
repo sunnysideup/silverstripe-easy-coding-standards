@@ -1,8 +1,9 @@
 #!/bin/bash
 
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 # : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 
@@ -12,25 +13,25 @@ help_and_exit() {
     echonice "   Available settings:";
     echoline;
     echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echonice "   -d, --dry-run                  is test only (default NO!)"
+    echonice "   -e, --ecs-config               ecs config file locaton";
     echonice "  "
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-remove-origs app -a other/dir -d yes";
+    echonice "   sake-lint-ecs   -a app_more/_config.php   -e ./ecs.php   foo/bar ";
     echoline;
     echonice " "
     echonice " "
     exit;
 }
 
-also=''
-dryRun='no'
+also='app/_config.php'
+ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.php"
 dir='app/src'
 while (( $# )); do
   case $1 in
     -a|--also)         also=$2;shift ;;
-    -d|--dry-run)      dryRun=$2;shift ;;
+    -e|--ecs-config)   ecsConfig=$2;shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -41,25 +42,23 @@ done
 echonice " "
 echonice " "
 echoline;
-echonice "   Running Remove Origs";
+echonice "   Running Easy Conding Standards";
 echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
 echoline;
 echonice "   Also check:                    $WORKING_DIR/$also";
-echonice "   Is test only (-d|--dry-run):   $dryRun";
+echonice "   Ecs config file:               $ecsConfig";
 echoline;
 echonice " "
 echonice " "
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/ssu-remove-origs -a 'nothing-here-hopefully' -d $dryRun
+    $SCRIPT_DIR/sake-lint-ecs -a 'nothing-here-hopefully' -e $ecsConfig $also
 fi
 
-find $WORKING_DIR/$dir -name "*.orig"
 
-if [[ "$dryRun" == "no" ]]; then
-    find $WORKING_DIR/$dir -name "*.orig" -exec rm "{}" \;
-fi
+$SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
+$SCRIPT_DIR/ecs check-markdown $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
 
 echoend;

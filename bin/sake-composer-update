@@ -2,7 +2,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 # : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 
@@ -15,7 +15,7 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-composer-update . -f 'yes'";
+    echonice "   sake-composer-update . -f 'yes'";
     echoline;
     exit;
 }
@@ -46,7 +46,7 @@ if [[ "$force" == "yes" ]]; then
     rm vendor -rf
 fi
 composer update --prefer-source
-ssu-gitpush . -m "MINOR: composer update"
+sake-gitpush . -m "MINOR: composer update"
 echoline;
 
 cd $WORKING_DIR/$dir

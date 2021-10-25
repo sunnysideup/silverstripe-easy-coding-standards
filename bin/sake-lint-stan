@@ -3,7 +3,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 if [ "$1" != "" ]; then
@@ -23,7 +23,7 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
+    echonice "   sake-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
     echoline;
     echonice " "
     echonice " "
@@ -61,7 +61,7 @@ echonice " "
 echonice " "
 
 if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/ssu-lint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also
+    $SCRIPT_DIR/sake-lint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also
 fi
 $SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$dir
 echoend;

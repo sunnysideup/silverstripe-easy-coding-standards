@@ -2,7 +2,8 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
+
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
 if [ "$1" != "" ]; then
@@ -19,7 +20,7 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-npm-build themes/client";
+    echonice "   sake-npm-watch themes/client";
     echoline;
     echonice " "
     echonice " "
@@ -38,7 +39,7 @@ done
 echonice " "
 echonice " "
 echoline;
-echonice "   Running NPM build";
+echonice "   Running NPM watch";
 echoline;
 echonice "   Directory of script:              $SCRIPT_DIR";
 echonice "   Directory to install:             $WORKING_DIR/$dir";
@@ -47,7 +48,6 @@ echonice " "
 echonice " "
 
 cd themes/sswebpack_engine_only/
-npm run build --theme_dir=$dir
-
+npm run watch --theme_dir=$dir
 
 echoend;

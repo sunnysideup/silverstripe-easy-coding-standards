@@ -3,7 +3,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 
 if [ "$1" != "" ]; then
     dir=$1;
@@ -27,8 +27,8 @@ help_and_exit() {
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-lint-js .";
-    echonice "   ssu-lint-js foo/bar";
+    echonice "   sake-lint-js .";
+    echonice "   sake-lint-js foo/bar";
     echoline;
     echonice " "
     echonice " "
@@ -60,8 +60,8 @@ echoline;
 echonice "   files to analyse: $WORKING_DIR/$dir/*.js";
 echoline;
 echonice "   Example usage:"
-echonice "   e.g. ssu-lint-js app/client/javascript";
-echonice "   e.g. ssu-lint-js .";
+echonice "   e.g. sake-lint-js app/client/javascript";
+echonice "   e.g. sake-lint-js .";
 echoline;
 echonice " "
 echonice " "

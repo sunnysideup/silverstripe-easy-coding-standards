@@ -3,17 +3,17 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/ssu-methods
+source $SCRIPT_DIR/sake-methods
 
 help_and_exit() {
     echoline;
     echonice "   Available settings:";
     echoline;
-    echonice "  NONE"
+    echonice " "
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   ssu-dev-build .";
+    echonice "   e.g. sake-add-site ./  # do this in a place where you would like the new site to be"
     echoline;
     echonice " "
     echonice " "
@@ -34,7 +34,7 @@ done
 echonice " "
 echonice " "
 echoline;
-echonice "   Running Dev/Build";
+echonice "   Running add-site";
 echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
@@ -48,15 +48,7 @@ echoline
 cd $dir
 echonice " "
 
-# cleanup ownership
-sudo chown $(whoami):www-data . -R
-sudo chown www-data public/assets -R
-sudo chown www-data .graphql/ public/assets/ public/admin.types.graphql -R
-
-# composer install
-composer install 
-
 # dev-build
-sudo -u www-data vendor/bin/sake dev/build flush=all
+echo "TO BE COMPLETED"
 
 echoend;
