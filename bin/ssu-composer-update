@@ -47,5 +47,16 @@ if [[ "$force" == "yes" ]]; then
 fi
 composer update --prefer-source
 ssu-gitpush . -m "MINOR: composer update"
-
+find
 echoend;
+
+find $WORKING_DIR/$dir/vendor -mindepth 2 -maxdepth 2 -type d -print0 |
+    while IFS= read -r -d '' line; do
+        if [ -d "$line" ]; then
+
+        else
+            echoline
+            echonice "   CHECK OUT AS DIST: $line"  ;
+            echoline
+        fi
+    done
