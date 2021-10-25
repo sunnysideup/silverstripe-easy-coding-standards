@@ -157,25 +157,25 @@ if test -f "$GIT_DIR/.git/config"; then
             exit 1
         fi
 
-        if [[ "$newVersion" == "major" ]]; then
+        if [[ "$newVersionLowerCase" == "major" ]]; then
           ((a[0]++))
           a[1]=0
           a[2]=0
         fi
 
-        if [[ "$newVersion" == "minor" ]]; then
+        if [[ "$newVersionLowerCase" == "minor" ]]; then
           ((a[1]++))
           a[2]=0
         fi
 
-        if [[ "$newVersion" == "patch" ]]; then
+        if [[ "$newVersionLowerCase" == "patch" ]]; then
           ((a[2]++))
         fi
 
         NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
 
         echoline;
-        echonice "   Found new Tag ($newVersion)";
+        echonice "   Found new Tag ($newVersionLowerCase)";
         echoline;
         echonice "   $NEW_TAG";
         echoline;
@@ -209,11 +209,11 @@ if test -f "$GIT_DIR/.git/config"; then
     echoline;
 
     if test -f "$WORKING_DIR/$also"; then
-        $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/$also
+        $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush $WORKING_DIR/$also
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
-        $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush -v $newVersion $WORKING_DIR/themes
+        $SCRIPT_DIR/ssu-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush  $WORKING_DIR/themes
     fi
 else
     echobad " "
