@@ -53,6 +53,6 @@ cd $WORKING_DIR/$dir
 find 'vendor' -mindepth 2 -maxdepth 2 -type d -print0 |
     while IFS= read -r -d '' line; do
         if [ ! -d "$line/.git" ]; then
-            echobad "   CHECK OUT AS DIST: $line"  ;
+            echobad "   CHECKED OUT AS DIST: $line ... consider --prefer-source if you want to change them."  ;
         fi
     done
