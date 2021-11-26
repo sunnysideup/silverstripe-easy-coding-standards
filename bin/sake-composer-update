@@ -35,10 +35,10 @@ done
 echoline;
 echonice "   Running Remove Origs";
 echoline;
-echonice "   Directory of script:                    $SCRIPT_DIR";
-echonice "   Directory to analyse:                   $WORKING_DIR/$dir";
+echonice "   Directory of script:                       $SCRIPT_DIR";
+echonice "   Directory to analyse:                      $WORKING_DIR/$dir";
 echoline;
-echonice "   Force (rm vendor first) (-f|--force):   $force";
+echonice "   Force aka rm vendor first, (-f|--force):   $force";
 echoline;
 
 cd $WORKING_DIR/$dir
