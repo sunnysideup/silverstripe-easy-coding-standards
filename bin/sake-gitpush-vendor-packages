@@ -18,6 +18,7 @@ help_and_exit() {
     echonice "   -m, --message                  message - e.g. Lint";
     echonice "   -c, --commit-and-push          commit and push also? enter yes to execute";
     echonice "   -v, --new-version              create new tag? options are no|patch|minor|major";
+    echonice "   -s, --status-only              check if there are any changes and there is a git folder present"
     echonice " "
     echoline;
     echonice "   Example usage:"
@@ -83,7 +84,19 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         echoline
         cd "$line";
         if [[ "$statusOnly" == "yes" ]]; then
-            git status -s
+            if test -f "./.git/config"; then
+                git status -s
+            else
+                echobad " "
+                echobad " "
+                echoline;
+                echobad "   ===  ERROR - NOT A GIT REPO ===";
+                echobad "   "$WORKING_DIR/$dir;
+                echobad "   "we tried to find the git dir: $GIT_DIR but that could not be found.;
+                echobad "   "But that did not work.;
+                echobad "   === IS NOT A GIT REPO       ===";
+                echoline;
+            fi
         else
             $SCRIPT_DIR/sake-gitpush . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
         fi
