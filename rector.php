@@ -9,6 +9,8 @@ use Rector\CodeQuality\Rector\Identical\SimplifyBoolIdenticalTrueRector;
 use Rector\CodeQuality\Rector\If_\CombineIfRector;
 use Rector\CodeQuality\Rector\If_\ExplicitBoolCompareRector;
 use Rector\CodeQuality\Rector\Return_\SimplifyUselessVariableRector;
+
+use Rector\CodeQuality\Rector\Isset_\IssetOnPropertyObjectToPropertyExistsRector;
 use Rector\CodingStyle\Rector\Encapsed\EncapsedStringsToSprintfRector;
 use Rector\CodingStyle\Rector\If_\NullableCompareToNullRector;
 use Rector\Core\Configuration\Option;
@@ -34,6 +36,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $containerConfigurator->import(SetList::CODING_STYLE);
 
     $parameters->set(Option::SKIP, [
+        IssetOnPropertyObjectToPropertyExistsRector::class,
         RemoveUnusedConstructorParamRector::class,
         RemoveUnusedPrivateConstantRector::class,
         RemoveUnusedPrivatePropertyRector::class,
