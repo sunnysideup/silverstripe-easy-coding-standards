@@ -46,8 +46,8 @@ echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
 echoline;
-echonice "   Also check:                    $WORKING_DIR/$also";
-echonice "   Is test only (-d|--dry-run):   $dryRun";
+echonice "   Also check (-a):               $WORKING_DIR/$also";
+echonice "   Is test only (-d):             $dryRun";
 echoline;
 echonice " "
 echonice " "

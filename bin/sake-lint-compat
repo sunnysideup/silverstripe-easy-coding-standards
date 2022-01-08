@@ -45,8 +45,8 @@ echoline;
 echonice "   directory of script:           $SCRIPT_DIR";
 echonice "   directory to analyse:          $WORKING_DIR/$dir";
 echoline;
-echonice "   PHP Version:                   $phpVersion";
-echonice "   Also Check:                    $also";
+echonice "   PHP Version (-p):              $phpVersion";
+echonice "   Also Check (-a):               $also";
 echoline;
 echonice " "
 echonice " "

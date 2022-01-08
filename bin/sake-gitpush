@@ -59,12 +59,12 @@ echoline;
 echonice "   directory of script:           $SCRIPT_DIR";
 echonice "   directory to commit:           $WORKING_DIR/$dir";
 echoline;
-echonice "   Commit and Push:               $commitAndPush";
-echonice "   Message:                       $message";
-echonice "   Create New Tag:                $newVersionLowercase";
-echonice "   Also check:                    $WORKING_DIR/$also";
-echonice "   Status Only:                   $statusOnly";
-echonice "   Also include themes:           $alsoDoThemes";
+echonice "   Commit and Push (-c):          $commitAndPush";
+echonice "   Message (-m):                  $message";
+echonice "   Create New Tag (-v):           $newVersionLowercase";
+echonice "   Also check (-a):               $WORKING_DIR/$also";
+echonice "   Status Only (-s):              $statusOnly";
+echonice "   Also include themes (-t):      $alsoDoThemes";
 echoline;
 echonice " "
 echonice " "

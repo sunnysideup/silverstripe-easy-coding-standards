@@ -55,10 +55,10 @@ echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
 echoline;
-echonice "   Message:                       $message";
-echonice "   Commit and Push?:              $commitAndPush";
-echonice "   Create New tag?:               $newVersion";
-echonice "   Status Only?:                  $statusOnly";
+echonice "   Message (-m):                  $message";
+echonice "   Commit and Push (-c):          $commitAndPush";
+echonice "   Create New tag (-v):           $newVersion";
+echonice "   Status Only (-s):              $statusOnly";
 echoline;
 echonice " "
 echonice " "

@@ -53,9 +53,9 @@ echoline;
 echonice "   Directory of script:              $SCRIPT_DIR";
 echonice "   Directory to analyse:             $WORKING_DIR/$dir";
 echoline;
-echonice "   Also check:                       $WORKING_DIR/$also";
-echonice "   Level:                            $level (1/6)";
-echonice "   Php stan config file:             $stanConfig";
+echonice "   Also check (-a):                  $WORKING_DIR/$also";
+echonice "   Level (-l):                       $level (1/6)";
+echonice "   Php stan config file (-s):        $stanConfig";
 echoline;
 echonice " "
 echonice " "

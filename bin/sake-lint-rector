@@ -46,8 +46,8 @@ echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
 echoline;
-echonice "   Also check:                    $WORKING_DIR/$also";
-echonice "   Rector config file:            $rectorConfig";
+echonice "   Also check (-a):               $WORKING_DIR/$also";
+echonice "   Rector config file (-r):       $rectorConfig";
 echoline;
 echonice " "
 echonice " "

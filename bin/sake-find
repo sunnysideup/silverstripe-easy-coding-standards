@@ -41,7 +41,7 @@ echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
 echoline;
-echonice " "
+echonice "   Find string (-f|--find):       $find";
 echonice " "
 
 echoline

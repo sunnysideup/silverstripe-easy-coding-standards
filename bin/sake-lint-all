@@ -71,14 +71,14 @@ echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
 echoline;
-echonice "   Just do all of it:             $justDoIt";
-echonice "   Also Check:                    $WORKING_DIR/$also";
-echonice "   Also include themes?:          $alsoDoThemes";
-echonice "   Commit And Push:               $commitAndPush";
-echonice "   New Tag:                       $newVersion";
-echonice "   Message:                       $message";
-echonice "   Javascript Also:               $javascriptAlso";
-echonice "   PHP Version:                   $phpVersion";
+echonice "   Just do all of it (-j):        $justDoIt";
+echonice "   Also Check (-a):               $WORKING_DIR/$also";
+echonice "   Also include themes *(-t):     $alsoDoThemes";
+echonice "   Commit And Push (-c):          $commitAndPush";
+echonice "   New Tag/Version (-v):          $newVersion";
+echonice "   Message (-m):                  $message";
+echonice "   Javascript Also (-j):          $javascriptAlso";
+echonice "   PHP Version (-p):              $phpVersion";
 echoline;
 echonice " "
 echonice " "
