@@ -1,9 +1,12 @@
 #!/bin/bash
 
 
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-methods
+
+
 
 help_and_exit() {
     echoline;
@@ -48,13 +51,14 @@ echoline
 cd $dir
 echonice " "
 
+composer install --prefer-source
+
 # cleanup ownership
 sudo chown $(whoami):www-data . -R
 sudo chown www-data public/assets -R
 sudo chown www-data .graphql/ public/assets/ public/admin.types.graphql -R
 
 # composer install
-composer install --prefer-source
 
 # dev-build
 sudo -u www-data vendor/bin/sake dev/build flush=all
