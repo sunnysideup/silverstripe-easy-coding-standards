@@ -32,7 +32,7 @@ help_and_exit() {
 
 also='app/_config.php'
 stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
-level=2
+level=3
 while (( $# )); do
   case $1 in
     -a|--also)         also=$2;shift ;;
