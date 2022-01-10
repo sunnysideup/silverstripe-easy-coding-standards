@@ -51,15 +51,14 @@ echoline
 cd $dir
 echonice " "
 
+# composer install
 composer install --prefer-source
 
+# we keep all the sudos together...
 # cleanup ownership
 sudo chown $(whoami):www-data . -R
 sudo chown www-data public/assets -R
 sudo chown www-data .graphql/ public/assets/ public/admin.types.graphql -R
-
-# composer install
-
 # dev-build
 sudo -u www-data vendor/bin/sake dev/build flush=all
 
