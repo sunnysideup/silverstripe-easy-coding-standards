@@ -51,6 +51,11 @@ echoline
 cd $dir
 echonice " "
 
+# create necessary folders
+mkdir -p ./public >/dev/null 2>$1
+mkdir -p ./public/assets >/dev/null 2>$1
+mkdir -p ./.graphql >/dev/null 2>$1
+
 # composer install
 composer install --prefer-source
 
