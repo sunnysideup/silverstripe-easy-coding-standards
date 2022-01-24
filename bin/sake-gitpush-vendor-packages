@@ -19,11 +19,12 @@ help_and_exit() {
     echonice "   -c, --commit-and-push          commit and push also? enter yes to execute";
     echonice "   -v, --new-version              create new tag? options are no|patch|minor|major";
     echonice "   -s, --status-only              check if there are any changes and there is a git folder present"
+    echonice "   -f, --full-update              run a full composer update afterwards and commit";
     echonice " "
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   sake-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch   vendor/my-vendor-name";
+    echonice "   sake-gitpush-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch -f no   vendor/my-vendor-name";
     echoline;
     echonice " "
     echonice " "
@@ -34,12 +35,14 @@ commitAndPush='yes'
 message='WIP'
 newVersion='no'
 statusOnly='no'
+fullUpdate='yes'
 while (( $# )); do
   case $1 in
     -m|--message)          message=$2;shift ;;
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
     -v|--new-version)      newVersion=$2;shift ;;
     -s|--status-only)      statusOnly=$2;shift ;;
+    -f|--full-update)      fullUpdate=$2;shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
     *)                     dir=$1;;
@@ -59,6 +62,7 @@ echonice "   Message (-m):                  $message";
 echonice "   Commit and Push (-c):          $commitAndPush";
 echonice "   Create New tag (-v):           $newVersion";
 echonice "   Status Only (-s):              $statusOnly";
+echonice "   Full Composer Update (-f):     $statusOnly";
 echoline;
 echonice " "
 echonice " "
@@ -100,7 +104,14 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         else
             $SCRIPT_DIR/sake-gitpush . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
         fi
+        cd -
     done
 
+if [[ "$fullUpdate" == "yes" ]]; then
+    composer update
+    composer update
+
+    $SCRIPT_DIR/sake-gitpush . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion
+fi
 
 echoend;
