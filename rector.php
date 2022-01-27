@@ -17,6 +17,7 @@ use Rector\Core\Configuration\Option;
 use Rector\DeadCode\Rector\Assign\RemoveUnusedVariableAssignRector;
 use Rector\DeadCode\Rector\Cast\RecastingRemovalRector;
 use Rector\DeadCode\Rector\ClassConst\RemoveUnusedPrivateConstantRector;
+use Rector\DeadCode\Rector\ClassConst\RemoveUnusedPrivateClassConstantRector;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedConstructorParamRector;
 use Rector\DeadCode\Rector\FunctionLike\RemoveCodeAfterReturnRector;
 use Rector\DeadCode\Rector\If_\RemoveDeadInstanceOfRector;
@@ -25,6 +26,8 @@ use Rector\DeadCode\Rector\Property\RemoveUnusedPrivatePropertyRector;
 use Rector\Php74\Rector\Property\TypedPropertyRector;
 use Rector\Set\ValueObject\SetList;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer;
+use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer;
 
 return static function (ContainerConfigurator $containerConfigurator): void {
 
@@ -38,7 +41,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $parameters->set(Option::SKIP, [
         IssetOnPropertyObjectToPropertyExistsRector::class,
         RemoveUnusedConstructorParamRector::class,
-        RemoveUnusedPrivateConstantRector::class,
+        //RemoveUnusedPrivateConstantRector::class,
+        RemoveUnusedPrivateClassConstantRector::class,
         RemoveUnusedPrivatePropertyRector::class,
         RemoveSetterOnlyPropertyAndMethodCallRector::class,
         ArrayOpenerAndCloserNewlineFixer::class,
