@@ -6,4 +6,4 @@ cd $SCRIPT_DIR
 cd ..
 cd ..
 pwd
-composer update
+composer update sunnysideup/easy-coding-standards
