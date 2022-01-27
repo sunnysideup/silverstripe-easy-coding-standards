@@ -11,7 +11,8 @@ parameters:
         - '#Access to an undefined property#'
         - '#Call to an undefined method#'
         - '#on an unknown class [a-zA-Z0-9\\_]+#'
-	
+        - '#is never read, only written#'
+
 #        - '#with incorrect case:#'
 
 #    autoload_directories:
