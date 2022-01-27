@@ -28,6 +28,7 @@ use Rector\Set\ValueObject\SetList;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer;
 use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer;
+// use PhpCsFixer\Fixer\ClassNotation\OrderedClassElementsFixer;
 
 return static function (ContainerConfigurator $containerConfigurator): void {
 
@@ -44,7 +45,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         //RemoveUnusedPrivateConstantRector::class,
         RemoveUnusedPrivateClassConstantRector::class,
         RemoveUnusedPrivatePropertyRector::class,
-        RemoveSetterOnlyPropertyAndMethodCallRector::class,
+        // RemoveSetterOnlyPropertyAndMethodCallRector::class,
         ArrayOpenerAndCloserNewlineFixer::class,
         ArrayListItemNewlineFixer::class,
         SelfAccessorFixer::class,
