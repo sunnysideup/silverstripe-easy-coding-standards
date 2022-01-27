@@ -49,6 +49,6 @@
     "bin/sake-npm-install",
     "bin/sake-npm-watch",
     "bin/sake-remove-origs",
-    "bin/sake-self-updates"
+    "bin/sake-self-update"
   ]
 }
