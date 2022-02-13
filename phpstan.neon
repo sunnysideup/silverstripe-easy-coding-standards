@@ -10,8 +10,9 @@ parameters:
     ignoreErrors:
         - '#Access to an undefined property#'
         - '#Call to an undefined method#'
-        - '#on an unknown class [a-zA-Z0-9\\_]+#'
+#       - '#on an unknown class [a-zA-Z0-9\\_]+#'
         - '#is never read, only written#'
+        - '#but returns SilverStripe\ORM\DataObject|null#'
 
 #        - '#with incorrect case:#'
 
