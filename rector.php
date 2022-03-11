@@ -1,7 +1,7 @@
 <?php
 
 declare(strict_types=1);
-
+use Rector\Core\ValueObject\PhpVersion;
 
 use PhpCsFixer\Fixer\Operator\NotOperatorWithSuccessorSpaceFixer;
 use Rector\CodeQuality\Rector\Identical\SimplifyBoolIdenticalTrueRector;
@@ -34,6 +34,7 @@ use PhpCsFixer\Fixer\ClassNotation\SelfAccessorFixer;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use PhpCsFixer\Fixer\ClassNotation\OrderedClassElementsFixer;
 
+
 return static function (ContainerConfigurator $containerConfigurator): void {
 
     $parameters = $containerConfigurator->parameters();
@@ -42,7 +43,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     // $containerConfigurator->import(SetList::DEAD_CODE); - causes error!
     $containerConfigurator->import(SetList::CODE_QUALITY);
     $containerConfigurator->import(SetList::CODING_STYLE);
-
+    $parameters->set(Option::PHP_VERSION_FEATURES, PhpVersion::PHP_74);
     $parameters->set(Option::SKIP, [
         IssetOnPropertyObjectToPropertyExistsRector::class,
         RemoveUnusedConstructorParamRector::class,
