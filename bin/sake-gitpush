@@ -89,6 +89,10 @@ if test -f "$GIT_DIR/.git/config"; then
     echonice "   # current commit"
     echoline;
     git rev-parse --short --verify HEAD
+    echoline;
+    echonice "   # unpushed branches"
+    echoline;
+    git log --branches --not --remotes --no-walk --decorate --oneline
 
     echoline;
 
