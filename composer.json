@@ -32,6 +32,7 @@
   },
   "bin": [
     "bin/sake-add-site",
+    "bin/sake-composer-available-updates",
     "bin/sake-composer-update",
     "bin/sake-dev-build",
     "bin/sake-find",

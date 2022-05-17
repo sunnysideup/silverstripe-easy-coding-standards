@@ -11,20 +11,23 @@ help_and_exit() {
     echoline;
     echonice "   Available settings:";
     echoline;
-    echonice "   -f, --force                  delete vendor folder first!"
+    echonice "   -f, --force                  delete vendor folder first, default value is 'no'"
+    echonice "   -c, --commit                 also commit, defaulf value is 'yes'"
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   sake-composer-update . -f 'yes'";
+    echonice "   sake-composer-update . -f 'yes' -c 'no'";
     echoline;
     exit;
 }
 
 force='no'
+commit='yes'
 dir='./'
 while (( $# )); do
   case $1 in
     -f|--force)        force=$2;shift ;;
+    -c|--commit)       commit=$2;shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -33,12 +36,13 @@ while (( $# )); do
 done
 
 echoline;
-echonice "   Running Remove Origs";
+echonice "   Running Composer Update";
 echoline;
 echonice "   Directory of script:                       $SCRIPT_DIR";
 echonice "   Directory to analyse:                      $WORKING_DIR/$dir";
 echoline;
 echonice "   Force aka rm vendor first, (-f|--force):   $force";
+echonice "   Commit result:                             $commit";
 echoline;
 
 cd $WORKING_DIR/$dir
@@ -46,7 +50,9 @@ if [[ "$force" == "yes" ]]; then
     rm vendor -rf
 fi
 composer update --prefer-source
-sake-gitpush . -m "MINOR: composer update"
+if [[ "$commit" == "yes" ]]; then
+    sake-gitpush . -m "MINOR: composer update"
+fi
 echoline;
 
 cd $WORKING_DIR/$dir

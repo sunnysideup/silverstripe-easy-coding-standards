@@ -1,0 +1,42 @@
+#!/bin/bash
+
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-methods
+# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+
+
+
+help_and_exit() {
+    echoline;
+    echonice "   Available settings:";
+    echoline;
+    echonice "   none"
+    echoline;
+    echonice "   Example usage:"
+    echoline;
+    echonice "   sake-composer-available-updates";
+    echoline;
+    exit;
+}
+
+dir='./'
+while (( $# )); do
+  case $1 in
+    -*)                printf 'Unknown option: %q\n\n' "$1";
+                       help_and_exit 1 ;;
+    *)                 dir=$1;;
+  esac
+  shift
+done
+
+echoline;
+echonice "   Running Remove Origs";
+echoline;
+echonice "   Directory of script:                       $SCRIPT_DIR";
+echonice "   Directory to analyse:                      $WORKING_DIR/$dir";
+echoline;
+echoline;
+
+composer show -oD
+echoline;
