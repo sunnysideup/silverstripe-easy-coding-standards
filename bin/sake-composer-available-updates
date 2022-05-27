@@ -31,7 +31,7 @@ while (( $# )); do
 done
 
 echoline;
-echonice "   Running Remove Origs";
+echonice "   Running Composer Updates Available";
 echoline;
 echonice "   Directory of script:                       $SCRIPT_DIR";
 echonice "   Directory to analyse:                      $WORKING_DIR/$dir";
