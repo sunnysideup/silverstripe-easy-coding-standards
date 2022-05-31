@@ -50,6 +50,7 @@
     "bin/sake-npm-install",
     "bin/sake-npm-watch",
     "bin/sake-remove-origs",
+    "bin/sake-rsync-assets",
     "bin/sake-self-update"
   ]
 }
