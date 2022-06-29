@@ -11,20 +11,22 @@ help_and_exit() {
     echoline;
     echonice "   Available settings:";
     echoline;
-    echonice "  "
+    echonice "   -d, --dry-run                  is test only (default NO!)"
     echoline;
     echonice "   Example usage:"
     echoline;
-    echonice "   sake-large-files ./";
+    echonice "   sake-remove-stale-branches ./";
     echoline;
     echonice " "
     echonice " "
     exit;
 }
 
+dryRun='no'
 dir='./'
 while (( $# )); do
   case $1 in
+    -d|--dry-run)      dryRun=$2;shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -35,14 +37,23 @@ done
 echonice " "
 echonice " "
 echoline;
-echonice "   Find Large Files";
+echonice "   Remove Stale Branches";
 echoline;
 echonice "   Directory of script:           $SCRIPT_DIR";
 echonice "   Directory to analyse:          $WORKING_DIR/$dir";
+echonice "   Excluded are:                  master|develop|dev|production|feature/pre-develop";
 echoline;
 echonice " "
 echonice " "
 
-find $WORKING_DIR/$dir -xdev -type f -size +100M -exec du -sh {} ';' | sort -rh | head -n50
+echonice "   # going to right directory: $WORKING_DIR/$dir"
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+fi
+if [[ "$dryRun" == "no" ]]; then
+    git branch --merged | egrep -v "(^\*|master|develop|dev|production|feature/pre-develop)" | xargs git branch -d
+else
+    git branch --merged | egrep -v "(^\*|master|develop|dev|production|feature/pre-develop)"
+fi
 
 echoend;

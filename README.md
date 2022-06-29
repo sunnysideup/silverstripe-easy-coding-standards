@@ -4,7 +4,7 @@ Lints your silverstripe php code, checks for potential bugs, and other helpful c
 
 # tl;dr version:
 
-Install as global composer package and then try to access the commands, starting with `sake-` from the command line. 
+Install as global composer package and then try to access the commands, starting with `sake-` from the command line.
 
 # commands available:
 
@@ -60,7 +60,7 @@ To make the composer `vendor/bin` available anywhere
 ```shell
 source ~/.bashrc
 ```
-or restart your computer. 
+or restart your computer.
 
 4. Now you should be able to run it from anywhere like this:
 
@@ -201,6 +201,18 @@ will git commit and git push ALL SilverStripe vendor packages.
 
 
 ### remove *.orig files:
+
+Do a quick git push
+```shell
+vendor/bin/sake-origs [dir]
+```
+
+If installed globally:
+```shell
+sake-origs [dir]
+```
+
+### remove stale branches from local:
 
 Do a quick git push
 ```shell
