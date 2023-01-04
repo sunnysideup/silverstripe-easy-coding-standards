@@ -1,4 +1,4 @@
 #!/bin/bash
 
-cd ~~/.config/composer
+cd ~/.config/composer
 composer update sunnysideup/easy-coding-standards
