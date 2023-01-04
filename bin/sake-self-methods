@@ -50,4 +50,4 @@ echolistoffunctions() {
     echogood "e.g. sake-lint-all -h"
 }
 
-echolistoffunctions;
+echofunctions;
