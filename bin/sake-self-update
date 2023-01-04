@@ -2,6 +2,7 @@
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
+
 cd $SCRIPT_DIR
 
 echohead "Updating sake methods in "
