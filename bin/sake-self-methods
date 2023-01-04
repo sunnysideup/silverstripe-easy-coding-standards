@@ -49,3 +49,5 @@ echolistoffunctions() {
     echogood "[command] -h"
     echogood "e.g. sake-lint-all -h"
 }
+
+echolistoffunctions;

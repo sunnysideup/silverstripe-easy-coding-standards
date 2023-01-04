@@ -53,6 +53,7 @@
     "bin/sake-npm-install",
     "bin/sake-npm-watch",
     "bin/sake-self-update",
+    "bin/sake-self-methods",
     "bin/sake-ss-add-site",
     "bin/sake-ss-dev-build",
     "bin/sake-ss-rsync-assets"
