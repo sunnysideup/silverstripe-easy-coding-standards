@@ -1,8 +1,8 @@
 # What it does
 
-Lints your silverstripe php code, checks for potential bugs, and other helpful commands.
+Lints your silverstripe php code, checks for potential bugs, and also has a raft of other helpful commands.
 
-# tl;dr version:
+# tl;dr
 
 Install as global composer package and then try to access the commands, starting with `sake-` from the command line.
 
@@ -100,10 +100,4 @@ If not installed globally, then you should add `vendor/bin/` in front of the com
 
 ```shell
 vendor/bin/sake-my-command -h
-```
-
-### apply easy coding standards:
-see: https://github.com/symplify/easy-coding-standard
-```shell
-sake-lint-ecs [dir]
 ```

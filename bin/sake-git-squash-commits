@@ -11,7 +11,7 @@ dir='./'
 
 ############################################ SETTINGS
 numberOfCommits=0
-message="WIP"
+message=""
 doToday="no"
 help='no'
 while (( $# )); do
@@ -31,7 +31,7 @@ if [[ "$message" == "" ]]; then
     read -p "Commit message: " message
 fi
 if [[ "$message" == "" ]]; then
-    message="WIP"
+    message={git log -1 --pretty=%B}
 fi
 
 help_and_exit() {
@@ -56,13 +56,6 @@ help_and_exit() {
     echofunctions
     exit;
 }
-
-if [[ "$message" == "" ]]; then
-    read -p "Commit message: " message
-fi
-if [[ "$message" == "" ]]; then
-    message="WIP"
-fi
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then

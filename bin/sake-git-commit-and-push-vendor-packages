@@ -38,7 +38,7 @@ if [[ "$message" == "" ]]; then
     read -p "Commit message: " message
 fi
 if [[ "$message" == "" ]]; then
-    message="WIP"
+    message={git log -1 --pretty=%B}
 fi
 
 help_and_exit() {
