@@ -12,11 +12,13 @@ dir='./'
 ############################################ SETTINGS
 numberOfCommits=0
 message="WIP"
+doToday="no"
 help='no'
 while (( $# )); do
   case $1 in
     -n|--number-of-commits)      numberOfCommits=$2;shift ;;
     -m|--message)                message=$2;shift ;;
+    -t|--today)                  doToday='yes';shift ;;
     -h|--help)                   help='yes';shift ;;
     -*)                          printf 'Unknown option: %q\n\n' "$1";
                                  help_and_exit 1 ;;
@@ -33,14 +35,16 @@ help_and_exit() {
     echonice "Directory to analyse:                $WORKING_DIR/$dir";
     echonice "Number of commits to merge:          $numberOfCommits";
     echonice "Message (-m):                        $message";
+    echonice "Do Today (-t):                       $doToday";
 
     echohead "Available settings:";
+    echonice "-t, --today                          message for new commit, default: WIP"
     echonice "-n, --number-of-commits              number of commits to merge, default: 0"
     echonice "-m, --message                        message for new commit, default: WIP"
     echonice "-h, --help                           show help information"
 
     echohead "Example usage:"
-    echonice "sake-git-squash-commits ./ -n 12";
+    echonice "sake-git-squash-commits ./ -t 'yes' -m 'MAJOR: overhaul of everything'";
 
     echofunctions
     exit;
@@ -74,15 +78,18 @@ git log --since="4am" --oneline
 echohead "Number of commits today:"
 git shortlog -s -n --all --no-merges --since="4am"
 
-if [ $numberOfCommits \> 0 ];
-then
+if [[ "$doToday" == "yes" ]]; then
+    $numberOfCommits=$todaysCount
+fi
+
+
+if [ $numberOfCommits \> 0 ]; then
     git reset --soft HEAD~$numberOfCommits
     git commit . -m "$message"
     git add . -A
     git push --force-with-lease
 else
-    echohead "Squash Today:"
-    echonice "Please use -n $todaysCount to squash all of commits today"
+    echohead "Nothing to squash, please use -t or -n option"
 fi
 
 echoend;
