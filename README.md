@@ -10,31 +10,47 @@ Install as global composer package and then try to access the commands, starting
 
 ```shell
 
-# silverstripe
-sake-ss-dev-build
+# composer
+- sake-composer-available-updates
+- sake-composer-update
 
-# linting
-sake-lint-all
-sake-lint-compat
-sake-lint-ecs
-sake-lint-js
-sake-lint-rector
-sake-lint-stan
+# find
+- sake-find-in-files
+- sake-find-large-files
 
 # git
-sake-git-commit-and-push
-sake-git-commit-and-push-vendor-packages  
-sake-lint-remove-origs
-sake-git-squash-commits
+- sake-git-commit-and-push
+- sake-git-commit-and-push-vendor-packages
+- sake-git-remove-stale-branches
+- sake-git-squash-commits
+
+# help
+- sake-help
+
+# lint
+- sake-lint-all
+- sake-lint-compat
+- sake-lint-ecs
+- sake-lint-js
+- sake-lint-one-file
+- sake-lint-rector
+- sake-lint-remove-origs
+- sake-lint-stan
 
 # webpack
-sake-npm-install
-sake-npm-build
-sake-npm-watch    
+- sake-npm-build
+- sake-npm-dev
+- sake-npm-install
+- sake-npm-watch
+
+# silverst
+- sake-ss-add-site
+- sake-ss-dev-build
+- sake-ss-rsync-asset
 
 ```
 
-# How to install (may not work!)
+# How to install for one project (not recommended - as it may not work)
 
 1. open your terminal
 2. browse to root folder of your project and type:
@@ -42,7 +58,7 @@ sake-npm-watch
 composer require --dev sunnysideup/easy-coding-standards:dev-master
  ```
 
-## global install (recommended)
+## global install (recommended - more likely to work)
 
 1. open your terminal and type
 ```shell
@@ -55,7 +71,7 @@ choose the appropriate one ...
 PATH=~/.composer/vendor/bin:$PATH
 PATH=~/.config/composer/vendor/bin:$PATH
 ```
-To make the composer `vendor/bin` available anywhere (use with care!).
+This will make the global composer `vendor/bin` available anywhere (use with care!).
 
 3. To enable it, run:
 ```shell
@@ -73,16 +89,15 @@ sake-lint-ecs [dir]
 # How to use:
 Commands should be run from the root directory of your project.
 
-To find out the options, just do this:
+To find out the options for a specific command:
 
 ```shell
 sake-my-command -h
 ```
 
-The default director, in most cases, is `app`.
-
 ## Not installed globally?
 If not installed globally, then you should add `vendor/bin/` in front of the commands.
+
 ```shell
 vendor/bin/sake-my-command -h
 ```

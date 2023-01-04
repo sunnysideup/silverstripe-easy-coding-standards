@@ -45,4 +45,5 @@ echolistoffunctions() {
     for entry in `ls $SCRIPT_DIR`; do
         echonice " -  $entry"
     done
+    echonice "To show the options for a specific command, add -h"
 }
