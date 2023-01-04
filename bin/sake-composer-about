@@ -8,9 +8,10 @@ source $SCRIPT_DIR/sake-self-methods
 
 ############################################ DIR
 dir='./'
-############################################ SETTINGS
 package=''
 
+############################################ SETTINGS
+help='no'
 while (( $# )); do
   case $1 in
     -h|--help)         help='yes';shift ;;
@@ -27,7 +28,7 @@ help_and_exit() {
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
     echohead "Current settings:";
-    echonice "Packae:                        $package";
+    echonice "Package:                       $package";
 
     echohead "Available settings:";
     echonice "-h, --help                     show help information"
@@ -45,6 +46,10 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 ############################################ CODE
+if [[ "$package" == "" ]]; then
+    echobad "please provide package name"
+    help_and_exit
+fi
 
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir

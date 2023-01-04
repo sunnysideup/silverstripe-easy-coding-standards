@@ -8,40 +8,41 @@ source $SCRIPT_DIR/sake-self-methods
 
 ############################################ DIR
 dir='./'
+package=''
 
 ############################################ SETTINGS
+branch='*@dev'
 help='no'
 while (( $# )); do
   case $1 in
+    -b|--branch)       branch=$2;shift ;;
     -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
-    *)                 dir=$1;;
+    *)                 package=$1;;
   esac
   shift
 done
 
 help_and_exit() {
+    echohead "Composer Require";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
-    echohead "Composer Updates Available";
-    echonice "Directory of script:          $SCRIPT_DIR";
-    echonice "Directory to analyse:         $WORKING_DIR/$dir";
+    echohead "Current settings:";
+    echonice "Package:                       $package";
+    echonice "Branch:                        $branch";
 
     echohead "Available settings:";
-    echonice "-h, --help                    show help information"
+    echonice "-b, --branch                   branch, default: *@dev"
+    echonice "-h, --help                     show help information"
 
     echohead "Example usage:"
-    echonice "sake-composer-available-updates";
+    echonice "sake-composer-require silverstripe/cms -b 4.x-dev";
 
     echofunctions
     exit;
 }
-
-
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -49,6 +50,10 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 ############################################ CODE
+if [[ "$package" == "" ]]; then
+    echobad "please provide package name"
+    help_and_exit
+fi
 
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
@@ -57,10 +62,6 @@ else
     help_and_exit;
 fi
 
-echhead "Easy to update"
-composer show -oD
-
-echohead "Other notifications"
-composer outdated
+composer require $package:$branch --prefer-source
 
 echoend;
