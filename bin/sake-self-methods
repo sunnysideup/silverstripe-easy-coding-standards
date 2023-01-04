@@ -46,8 +46,8 @@ echolistoffunctions() {
         echonice " -  $entry"
     done
     echonice "To show the options for a specific command, run:"
-    echogood "[command] -h"
-    echogood "e.g. sake-lint-all -h"
+    echo "[command] -h"
+    echonice "e.g. sake-lint-all -h"
 }
 
 echofunctions;
