@@ -4,43 +4,43 @@
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 ############################################ DIR
 dir='./'
+
 ############################################ SETTINGS
 help='no'
 while (( $# )); do
   case $1 in
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
-    *)                 dir=$1;;
+    -f|--find)               find=$2;shift ;;
+    -h|--help)               help='yes';shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       dir=$1;;
   esac
   shift
 done
 
 help_and_exit() {
+    echohead "Grep search - find in files";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
-    echohead "Composer Updates Available";
-    echonice "Directory of script:          $SCRIPT_DIR";
-    echonice "Directory to analyse:         $WORKING_DIR/$dir";
+    echohead "Current settings:";
+    echonice "Find string (-f|--find):       $find";
 
     echohead "Available settings:";
-    echonice "-h, --help                    show help information"
+    echonice "-f, --find                   string you are looking for"
+    echonice "-h, --help                   show help information"
 
     echohead "Example usage:"
-    echonice "sake-composer-available-updates";
+    echonice "e.g. sake-find-in-files app/src -f 'piece of code'";
 
     echofunctions
     exit;
 }
 
 
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -55,6 +55,7 @@ else
     echonice "Could not change to $WORKING_DIR/$dir"
 fi
 
-composer show -oD
+# dev-build
+grep -rnw ./ -e "'$find'"
 
 echoend;

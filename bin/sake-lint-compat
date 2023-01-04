@@ -1,35 +1,22 @@
 #!/bin/bash
 
-
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-methods
+source $SCRIPT_DIR/sake-self-methods
 # composer global require squizlabs/php_codesniffer --dev
 # composer global require phpcompatibility/php-compatibility --dev
 
-
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   -p, --php-version              php version (e.g. 7.4)";
-    echonice "   -a, --also                     also lint, e.g. app/_config.php or app/";
-    echoline;
-    echonice " "
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   sake-lint-compat   -p 7.4   foo/bar ";
-    echonice " "
-    echonice " "
-    exit;
-}
-
-phpVersion="7.4"
+############################################ DIR
 dir='app/src'
+
+############################################ SETTINGS
+phpVersion="8.0"
+help='no'
 while (( $# )); do
   case $1 in
     -p|--php-version)  phpVersion=$2;shift ;;
+    -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -37,20 +24,40 @@ while (( $# )); do
   shift
 done
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running PHP Compatability";
-echoline;
-echonice "   directory of script:           $SCRIPT_DIR";
-echonice "   directory to analyse:          $WORKING_DIR/$dir";
-echoline;
-echonice "   PHP Version (-p):              $phpVersion";
-echonice "   Also Check (-a):               $also";
-echoline;
-echonice " "
-echonice " "
+help_and_exit() {
 
+    echohead "Running PHP Compatability";
+    echonice "directory of script:           $SCRIPT_DIR";
+    echonice "directory to analyse:          $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+    echonice "PHP Version (-p):              $phpVersion";
+    echonice "Also Check (-a):               $also";
+
+    echohead "Available settings:";
+    echonice "-p, --php-version              php version, default: 8.0";
+    echonice "-a, --also                     also lint, e.g. app/_config.php OR mysite";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-lint-compat   -p 7.4   foo/bar ";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change to $WORKING_DIR"
+fi
 
 $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
 $SCRIPT_DIR/phpcs --config-set colors 1

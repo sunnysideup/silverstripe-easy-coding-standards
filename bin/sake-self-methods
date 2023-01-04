@@ -1,0 +1,48 @@
+#!/bin/bash
+
+echonice() {
+   echo -e "\033[0;33m$1 \033[0m";
+}
+
+echogood() {
+   echo -e "\033[0;32m$1 \033[0m";
+}
+
+echobad() {
+   echo -e "\033[1;32;41m ---------------------------------------- \033[0m";
+   echo -e "\033[1;32;41m ERROR: $1 \033[0m";
+   echo -e "\033[1;32;41m ---------------------------------------- \033[0m";
+}
+
+echoline() {
+    echonice '----------------------------------------';
+}
+
+echohead() {
+    echonice ""
+    echoline
+    echonice "$1"
+    echoline
+}
+
+echoend() {
+    echogood ""
+    echogood '----------------------------------------';
+    echogood "COMPLETED"
+    echogood '----------------------------------------';
+
+    [ $(date +%1N) == 1 ] && $SCRIPT_DIR/sake-self-update
+}
+
+echofunctions() {
+    echohead 'List of Available Functions'
+    echonice "To get a list of available options, run: "
+    echonice "sake-help"
+}
+
+echolistoffunctions() {
+    echohead 'List of Available Functions'
+    for entry in `ls $SCRIPT_DIR`; do
+        echonice " -  $entry"
+    done
+}

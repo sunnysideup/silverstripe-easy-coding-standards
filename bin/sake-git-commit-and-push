@@ -1,39 +1,21 @@
 #!/bin/bash
 
-
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-methods
+source $SCRIPT_DIR/sake-self-methods
 
-
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   -c, --commit-and-push          commit and push also? enter yes to execute";
-    echonice "   -m, --message                  commit message";
-    echonice "   -v, --new-version              create new tag? options are no|patch|minor|major";
-    echonice "   -a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
-    echonice "   -s, --status-only              include folders in themes";
-    echonice "   -t, --themes-also              include folders in themes";
-    echonice " "
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   e.g. sake-gitpush  -m 'PATCH'   -c yes -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
-    echoline;
-    echonice " "
-    echonice " "
-
-    exit;
-}
-commitAndPush="yes"
-message="WIP"
+############################################ DIR
 dir='./'
+
+############################################ SETTINGS
+commitAndPush="yes"
+message=""
 newVersion='no'
 also='nothing-here-hopefully'
 alsoDoThemes='no'
 statusOnly='no'
+help='no'
 while (( $# )); do
   case $1 in
     -c|--commit-and-push)  commitAndPush=$2;shift ;;
@@ -42,6 +24,7 @@ while (( $# )); do
     -a|--also)             also=$2;shift ;;
     -s|--status-only)      statusOnly=$2;shift ;;
     -t|--themes-also)      alsoDoThemes=$2;shift ;;
+    -h|--help)             help='yes';shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help_and_exit 1 ;;
     *)                     dir=$1;;
@@ -49,49 +32,73 @@ while (( $# )); do
   shift
 done
 
+if [[ "$message" == "" ]]; then
+    read -p "Commit message: " message
+fi
+if [[ "$message" == "" ]]; then
+    message="WIP"
+fi
+
 newVersionLowerCase=$(echo ${newVersion} | tr '[:upper:]' '[:lower:]')
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running GIT PUSH";
-echoline;
-echonice "   directory of script:           $SCRIPT_DIR";
-echonice "   directory to commit:           $WORKING_DIR/$dir";
-echoline;
-echonice "   Commit and Push (-c):          $commitAndPush";
-echonice "   Message (-m):                  $message";
-echonice "   Create New Tag (-v):           $newVersionLowercase";
-echonice "   Also check (-a):               $WORKING_DIR/$also";
-echonice "   Status Only (-s):              $statusOnly";
-echonice "   Also include themes (-t):      $alsoDoThemes";
-echoline;
-echonice " "
-echonice " "
 
-echonice "   # going to right directory: $WORKING_DIR/$dir"
+help_and_exit() {
+    echohead "Git commit and push";
+    echonice "directory of script:           $SCRIPT_DIR";
+    echonice "directory to commit:           $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+    echonice "Commit and Push (-c):          $commitAndPush";
+    echonice "Message (-m):                  $message";
+    echonice "Create New Tag (-v):           $newVersionLowercase";
+    echonice "Also check (-a):               $WORKING_DIR/$also";
+    echonice "Status Only (-s):              $statusOnly";
+    echonice "Also include themes (-t):      $alsoDoThemes";
+
+    echohead "Available settings:";
+    echonice "-c, --commit-and-push          commit and push also? default: yes !!!";
+    echonice "-m, --message                  commit message, default: WIP";
+    echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no";
+    echonice "-a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup";
+    echonice "-s, --status-only              status only, default: no !!!";
+    echonice "-t, --themes-also              include folders in themes, default: no";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "e.g. sake-git-commit-and-push  -m 'PATCH' -v patch -a 'vendor/silverstripe'   -t yes  app/src ";
+
+    echofunctions
+    exit;
+}
+
+
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
+else
+    echonice "Could not change to $WORKING_DIR/$dir"
 fi
-GIT_DIR=$(git rev-parse --show-toplevel)
 
+GIT_DIR=$(git rev-parse --show-toplevel)
 
 if test -f "$GIT_DIR/.git/config"; then
     # set the right way to look at branches
     git config push.default matching
 
-    echoline;
-    echonice "   # check git status"
-    echoline;
+    echohead "# check git status"
     git status
 
-    echoline;
-    echonice "   # current commit"
-    echoline;
+    echohead "# current commit"
     git rev-parse --short --verify HEAD
-    echoline;
-    echonice "   # unpushed branches"
-    echoline;
+
+    echohead "# unpushed branches"
     git log --branches --not --remotes --no-walk --decorate --oneline
 
     # pull all branches
@@ -105,32 +112,28 @@ if test -f "$GIT_DIR/.git/config"; then
     fi
 
     if [[ "$commitAndPush" == "yes" ]]; then
-        echoline;
-        echonice "   # adding files to git repo"
-        echoline;
+
+        echohead "# adding files to git repo"
         git add . -A
         #git add $WORKING_DIR/$also
         #git add $WORKING_DIR/$logFile
-        echoline;
-        echonice "   # committing files to git repo"
-        echoline;
+
+        echohead "# committing files to git repo"
         git commit . -m "$message"
         #git commit $WORKING_DIR/$also -m "$message"
         #git commit $WORKING_DIR/$logFile -m "$message"
     fi
-    echoline;
-    echonice "   # pulling commits for the current branch from git repo"
-    echoline;
+
+    echohead "# pulling commits for the current branch from git repo"
     git pull origin $(git rev-parse --abbrev-ref HEAD) --ipv4
     git fetch --all --ipv4
+
     if [[ "$commitAndPush" == "yes" ]]; then
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
-        echoline;
-        echonice "   # pushing commits to git repo, branch: $BRANCH"
-        echoline;
+
+        echohead "# pushing commits to git repo, branch: $BRANCH"
         git push origin $(git rev-parse --abbrev-ref HEAD)  --ipv4
     fi
-
 
     if [[ "$newVersionLowerCase" == "patch" || "$newVersionLowerCase" == "minor" || "$newVersionLowerCase" == "major" ]]; then
 
@@ -145,23 +148,17 @@ if test -f "$GIT_DIR/.git/config"; then
         #     OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
         # fi
 
+        echohead "Found old Tag";
+        echonice "$OLD_TAG";
         echoline;
-        echonice "   Found old Tag";
-        echoline;
-        echonice "   $OLD_TAG";
-        echoline;
-
 
         # Build array from version string.
         a=( ${OLD_TAG//./ } )
 
-
         # Increment version numbers as requested.
         if [ ${#a[@]} -ne 3 ]
         then
-            echoline;
-            echobad "   ERROR $OLD_TAG (current tag) can not be parsed!"
-            echoline;
+            echobad "ERROR $OLD_TAG (current tag) can not be parsed!"
             exit 1
         fi
 
@@ -182,10 +179,8 @@ if test -f "$GIT_DIR/.git/config"; then
 
         NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
 
-        echoline;
-        echonice "   Found new Tag ($newVersionLowerCase)";
-        echoline;
-        echonice "   $NEW_TAG";
+        echohead "Found new Tag ($newVersionLowerCase)";
+        echonice "$NEW_TAG";
         echoline;
 
         git tag -a $NEW_TAG -m "auto-generated linter tag"
@@ -194,45 +189,34 @@ if test -f "$GIT_DIR/.git/config"; then
 
         git tag -v
 
-
     fi
 
-    echonice " ";
-    echonice " ";
-    echoline;
-    echonice "   # check git status"
-    echoline;
+    echohead "# check git status"
     git status
     echoline;
+
     if output=$(git status --porcelain) && [ -z "$output" ]; then
         echogood " # ALL COMMITTED";
     else
-        echobad " Not all Code is Committed";
+        echobad "Not all Code is Committed";
     fi
     if git diff-index --quiet HEAD --; then
         echogood " # ALL PUSHED";
     else
-        echobad " There are changes to push";
+        echobad "There are changes to push";
     fi
     echoline;
 
     if test -f "$WORKING_DIR/$also"; then
-        $SCRIPT_DIR/sake-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush $WORKING_DIR/$also
+        $SCRIPT_DIR/sake-git-commit-and-push-vendor-packages -m "'$message'" -t no -c $commitAndPush $WORKING_DIR/$also
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
-        $SCRIPT_DIR/sake-gitpush-vendor-packages -m "'$message'" -t no -c $commitAndPush  $WORKING_DIR/themes
+        $SCRIPT_DIR/sake-git-commit-and-push-vendor-packages -m "'$message'" -t no -c $commitAndPush  $WORKING_DIR/themes
     fi
 else
-    echobad " "
-    echobad " "
-    echoline;
-    echobad "   ===  ERROR - NOT A GIT REPO ===";
-    echobad "   "$WORKING_DIR/$dir;
-    echobad "   "we tried to find the git dir: $GIT_DIR but that could not be found.;
-    echobad "   "But that did not work.;
-    echobad "   === IS NOT A GIT REPO       ===";
-    echoline;
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
+    echobad "Also, $GIT_DIR IS is not a git repo";
 fi
 
 echoend;

@@ -1,36 +1,23 @@
 #!/bin/bash
 
-
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
 # : ${rectorConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rector.php}
 
-source $SCRIPT_DIR/sake-methods
+############################################ DIR
+dir='app/src'
 
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echonice "   -r, --rector-config            rector config file locaton e.g. ../rector.php";
-    echonice "  "
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   sake-lint-rector   -a app_more/_config.php   -r ./rector.php   foo/bar ";
-    echoline;
-    echonice " "
-    echonice " "
-    exit;
-}
-
+############################################ SETTINGS
 also='app/_config.php'
 rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rector.php"
-dir='app/src'
+help='no'
 while (( $# )); do
   case $1 in
     -a|--also)          also=$2;shift ;;
     -r|--rector-config) rectorConfig=$2;shift ;;
+    -h|--help)          help='yes';shift ;;
     -*)                 printf 'Unknown option: %q\n\n' "$1";
                         help_and_exit 1 ;;
     *)                  dir=$1;;
@@ -38,19 +25,41 @@ while (( $# )); do
   shift
 done
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running Rector";
-echoline;
-echonice "   Directory of script:           $SCRIPT_DIR";
-echonice "   Directory to analyse:          $WORKING_DIR/$dir";
-echoline;
-echonice "   Also check (-a):               $WORKING_DIR/$also";
-echonice "   Rector config file (-r):       $rectorConfig";
-echoline;
-echonice " "
-echonice " "
+help_and_exit() {
+
+    echohead "Rector";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+    echonice "Also check (-a):               $WORKING_DIR/$also";
+    echonice "Rector config file (-r):       $rectorConfig";
+
+    echohead "Available settings:";
+    echonice "-a, --also                     also lint - e.g. app/_config.php OR myfolder";
+    echonice "-r, --rector-config            rector config file locaton e.g. ../rector.php";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-lint-rector -a app_more/_config.php   -r ./rector.php   foo/bar ";
+    echoline;
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change to $WORKING_DIR"
+fi
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/sake-lint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also

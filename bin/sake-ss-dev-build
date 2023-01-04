@@ -1,0 +1,95 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+skipComposer="no"
+help='no'
+while (( $# )); do
+  case $1 in
+    -s|--skip-composer)      skipComposer=$2;shift ;;
+    -h|--help)               help='yes';shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       dir=$1;;
+  esac
+  shift
+done
+
+
+help_and_exit() {
+
+    echohead "Dev/Build";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+    echonice "-s, --skip-composer            $skipComposer";
+
+    echohead "Available settings:";
+    echonice "-s, --skip-composer            skip composer install, default: no !!!"
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-ss-dev-build .";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change to $WORKING_DIR"
+fi
+
+if [[ "$skipComposer" == "yes" ]]; then
+    echo "skipping composer"
+else
+    composer install --prefer-source
+fi
+
+# composer install
+
+# remove obsolete folders
+sudo rm .graphql/ -rf
+
+# create necessary folders
+sudo mkdir -p ./public
+sudo mkdir -p ./public/assets
+sudo mkdir -p ./.graphql-generated
+sudo mkdir -p ./public/_graphql
+
+# root folder is accessible
+sudo chmod 0755 .
+sudo chmod 0755 themes
+sudo chmod 0755 public
+
+# we keep all the sudos together...
+# cleanup ownership
+sudo chown $(whoami):www-data . -R
+sudo chown www-data public/assets -R
+sudo chown www-data .graphql-generated/ -R
+sudo chown www-data public/_graphql -R
+# files ...
+if [ -f public/admin.types.graphql ]; then
+    sudo chown www-data public/admin.types.graphql
+fi
+
+# dev-build
+sudo -u www-data vendor/bin/sake dev/build flush=all
+
+echoend;

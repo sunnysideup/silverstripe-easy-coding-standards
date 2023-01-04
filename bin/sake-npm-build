@@ -1,33 +1,23 @@
 #!/bin/bash
 
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-methods
+source $SCRIPT_DIR/sake-self-methods
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
+############################################ DIR
 if [ "$1" != "" ]; then
     dir=$1;
 else
     dir='themes/client'
 fi
 
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   none"
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   sake-npm-build themes/client";
-    echoline;
-    echonice " "
-    echonice " "
-    exit;
-}
-
+############################################ SETTINGS
+help='no'
 while (( $# )); do
   case $1 in
+    -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -35,19 +25,36 @@ while (( $# )); do
   shift
 done
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running NPM build";
-echoline;
-echonice "   Directory of script:              $SCRIPT_DIR";
-echonice "   Directory to install:             $WORKING_DIR/$dir";
-echoline;
-echonice " "
-echonice " "
+help_and_exit() {
+    echohead "NPM build";
+    echonice "Directory of script:              $SCRIPT_DIR";
+    echonice "Directory to install:             $WORKING_DIR/$dir";
+
+    echohead "Available settings:";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-npm-build themes/client";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change to $WORKING_DIR"
+fi
+
 
 cd themes/sswebpack_engine_only/
 npm run build --theme_dir=$dir
-
 
 echoend;

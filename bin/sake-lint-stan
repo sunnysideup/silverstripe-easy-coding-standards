@@ -1,10 +1,11 @@
 #!/bin/bash
 
-
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-methods
+source $SCRIPT_DIR/sake-self-methods
 
+############################################ DIR
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 if [ "$1" != "" ]; then
     dir=$1;
@@ -12,32 +13,17 @@ else
     dir='app/src'
 fi
 
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   -a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
-    echonice "   -s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
-    echonice "   -l, --level                    level of scrutiny (1 - 6) - Two is recommended.";
-    echonice "  "
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   sake-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
-    echoline;
-    echonice " "
-    echonice " "
-    exit;
-}
-
+############################################ SETTINGS
 also='app/_config.php'
 stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
 level=3
+help='no'
 while (( $# )); do
   case $1 in
     -a|--also)         also=$2;shift ;;
     -l|--level)        level=$2;shift ;;
     -s|--stan-config)  stanConfig=$2;shift ;;
+    -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -45,23 +31,47 @@ while (( $# )); do
   shift
 done
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running PHP STAN";
-echoline;
-echonice "   Directory of script:              $SCRIPT_DIR";
-echonice "   Directory to analyse:             $WORKING_DIR/$dir";
-echoline;
-echonice "   Also check (-a):                  $WORKING_DIR/$also";
-echonice "   Level (-l):                       $level (1/6)";
-echonice "   Php stan config file (-s):        $stanConfig";
-echoline;
-echonice " "
-echonice " "
+help_and_exit() {
+
+    echohead "PHP STAN";
+    echonice "Directory of script:              $SCRIPT_DIR";
+    echonice "Directory to analyse:             $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+    echonice "Also check (-a):                  $WORKING_DIR/$also";
+    echonice "Level (-l):                       $level (1/6)";
+    echonice "Php stan config file (-s):        $stanConfig";
+
+    echohead "Available settings:";
+    echonice "-a, --also                     also lint - e.g. app/_config.php OR otherfolder";
+    echonice "-s, --stan-config              stan config file locaton e.g. ../phpstan.neon";
+    echonice "-l, --level                    level of scrutiny, default: 3";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change to $WORKING_DIR"
+fi
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/sake-lint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also
 fi
+
 $SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$dir
+
 echoend;

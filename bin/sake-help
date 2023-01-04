@@ -5,37 +5,37 @@ SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
 
-# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
-
 ############################################ DIR
-if [ "$1" != "" ]; then
-    dir=$1;
-else
-    dir='themes/client'
-fi
+dir='./'
 
 ############################################ SETTINGS
+more="no"
 help='no'
 while (( $# )); do
   case $1 in
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
-    *)                 dir=$1;;
+    -m|--more)               more=$2;shift ;;
+    -h|--help)               help='yes';shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       dir=$1;;
   esac
   shift
 done
 
 help_and_exit() {
-    echohead "NPM watch";
-    echonice "Directory of script:              $SCRIPT_DIR";
-    echonice "Directory to install:             $WORKING_DIR/$dir";
+
+    echohead "self help";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+    echonice "More (-m|--more):              $more";
 
     echohead "Available settings:";
-    echonice "-h, --help                     show help information"
+    echonice "-m, --more                     show MORE help information"
 
     echohead "Example usage:"
-    echonice "sake-npm-watch themes/client";
+    echonice "e.g. sake-help -m yes";
 
     echofunctions
     exit;
@@ -54,7 +54,6 @@ else
     echonice "Could not change to $WORKING_DIR"
 fi
 
-cd themes/sswebpack_engine_only/
-npm run watch --theme_dir=$dir
+echolistoffunctions
 
 echoend;

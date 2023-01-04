@@ -1,0 +1,89 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+numberOfCommits=0
+message="WIP"
+help='no'
+while (( $# )); do
+  case $1 in
+    -n|--number-of-commits)      numberOfCommits=$2;shift ;;
+    -m|--message)                message=$2;shift ;;
+    -h|--help)                   help='yes';shift ;;
+    -*)                          printf 'Unknown option: %q\n\n' "$1";
+                                 help_and_exit 1 ;;
+    *)                           dir=$1;;
+  esac
+  shift
+done
+
+help_and_exit() {
+    echohead "Merge previous commits";
+    echonice "Directory of script:                 $SCRIPT_DIR";
+
+    echohead "Current settings:";
+    echonice "Directory to analyse:                $WORKING_DIR/$dir";
+    echonice "Number of commits to merge:          $numberOfCommits";
+    echonice "Message (-m):                        $message";
+
+    echohead "Available settings:";
+    echonice "-n, --number-of-commits              number of commits to merge, default: 0"
+    echonice "-m, --message                        message for new commit, default: WIP"
+    echonice "-h, --help                           show help information"
+
+    echohead "Example usage:"
+    echonice "sake-git-squash-commits ./ -n 12";
+
+    echofunctions
+    exit;
+}
+
+if [[ "$message" == "" ]]; then
+    read -p "Commit message: " message
+fi
+if [[ "$message" == "" ]]; then
+    message="WIP"
+fi
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+else
+    echonice "Could not change to $WORKING_DIR/$dir"
+fi
+
+todaysCount=`git log --since="4am"  --oneline | wc -l`
+echo $todaysCount
+
+echohead "List of commits for today"
+git log --since="4am" --oneline
+
+echohead "Number of commits today:"
+git shortlog -s -n --all --no-merges --since="4am"
+
+if [ $numberOfCommits \> 0 ];
+then
+    git reset --soft HEAD~$numberOfCommits
+    git commit . -m "$message"
+    git add . -A
+    git push --force-with-lease
+else
+    echohead "Squash Today:"
+    echonice "Please use -n $todaysCount to squash all of commits today"
+fi
+
+echoend;

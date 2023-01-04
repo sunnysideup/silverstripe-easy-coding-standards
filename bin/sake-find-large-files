@@ -1,20 +1,19 @@
 #!/bin/bash
+
 ############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
+
 # : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 ############################################ DIR
-dir="./app/src"
+dir='./'
 
 ############################################ SETTINGS
-also='app/_config.php'
-ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.php"
+help='no'
 while (( $# )); do
   case $1 in
-    -a|--also)         also=$2;shift ;;
-    -e|--ecs-config)   ecsConfig=$2;shift ;;
     -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
@@ -23,22 +22,23 @@ while (( $# )); do
   shift
 done
 
+help_and_exit() {
+
+    echohead "Find Large Files";
     echonice "Directory of script:           $SCRIPT_DIR";
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
-    echonice "Also check (-a):               $WORKING_DIR/$also";
-    echonice "Ecs config file (-e):          $ecsConfig";
-
     echohead "Available settings:";
-    echonice "-e, --ecs-config               ecs config file locaton";
     echonice "-h, --help                     show help information"
 
     echohead "Example usage:"
-    echonice "sake-lint-ecs foo/bar ";
+    echonice "sake-find-large-files ./";
 
     echofunctions
     exit;
 }
+
+
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -47,13 +47,12 @@ fi
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR" ]; then
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
 else
-    echonice "Could not change to $WORKING_DIR"
+    echonice "Could not change to $WORKING_DIR/$dir"
 fi
 
-
-$SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
-$SCRIPT_DIR/ecs check-markdown $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
+find $WORKING_DIR/$dir -xdev -type f -size +100M -exec du -sh {} ';' | sort -rh | head -n50
 
 echoend;
