@@ -45,5 +45,7 @@ echolistoffunctions() {
     for entry in `ls $SCRIPT_DIR`; do
         echonice " -  $entry"
     done
-    echonice "To show the options for a specific command, run [command] -h, e.g. sake-lint-all -h"
+    echonice "To show the options for a specific command, run:"
+    echogood "[command] -h"
+    echogood "e.g. sake-lint-all -h"
 }
