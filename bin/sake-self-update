@@ -1,4 +1,20 @@
 #!/bin/bash
+echo ""
+echo ""
+echo ""
+echo "===================================================="
+echo " SELF-UPDATING (this happens from time to time)"
+echo " We expect this to be in ~/.config/composer/"
+echo "===================================================="
+echo ""
+echo ""
+echo ""
 
-cd ~/.config/composer
-composer update sunnysideup/easy-coding-standards --prefer-source
+if [ -d "~/.config/composer" ]; then
+    cd ~/.config/composer
+    composer update sunnysideup/easy-coding-standards --prefer-source
+else
+    echo "===================================================="
+    echo " ERROR: could not find ~/.config/composer/"
+    echo "===================================================="
+fi
