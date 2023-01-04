@@ -1,9 +1,13 @@
 #!/bin/bash
-
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
 cd $SCRIPT_DIR
-echo $SCRIPT_DIR
-cd ..
-cd ..
+
+echohead "Updating sake methods in "
+
+echonice $SCRIPT_DIR
+
 pwd
+
 composer update sunnysideup/easy-coding-standards
