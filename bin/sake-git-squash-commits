@@ -67,7 +67,6 @@ else
 fi
 
 todaysCount=`git log --since="4am"  --oneline | wc -l`
-echo $todaysCount
 
 echohead "List of commits for today"
 git log --since="4am" --oneline
