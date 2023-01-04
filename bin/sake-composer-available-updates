@@ -56,6 +56,10 @@ else
     help_and_exit;
 fi
 
+echhead "Easy to update"
 composer show -oD
+
+echohead "Other notifications"
+composer outdated
 
 echoend;

@@ -9,18 +9,14 @@ source $SCRIPT_DIR/sake-self-methods
 ############################################ DIR
 dir='./'
 ############################################ SETTINGS
-force='no'
-commit='yes'
-help='no'
+package=''
 
 while (( $# )); do
   case $1 in
-    -f|--force)        force=$2;shift ;;
-    -c|--commit)       commit=$2;shift ;;
     -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
-    *)                 dir=$1;;
+    *)                 package=$1;;
   esac
   shift
 done
@@ -31,16 +27,13 @@ help_and_exit() {
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
     echohead "Current settings:";
-    echonice "Force (-f|--force):            $force";
-    echonice "Commit result:                 $commit";
+    echonice "Packae:                        $package";
 
     echohead "Available settings:";
-    echonice "-f, --force                    delete vendor folder, default: 'no'"
-    echonice "-c, --commit                   also commit, default: 'yes'"
     echonice "-h, --help                     show help information"
 
     echohead "Example usage:"
-    echonice "sake-composer-update . -f 'yes' -c 'no'";
+    echonice "sake-composer-about silverstripe/cms";
 
     echofunctions
     exit;
@@ -60,30 +53,6 @@ else
     help_and_exit;
 fi
 
-if [[ "$force" == "yes" ]]; then
-    rm vendor -rf
-fi
-
-composer update --prefer-source
-
-if [[ "$commit" == "yes" ]]; then
-    sake-git-commit-and-push . -m "MINOR: composer update"
-fi
-
-echoline;
-
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
-else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
-fi
-
-find 'vendor' -mindepth 2 -maxdepth 2 -type d -print0 |
-    while IFS= read -r -d '' line; do
-        if [ ! -d "$line/.git" ]; then
-            echobad "CHECKED OUT AS DIST: $line ... consider --prefer-source if you want to change them."  ;
-        fi
-    done
+composer depends $package
 
 echoend;
