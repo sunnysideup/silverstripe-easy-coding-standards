@@ -1,0 +1,60 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+more="no"
+help='no'
+while (( $# )); do
+  case $1 in
+    -m|--more)               more=$2;shift ;;
+    -h|--help)               help='yes';shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       dir=$1;;
+  esac
+  shift
+done
+
+help_and_exit() {
+
+    echohead "self help";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+    echonice "More (-m|--more):              $more";
+
+    echohead "Available settings:";
+    echonice "-m, --more                     show MORE help information"
+
+    echohead "Example usage:"
+    echonice "e.g. sake-help -m yes";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change directory to $WORKING_DIR";
+    help_and_exit;
+fi
+
+echolistoffunctions
+
+echoend;

@@ -1,16 +1,18 @@
 #!/bin/bash
 
-
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-methods
+source $SCRIPT_DIR/sake-self-methods
 
+############################################ DIR
 if [ "$1" != "" ]; then
     dir=$1;
 else
     dir='app/client/src'
 fi
 
+############################################ SETTINGS EXTRA
 while getopts a: flag
 do
     case "${flag}" in
@@ -18,25 +20,11 @@ do
     esac
 done
 
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   --NONE--";
-    echonice " "
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   sake-lint-js .";
-    echonice "   sake-lint-js foo/bar";
-    echoline;
-    echonice " "
-    echonice " "
-    exit;
-}
-
+############################################ SETTINGS
+help='no'
 while (( $# )); do
   case $1 in
+    -h|--help)        help='yes';shift ;;
     -*)               printf 'Unknown option: %q\n\n' "$1";
                       help_and_exit 1 ;;
     *)                dir=$1;;
@@ -44,28 +32,40 @@ while (( $# )); do
   shift
 done
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running JS Standard";
-echoline;
-echonice " "
-echonice " "
-echonice "   Make sure you have intalled and updated:";
-echonice " ";
-echonice "   sudo npm install standard --global'";
-echonice " "
-echonice " "
-echoline;
-echonice "   files to analyse: $WORKING_DIR/$dir/*.js";
-echoline;
-echonice "   Example usage:"
-echonice "   e.g. sake-lint-js app/client/javascript";
-echonice "   e.g. sake-lint-js .";
-echoline;
-echonice " "
-echonice " "
+help_and_exit() {
 
+    echohead "JS Standard";
+    echonice "Make sure you have intalled and updated:";
+    echonice "sudo npm install standard --global";
+
+    echohead "Current settings:";
+    echonice "files to analyse:             $WORKING_DIR/$dir/*.js";
+
+    echohead "Available settings:";
+    echonice "-h, --help                    show help information"
+
+    echohead "Example usage:"
+    echonice "sake-lint-js .";
+    echonice "sake-lint-js app/client/javascript";
+    echonice "sake-lint-js foo/bar"
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change directory to $WORKING_DIR";
+    help_and_exit;
+fi
 
 standard --fix $dir/*.js
 

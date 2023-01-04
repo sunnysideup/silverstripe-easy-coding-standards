@@ -1,35 +1,14 @@
 #!/bin/bash
 
-
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-methods
+source $SCRIPT_DIR/sake-self-methods
 
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   -f, --just-do-it                 do it all (excluding javascript!)";
-    echonice "   -a, --also                     also lint, e.g. app/_config.php or app/";
-    echonice "   -c, --commit-and-push          also commit and push - set to yes to enable";
-    echonice "   -v, --new-version              create tag - values can be no|patch|minor|major";
-    echonice "   -m, --message                  commit message";
-    echonice "   -t, --themes-also              include folders in themes";
-    echonice "   -j, --javascript-also          include javascript linting"
-    echonice "   -p, --php-version              php version - e.g. 7.4";
-    echonice "  "
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   sake-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
-    echoline;
-    echonice " "
-    echonice " "
-    exit;
-}
-
+############################################ DIR
 dir='app/src'
 
+############################################ SETTINGS
 justDoIt='no'
 also='app/_config.php'
 alsoDoThemes='no'
@@ -37,7 +16,8 @@ commitAndPush='yes'
 newVersion='no'
 message='PATCH: linter'
 javascriptAlso='no'
-phpVersion='7.4'
+phpVersion='8.0'
+help='no'
 while (( $# )); do
   case $1 in
     -j|--just-do-it)         justDoIt=$2;shift ;;
@@ -48,6 +28,7 @@ while (( $# )); do
     -m|--message)            message=$2;shift ;;
     -j|--javascript-also)    javascriptAlso=$2;shift ;;
     -p|--php-version)        phpVersion=$2;shift ;;
+    -h|--help)               help='yes';shift ;;
     -*)                      printf 'Unknown option: %q\n\n' "$1";
                              help_and_exit 1 ;;
     *)                       dir=$1;;
@@ -60,109 +41,116 @@ if [[ "$justDoIt" == "yes" ]]; then
     alsoDoThemes='yes'
     commitAndPush='yes'
     newVersion='patch'
-    message='PATCH: linter'
+    message='PATCH: linter all'
 fi
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running Lint All";
-echoline;
-echonice "   Directory of script:           $SCRIPT_DIR";
-echonice "   Directory to analyse:          $WORKING_DIR/$dir";
-echoline;
-echonice "   Just do all of it (-j):        $justDoIt";
-echonice "   Also Check (-a):               $WORKING_DIR/$also";
-echonice "   Also include themes *(-t):     $alsoDoThemes";
-echonice "   Commit And Push (-c):          $commitAndPush";
-echonice "   New Tag/Version (-v):          $newVersion";
-echonice "   Message (-m):                  $message";
-echonice "   Javascript Also (-j):          $javascriptAlso";
-echonice "   PHP Version (-p):              $phpVersion";
-echoline;
-echonice " "
-echonice " "
+help_and_exit() {
 
-echoline
-echonice "   changing directory to $dir "
-echoline
-cd $dir
-echonice " "
+    echohead "Lint All";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
+    echohead "Current settings:";
+    echonice "Just do all of it (-j):        $justDoIt";
+    echonice "Also Check (-a):               $WORKING_DIR/$also";
+    echonice "Also include themes *(-t):     $alsoDoThemes";
+    echonice "Commit And Push (-c):          $commitAndPush";
+    echonice "New Tag/Version (-v):          $newVersion";
+    echonice "Message (-m):                  $message";
+    echonice "Javascript Also (-j):          $javascriptAlso";
+    echonice "PHP Version (-p):              $phpVersion";
 
+    echohead "Available settings:";
+    echonice "-j, --just-do-it               do it all (excluding javascript!), default: no";
+    echonice "-a, --also                     also lint, e.g. app/_config.php or app/, default: app/_config.php";
+    echonice "-c, --commit-and-push          also commit and push, default: yes";
+    echonice "-v, --new-version              create tag (no|patch|minor|major), default: no";
+    echonice "-m, --message                  commit message, default: PATCH: linter";
+    echonice "-t, --themes-also              include folders in themes, default: no";
+    echonice "-j, --javascript-also          include javascript linting, default: no"
+    echonice "-p, --php-version              php version, default: 8.0";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change directory to $WORKING_DIR";
+    help_and_exit;
+fi
 
 if [ -z "$(git status --porcelain)" ]; then
-    cd -
-
-    echonice "   # remove origs"
-    $SCRIPT_DIR/sake-remove-origs -a $also $dir
     cd $WORKING_DIR
 
-    echonice "   # run php check"
+    echonice "# remove origs"
+    $SCRIPT_DIR/sake-lint-remove-origs -a $also $dir
+    cd $WORKING_DIR
+
+    echonice "# run php check"
     $SCRIPT_DIR/sake-lint-compat -p $phpVersion $dir
     cd $WORKING_DIR
 
-    echonice "   # run linter ecs #1"
+    echonice "# run linter ecs #1"
     $SCRIPT_DIR/sake-lint-ecs -a $also $dir
 
-    echonice "   # run rector #1"
+    echonice "# run rector #1"
     $SCRIPT_DIR/sake-lint-rector -a $also $dir
     cd $WORKING_DIR
 
-    echonice "   # run ecs #2"
+    echonice "# run ecs #2"
     $SCRIPT_DIR/sake-lint-ecs -a $also $dir
     cd $WORKING_DIR
 
-    echonice "   # run rector #2"
+    echonice "# run rector #2"
     $SCRIPT_DIR/sake-lint-rector -a $also $dir
     cd $WORKING_DIR
 
-    echonice "   # run ecs #3"
+    echonice "# run ecs #3"
     $SCRIPT_DIR/sake-lint-ecs -a $also $dir
     cd $WORKING_DIR
 
-    echonice "   # run stan"
+    echonice "# run stan"
     $SCRIPT_DIR/sake-lint-stan -a $also -l 2 $dir
     cd $WORKING_DIR
 
     if test -f "$WORKING_DIR/$also"; then
-        echonice " #########################"
-        echonice "   # run the above on $also"
-        echonice " #########################"
+        echohead "# run the above on $also"
         $SCRIPT_DIR/sake-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
         cd $WORKING_DIR
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
-        echonice " #########################"
-        echonice "   # run the above on themes"
-        echonice " #########################"
+        echohead "# run the above on themes"
         $SCRIPT_DIR/sake-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso themes
         cd $WORKING_DIR
     fi
 
-
     if [[ "$javascriptAlso" == "yes" ]]; then
-        echonice " #########################"
-        echonice "   # run javascript linter"
-        echonice " #########################"
+        echohead "# run javascript linter"
         $SCRIPT_DIR/sake-lint-js $WORKING_DIR
         cd $WORKING_DIR
     fi
 
-    echoline
-    echonice "   commit in $WORKING_DIR/$dir and $also"
-    echoline
-    $SCRIPT_DIR/sake-gitpush -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
+    echohead "commit in $WORKING_DIR/$dir and $also"
+
+    $SCRIPT_DIR/sake-git-commit-and-push -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
     cd $WORKING_DIR
 
-    echoline
-    echonice "  DONE"
-    echoline
 else
-    echoline
-    echobad "  Sorry, can not run, there are uncommitted changes"
-    echoline
+    echobad "Sorry, can not run, there are uncommitted changes"
 fi
 
 echoend;

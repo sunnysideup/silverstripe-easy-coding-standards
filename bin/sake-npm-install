@@ -1,33 +1,22 @@
 #!/bin/bash
 
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-methods
+source $SCRIPT_DIR/sake-self-methods
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
-if [ "$1" != "" ]; then
-    dir=$1;
-else
-    dir='themes/client'
-fi
+############################################ DIR
+dir="./"
 
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   none"
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   sake-npm-install themes/client";
-    echoline;
-    echonice " "
-    echonice " "
-    exit;
-}
-
+############################################ SETTINGS
+webpackDir='themes/sswebpack_engine_only/'
+themeDir=''
+help='no'
 while (( $# )); do
   case $1 in
+    -w|--webpack-dir)  webpackDir=$2;shift ;;
+    -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -35,41 +24,55 @@ while (( $# )); do
   shift
 done
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running NPM INSTALL";
-echoline;
-echonice "   Directory of script:              $SCRIPT_DIR";
-echonice "   Directory to install:             $WORKING_DIR/$dir";
-echoline;
-echonice " "
-echonice " "
+help_and_exit() {
+    echohead "NPM install";
+    echonice "Directory of script:          $SCRIPT_DIR";
+    echonice "Directory to install:         $WORKING_DIR/$dir";
 
-echo ''
-echoline
-echo 'installing webpack'
-echoline
-echo ''
+    echohead "Current settings:"
+    echonice "Webpack dir (-w):             $WORKING_DIR/$webpackDir";
 
-cd themes/sswebpack_engine_only/
+    echohead "Available settings:";
+    echonice "-w, --webpack-dir             directory where webpack lives"
+    echonice "-h, --help                    show help information"
+
+    echohead "Example usage:"
+    echonice "sake-npm-install themes/client";
+
+    echofunctions
+    exit;
+}
+
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+echohead 'installing webpack'
+
+if [ -d "$WORKING_DIR/$webpackDir" ]; then
+    cd $WORKING_DIR/$webpackDir
+else
+    echonice "Could not change directory to $WORKING_DIR/$webpackDir";
+    help_and_exit;
+fi
+
 npm i
-npm update
-npm install
+
+echohead 'installing node-sass fix'
 node node_modules/node-sass/scripts/install.js
 npm rebuild node-sass
 
-cd -
+cd $WORKING_DIR
 
-echo ''
-echoline
-echo 'installing application packages'
-echoline
-echo ''
-
-cd $WORKING_DIR/$dir/my_node_modules/
+echohead 'installing application packages'
+cd $WORKING_DIR
+cd $themeDir
+cd my_node_modules
 npm i
-cd -
 
+cd $WORKING_DIR
 
 echoend;

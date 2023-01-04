@@ -1,0 +1,72 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir="./"
+
+############################################ SETTINGS
+server=''
+wwwDataUser='www-data'
+help='no'
+while (( $# )); do
+  case $1 in
+    -w|--www-data-user)         wwwDataUser=$2;shift ;;
+    -h|--help)                  help='yes'; shift;;
+    -*)                         printf 'Unknown option: %q\n\n' "$1";
+                                help_and_exit 1 ;;
+    *)                          server=$1;;
+  esac
+  shift
+done
+
+help_and_exit() {
+
+    echohead "Rsync assets from server";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to copy from:        $server/public/assets";
+    echonice "Directory to copy to:          $WORKING_DIR/public/assets";
+
+    echonice "Apache user (-w):              $wwwDataUser";
+
+    echohead "Available settings:";
+    echonice "-w, --www-data-user            the apache user, default: www-data"
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-ss-rsync-assets my-server:/var/www/website-root";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change directory to $WORKING_DIR";
+    help_and_exit;
+fi
+
+if [-n "$server"]; then
+    if test -f "$WORKING_DIR/public/assets"; then
+        sudo chown $USER public/assets -R
+        rsync --stats -chavzPr $server/public/assets ./public/assets
+        sudo chown $wwwDataUser public/assets -R
+    else
+        echobad "Could not find  $WORKING_DIR/public/assets"
+    fi
+else
+    echobad "no server specified $server"
+fi
+
+echoend;

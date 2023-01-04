@@ -1,0 +1,139 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+if [ "$1" != "" ]; then
+    dir=$1;
+else
+    dir='vendor'
+fi
+
+############################################ SETTINGS
+commitAndPush='yes'
+message='WIP'
+newVersion='no'
+statusOnly='no'
+fullUpdate='yes'
+help='no'
+while (( $# )); do
+  case $1 in
+    -m|--message)          message=$2;shift ;;
+    -c|--commit-and-push)  commitAndPush=$2;shift ;;
+    -v|--new-version)      newVersion=$2;shift ;;
+    -s|--status-only)      statusOnly=$2;shift ;;
+    -f|--full-update)      fullUpdate=$2;shift ;;
+    -h|--help)             help='yes';shift ;;
+    -*)                    printf 'Unknown option: %q\n\n' "$1";
+                           help_and_exit 1 ;;
+    *)                     dir=$1;;
+  esac
+  shift
+done
+
+if [[ "$message" == "" ]]; then
+    read -p "Commit message: " message
+fi
+if [[ "$message" == "" ]]; then
+    message="WIP"
+fi
+
+help_and_exit() {
+
+    echohead "Checking Vendor Packages for Changes";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+    echonice "Message (-m):                  $message";
+    echonice "Commit and Push (-c):          $commitAndPush";
+    echonice "Create New tag (-v):           $newVersion";
+    echonice "Status Only (-s):              $statusOnly";
+    echonice "Full Composer Update (-f):     $statusOnly";
+
+    echohead "Available settings:";
+    echonice "-m, --message                  message - e.g. Lint, default: WIP";
+    echonice "-c, --commit-and-push          commit and push also? default: yes";
+    echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no";
+    echonice "-s, --status-only              check if there are changes git folder present, default: no"
+    echonice "-f, --full-update              run a full composer update afterwards and commit, default: yes"
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-git-commit-and-push-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch -f no   vendor/my-vendor-name";
+
+    echofunctions
+    exit;
+}
+
+
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir";
+    help_and_exit;
+fi
+
+echohead "Removing folders that do not need to be there ..."
+
+find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"
+find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"  -exec rm "{}" -rf  \;
+sake-lint-remove-origs $dir
+
+echohead "going to look for folders in $WORKING_DIR/$dir"
+
+find $WORKING_DIR/themes -mindepth 1 -maxdepth 1 -type d -print0 |
+    while IFS= read -r -d '' line; do
+
+        echohead "DOING: $line"  ;
+        cd "$line";
+        if [[ "$statusOnly" == "yes" ]]; then
+            if test -f "./.git/config"; then
+                git status -s
+            else
+                echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
+                echobad "Also, $GIT_DIR IS is not a git repo";
+            fi
+        else
+            $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
+        fi
+        cd -
+    done
+
+find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
+    while IFS= read -r -d '' line; do
+
+        echohead "DOING: $line"  ;
+        cd "$line";
+        if [[ "$statusOnly" == "yes" ]]; then
+            if test -f "./.git/config"; then
+                git status -s
+            else
+                echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
+                echobad "Also, $GIT_DIR IS is not a git repo";
+            fi
+        else
+            $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
+        fi
+        cd -
+    done
+
+if [[ "$fullUpdate" == "yes" ]]; then
+    composer update
+    composer update
+
+    $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion
+fi
+
+echoend;

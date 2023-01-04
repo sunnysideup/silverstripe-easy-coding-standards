@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 cd $SCRIPT_DIR
 cd ..

@@ -1,41 +1,37 @@
 #!/bin/bash
+
 ############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 ############################################ DIR
-dir="./app/src"
+dir='./'
 
 ############################################ SETTINGS
-also='app/_config.php'
-ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.php"
+help='no'
 while (( $# )); do
   case $1 in
-    -a|--also)         also=$2;shift ;;
-    -e|--ecs-config)   ecsConfig=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
-    *)                 dir=$1;;
+    -h|--help)               help='yes';shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help_and_exit 1 ;;
+    *)                       dir=$1;;
   esac
   shift
 done
 
+help_and_exit() {
+
+    echohead "add-site";
     echonice "Directory of script:           $SCRIPT_DIR";
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
-    echohead "Current settings:"
-    echonice "Also check (-a):               $WORKING_DIR/$also";
-    echonice "Ecs config file (-e):          $ecsConfig";
-
     echohead "Available settings:";
-    echonice "-e, --ecs-config               ecs config file locaton";
     echonice "-h, --help                     show help information"
 
     echohead "Example usage:"
-    echonice "sake-lint-ecs foo/bar ";
+    echonice "e.g. sake-ss-add-site ./  "
+    echonice "... run in the destination folder"
 
     echofunctions
     exit;
@@ -49,13 +45,14 @@ fi
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
 else
     echonice "Could not change directory to $WORKING_DIR";
     help_and_exit;
 fi
 
 
-$SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
-$SCRIPT_DIR/ecs check-markdown $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
+# dev-build
+echo "TO BE COMPLETED"
 
 echoend;

@@ -27,7 +27,7 @@ while (( $# )); do
 done
 
 help_and_exit() {
-    echohead "NPM watch";
+    echohead "NPM dev";
     echonice "Directory of script:          $SCRIPT_DIR";
     echonice "Directory to install:         $WORKING_DIR/$dir";
 
@@ -41,7 +41,7 @@ help_and_exit() {
     echonice "-h, --help                    show help information"
 
     echohead "Example usage:"
-    echonice "sake-npm-watch -t themes/client";
+    echonice "sake-npm-dev -t themes/client";
 
     echofunctions
     exit;
@@ -61,12 +61,10 @@ else
     help_and_exit;
 fi
 
-cd $WORKING_DIR/$webpackDir
-
 if [ "$themeDir" != "" ]; then
-    npm run watch --theme_dir=$themeDir
+    npm run dev --theme_dir=$themeDir
 else
-    npm run watch
+    npm run dev
 fi
 
 cd $WORKING_DIR

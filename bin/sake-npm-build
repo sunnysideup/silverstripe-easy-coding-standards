@@ -1,33 +1,23 @@
 #!/bin/bash
 
+############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-methods
+source $SCRIPT_DIR/sake-self-methods
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
-if [ "$1" != "" ]; then
-    dir=$1;
-else
-    dir='themes/client'
-fi
+############################################ DIR
+dir="./"
 
-help_and_exit() {
-    echoline;
-    echonice "   Available settings:";
-    echoline;
-    echonice "   none"
-    echoline;
-    echonice "   Example usage:"
-    echoline;
-    echonice "   sake-npm-build themes/client";
-    echoline;
-    echonice " "
-    echonice " "
-    exit;
-}
-
+############################################ SETTINGS
+webpackDir='themes/sswebpack_engine_only/'
+themeDir=''
+help='no'
 while (( $# )); do
   case $1 in
+    -w|--webpack-dir)  webpackDir=$2;shift ;;
+    -t|--theme-dir)    themeDir=$2;shift ;;
+    -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help_and_exit 1 ;;
     *)                 dir=$1;;
@@ -35,19 +25,47 @@ while (( $# )); do
   shift
 done
 
-echonice " "
-echonice " "
-echoline;
-echonice "   Running NPM build";
-echoline;
-echonice "   Directory of script:              $SCRIPT_DIR";
-echonice "   Directory to install:             $WORKING_DIR/$dir";
-echoline;
-echonice " "
-echonice " "
+help_and_exit() {
+    echohead "NPM build";
+    echonice "Directory of script:          $SCRIPT_DIR";
+    echonice "Directory to install:         $WORKING_DIR/$dir";
 
-cd themes/sswebpack_engine_only/
-npm run build --theme_dir=$dir
+    echohead "Current settings:"
+    echonice "Webpack dir (-w):             $WORKING_DIR/$webpackDir";
+    echonice "Theme dir (-t):               $WORKING_DIR/$themeDir";
 
+    echohead "Available settings:";
+    echonice "-w, --webpack-dir             directory where webpack lives"
+    echonice "-t, --theme-dir               add --theme-dir to npm command"
+    echonice "-h, --help                    show help information"
+
+    echohead "Example usage:"
+    echonice "sake-npm-build themes/client";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$webpackDir" ]; then
+    cd $WORKING_DIR/$webpackDir
+else
+    echonice "Could not change directory to $WORKING_DIR/$webpackDir";
+    help_and_exit;
+fi
+
+if [ "$themeDir" != "" ]; then
+    npm run build --theme_dir=$themeDir
+else
+    npm run build
+fi
+
+cd $WORKING_DIR
 
 echoend;
