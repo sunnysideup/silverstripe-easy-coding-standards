@@ -23,7 +23,7 @@ while (( $# )); do
 done
 
 help_and_exit() {
-    echohead "Composer Update";
+    echohead "Composer About a Package";
     echonice "Directory of script:           $SCRIPT_DIR";
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
