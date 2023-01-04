@@ -90,7 +90,6 @@ if [[ "$doToday" == "yes" ]]; then
     numberOfCommits=$todaysCount
 fi
 
-
 if [ $numberOfCommits \> 0 ]; then
     git reset --soft HEAD~$numberOfCommits
     git commit . -m "$message"
