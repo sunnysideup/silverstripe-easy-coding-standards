@@ -15,7 +15,7 @@ if test -f "$COMPOSER_DIR/composer.json"; then
     cd $COMPOSER_DIR
     echo "===================================================="
     echo " UPDATING IN:"
-    echo $(pwd)
+    echo " $(pwd)"
     echo "===================================================="
     composer update sunnysideup/easy-coding-standards --prefer-source
 else
