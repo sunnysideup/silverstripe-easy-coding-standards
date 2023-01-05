@@ -10,7 +10,6 @@ echo ""
 echo ""
 
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
-WORKING_DIR=$(pwd)
 COMPOSER_DIR=$SCRIPT_DIR/../..
 if test -f "$COMPOSER_DIR/composer.json"; then
     cd $COMPOSER_DIR
