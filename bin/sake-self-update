@@ -4,25 +4,20 @@ echo ""
 echo ""
 echo "===================================================="
 echo " SELF-UPDATING (this happens from time to time)"
-echo " We expect this to be in ~/.config/composer/"
 echo "===================================================="
 echo ""
 echo ""
 echo ""
 
-if [ -d "~/.config/composer" ]; then
-    cd ~/.config/composer
-else
-    echo "===================================================="
-    echo " ERROR: could not find ~/.config/composer/"
-    echo " no trying to get there another way"
-    echo "===================================================="
-    SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
-    WORKING_DIR=$(pwd)
-    cd $SCRIPT_DIR/../../
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+COMPOSER_DIR=$SCRIPT_DIR/../..
+if test -f "$COMPOSER_DIR/composer.json"; then
+    cd $COMPOSER_DIR
     echo $(pwd)
-
-    echo $SCRIPT_DIR
+    echo "===================================================="
+    echo " UPDATING IN:"
+    echo $(pwd)
+    echo "===================================================="
+    composer update sunnysideup/easy-coding-standards --prefer-source
 fi
-
-composer update sunnysideup/easy-coding-standards --prefer-source
