@@ -25,6 +25,7 @@ while (( $# )); do
 done
 
 help_and_exit() {
+
     echohead "Composer Require";
     echonice "Directory of script:           $SCRIPT_DIR";
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
