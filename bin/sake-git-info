@@ -77,7 +77,7 @@ if test -f "$GIT_DIR/.git/config"; then
     # dns_check (ahead 1) | (behind 112) origin/master
     # master (ahead 2) | (behind 0) origin/master
 
-    echohead "behind and ahead"
+    echohead "Branches that are ahead:"
     git for-each-ref --format="%(refname:short) %(upstream:short)" refs/heads | \
     while read local remote
     do
@@ -85,7 +85,9 @@ if test -f "$GIT_DIR/.git/config"; then
         git rev-list --left-right "${local}...${remote}" -- 2>/dev/null >/tmp/git_upstream_status_delta || continue
         LEFT_AHEAD=$(grep -c '^<' /tmp/git_upstream_status_delta)
         RIGHT_AHEAD=$(grep -c '^>' /tmp/git_upstream_status_delta)
-        echonice "$local (ahead $LEFT_AHEAD) | (behind $RIGHT_AHEAD) $remote"
+        if [ $LEFT_AHEAD -gt 0 ]; then
+            echonice "$local (ahead $LEFT_AHEAD) | (behind $RIGHT_AHEAD) $remote"
+        fi
     done
 
     echohead "branches"
