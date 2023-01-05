@@ -17,4 +17,7 @@ else
     echo "===================================================="
     echo " ERROR: could not find ~/.config/composer/"
     echo "===================================================="
+    SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+    WORKING_DIR=$(pwd)
+    echo $SCRIPT_DIR
 fi
