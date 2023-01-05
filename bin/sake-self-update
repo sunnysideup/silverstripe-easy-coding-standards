@@ -18,4 +18,8 @@ if test -f "$COMPOSER_DIR/composer.json"; then
     echo $(pwd)
     echo "===================================================="
     composer update sunnysideup/easy-coding-standards --prefer-source
+else
+    echo "===================================================="
+    echo " ERROR: could not find composer file in: $COMPOSER_DIR/composer.json"
+    echo "===================================================="
 fi
