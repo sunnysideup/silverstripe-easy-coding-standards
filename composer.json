@@ -33,6 +33,7 @@
   "bin": [
     "bin/sake-composer-available-updates",
     "bin/sake-composer-update",
+    "bin/sake-composer-require",
     "bin/sake-find-in-files",
     "bin/sake-find-large-files",
     "bin/sake-git-commit-and-push",
