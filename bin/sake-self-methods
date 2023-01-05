@@ -1,12 +1,18 @@
 #!/bin/bash
 
+echoplain() {
+    echo $1
+}
+
 echonice() {
    echo -e " \033[0;33m$1 \033[0m";
 }
 
-echogood() {
+echogood(){
    echo -e " \033[0;32m$1 \033[0m";
 }
+
+
 
 echobad() {
    echo -e "\033[1;32;41m ---------------------------------------- \033[0m";
@@ -37,7 +43,8 @@ echoend() {
 echofunctions() {
     echohead 'List of Available Functions'
     echonice "To get a list of available options, run: "
-    echonice "sake-help"
+    echoplain "sake-help"
+    echoline
 }
 
 echolistoffunctions() {

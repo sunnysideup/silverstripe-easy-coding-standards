@@ -1,0 +1,89 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+while (( $# )); do
+  case $1 in
+    -h|--help)             help='yes';shift ;;
+    -*)                    printf 'Unknown option: %q\n\n' "$1";
+                           help_and_exit 1 ;;
+    *)                     dir=$1;;
+  esac
+  shift
+done
+
+
+
+help_and_exit() {
+    echohead "Git info";
+    echonice "directory of script:           $SCRIPT_DIR";
+    echonice "directory to commit:           $WORKING_DIR/$dir";
+
+    echohead "Available settings:";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "e.g. sake-git-info ";
+
+    echofunctions
+    exit;
+}
+
+
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir";
+    help_and_exit;
+fi
+
+GIT_DIR=$(git rev-parse --show-toplevel)
+
+if test -f "$GIT_DIR/.git/config"; then
+    # set the right way to look at branches
+    git config push.default matching
+
+    echohead "# check git status"
+    git status
+
+    echohead "# current commit"
+    git rev-parse --short --verify HEAD
+    #!/bin/bash
+    # by http://github.com/jehiah
+    # this prints out some branch status (similar to the '... ahead' info you get from git status)
+
+    # example:
+    # $ git branch-status
+    # dns_check (ahead 1) | (behind 112) origin/master
+    # master (ahead 2) | (behind 0) origin/master
+
+    git for-each-ref --format="%(refname:short) %(upstream:short)" refs/heads | \
+    while read local remote
+    do
+        [ -z "$remote" ] && continue
+        git rev-list --left-right "${local}...${remote}" -- 2>/dev/null >/tmp/git_upstream_status_delta || continue
+        LEFT_AHEAD=$(grep -c '^<' /tmp/git_upstream_status_delta)
+        RIGHT_AHEAD=$(grep -c '^>' /tmp/git_upstream_status_delta)
+        echonice "$local (ahead $LEFT_AHEAD) | (behind $RIGHT_AHEAD) $remote"
+    done
+else
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
+fi
+
+echoend;

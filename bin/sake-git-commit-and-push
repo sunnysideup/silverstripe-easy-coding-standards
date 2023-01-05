@@ -119,6 +119,8 @@ if test -f "$GIT_DIR/.git/config"; then
         #git add $WORKING_DIR/$also
         #git add $WORKING_DIR/$logFile
 
+        echohead "Commit message: $message"
+
         echohead "# committing files to git repo"
         git commit . -m "$message"
         #git commit $WORKING_DIR/$also -m "$message"

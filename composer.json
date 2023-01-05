@@ -39,6 +39,7 @@
     "bin/sake-find-large-files",
     "bin/sake-git-commit-and-push",
     "bin/sake-git-commit-and-push-vendor-packages",
+    "bin/sake-git-info",
     "bin/sake-git-remove-stale-branches",
     "bin/sake-git-squash-commits",
     "bin/sake-help",
