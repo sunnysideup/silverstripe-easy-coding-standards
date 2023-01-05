@@ -12,12 +12,17 @@ echo ""
 
 if [ -d "~/.config/composer" ]; then
     cd ~/.config/composer
-    composer update sunnysideup/easy-coding-standards --prefer-source
 else
     echo "===================================================="
     echo " ERROR: could not find ~/.config/composer/"
+    echo " no trying to get there another way"
     echo "===================================================="
     SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
     WORKING_DIR=$(pwd)
+    cd $SCRIPT_DIR/../../
+    echo $(pwd)
+
     echo $SCRIPT_DIR
 fi
+
+composer update sunnysideup/easy-coding-standards --prefer-source
