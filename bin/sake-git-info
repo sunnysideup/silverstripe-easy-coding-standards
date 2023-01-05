@@ -60,7 +60,7 @@ if test -f "$GIT_DIR/.git/config"; then
     echohead "fetchin --all"
     git fetch --all
 
-    # set the right way to look at branches
+    # set the right way to look at testbranches
     git config push.default matching
 
     echohead "# check git status"
@@ -68,30 +68,27 @@ if test -f "$GIT_DIR/.git/config"; then
 
     echohead "# current commit"
     git rev-parse --short --verify HEAD
-    #!/bin/bash
-    # by http://github.com/jehiah
-    # this prints out some branch status (similar to the '... ahead' info you get from git status)
 
-    # example:
-    # $ git branch-status
-    # dns_check (ahead 1) | (behind 112) origin/master
-    # master (ahead 2) | (behind 0) origin/master
+    echohead "# last three commits"
+    git log -3
 
-    echohead "Branches that are ahead:"
-    git for-each-ref --format="%(refname:short) %(upstream:short)" refs/heads | \
-    while read local remote
-    do
-        [ -z "$remote" ] && continue
-        git rev-list --left-right "${local}...${remote}" -- 2>/dev/null >/tmp/git_upstream_status_delta || continue
-        LEFT_AHEAD=$(grep -c '^<' /tmp/git_upstream_status_delta)
-        RIGHT_AHEAD=$(grep -c '^>' /tmp/git_upstream_status_delta)
-        if [ $LEFT_AHEAD -gt 0 ]; then
-            echonice "$local (ahead $LEFT_AHEAD) | (behind $RIGHT_AHEAD) $remote"
+    echohead "# unpushed branches"
+    git log --branches --not --remotes --no-walk --decorate --oneline
+
+    mybranch=$(git symbolic-ref -q HEAD)
+    mybranch=${mybranch##refs/heads/}
+    mybranch=${mybranch:-HEAD}
+
+    echohead "# branches that are ahead:"
+    git for-each-ref refs/heads/ --format='%(refname:short)' |
+    while read testbranch; do
+        AHEAD=$(git rev-list --count $mybranch..$testbranch)
+        if [ $AHEAD -gt 0 ]; then
+            BEHIND=$(git rev-list --count $testbranch..$mybranch)
+            echonice "$AHEAD $testbranch ($BEHIND behind $mybranch)"
         fi
     done
 
-    echohead "branches"
-    git branch -a
 else
     echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
 fi
