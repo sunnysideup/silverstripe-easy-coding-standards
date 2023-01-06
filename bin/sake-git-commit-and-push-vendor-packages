@@ -135,15 +135,13 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         cd -
 
     done
-#
-# echohead "back to the start: $WORKING_DIR"
-# cd $WORKING_DIR
-#
-# if [[ "$fullUpdate" == "yes" ]]; then
-#     composer update
-#     composer update
-#
-#     $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion
-# fi
+
+echohead "back to the start: $WORKING_DIR"
+cd $WORKING_DIR
+
+if [[ "$fullUpdate" == "yes" ]]; then
+    sake-composer-update
+    $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion
+fi
 
 echoend;
