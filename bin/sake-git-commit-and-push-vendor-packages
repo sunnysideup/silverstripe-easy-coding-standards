@@ -122,7 +122,7 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         echohead "### DOING: $line"  ;
         cd "$line";
         test="$line/.git/config"
-        echonice $test
+        echonice "Checking for /.git/config"
         if [[ ! -f "$test" ]]; then
             echobad "$line IS NOT A GIT REPO";
         else
