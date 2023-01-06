@@ -78,10 +78,10 @@ fi
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR/$dir" ]; then
+if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
+    echonice "Could not change directory to $WORKING_DIR";
     help_and_exit;
 fi
 
@@ -91,42 +91,45 @@ find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"
 find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"  -exec rm "{}" -rf  \;
 sake-lint-remove-origs $dir
 
-echohead "going to look for folders in $WORKING_DIR/$dir"
+
+echohead "going to look for folders in $WORKING_DIR/themes"
 
 find $WORKING_DIR/themes -mindepth 1 -maxdepth 1 -type d -print0 |
     while IFS= read -r -d '' line; do
 
         echohead "DOING: $line"  ;
         cd "$line";
-        if [[ "$statusOnly" == "yes" ]]; then
-            if test -f "./.git/config"; then
+        if test -f "./.git/config"; then
+            echobad "$line IS NOT A GIT REPO";
+        else
+            if [[ "$statusOnly" == "yes" ]]; then
                 git status -s
             else
-                echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
-                echobad "Also, $GIT_DIR IS is not a git repo";
+                $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
             fi
-        else
-            $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
         fi
         cd -
+
     done
+
+echohead "going to look for folders in $WORKING_DIR/$dir"
 
 find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
     while IFS= read -r -d '' line; do
 
         echohead "DOING: $line"  ;
         cd "$line";
-        if [[ "$statusOnly" == "yes" ]]; then
-            if test -f "./.git/config"; then
+        if test -f "./.git/config"; then
+            echobad "$line IS NOT A GIT REPO";
+        else
+            if [[ "$statusOnly" == "yes" ]]; then
                 git status -s
             else
-                echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
-                echobad "Also, $GIT_DIR IS is not a git repo";
+                $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
             fi
-        else
-            $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
         fi
         cd -
+
     done
 
 if [[ "$fullUpdate" == "yes" ]]; then
