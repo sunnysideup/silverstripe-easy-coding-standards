@@ -99,7 +99,8 @@ find $WORKING_DIR/themes -mindepth 1 -maxdepth 1 -type d -print0 |
 
         echohead "### DOING: $line"  ;
         cd "$line";
-        if test -f "./.git/config"; then
+        echonice $(pwd)
+        if [[ -f "./.git/config" ]]; then
             echobad "$line IS NOT A GIT REPO";
         else
             if [[ "$statusOnly" == "yes" ]]; then
@@ -119,7 +120,8 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
 
         echohead "### DOING: $line"  ;
         cd "$line";
-        if test -f "./.git/config"; then
+        echonice $(pwd)
+        if [[ -f "./.git/config" ]]; then
             echobad "$line IS NOT A GIT REPO";
         else
             if [[ "$statusOnly" == "yes" ]]; then
