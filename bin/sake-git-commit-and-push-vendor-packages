@@ -52,7 +52,7 @@ help_and_exit() {
     echonice "Commit and Push (-c):          $commitAndPush";
     echonice "Create New tag (-v):           $newVersion";
     echonice "Status Only (-s):              $statusOnly";
-    echonice "Full Composer Update (-f):     $statusOnly";
+    echonice "Full Composer Update (-f):     $fullUpdate";
 
     echohead "Available settings:";
     echonice "-m, --message                  message - e.g. Lint, default: WIP";
@@ -99,11 +99,12 @@ find $WORKING_DIR/themes -mindepth 1 -maxdepth 1 -type d -print0 |
 
         echohead "### DOING: $line"  ;
         cd "$line";
-        echonice $(pwd)
-        if [[ -f "$line/.git/config" ]]; then
+        test="$line/.git/config"
+        if [[ ! -f "$line/.git/config" ]]; then
             echobad "$line IS NOT A GIT REPO";
         else
             if [[ "$statusOnly" == "yes" ]]; then
+                echonice '000sa0df'
                 git status -s
             else
                 $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
@@ -120,8 +121,9 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
 
         echohead "### DOING: $line"  ;
         cd "$line";
-        echonice $(pwd)
-        if [[ -f "$line/.git/config" ]]; then
+        test="$line/.git/config"
+        echonice $test
+        if [[ ! -f "$test" ]]; then
             echobad "$line IS NOT A GIT REPO";
         else
             if [[ "$statusOnly" == "yes" ]]; then
@@ -133,15 +135,15 @@ find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
         cd -
 
     done
-
-echohead "back to the start: $WORKING_DIR"
-cd $WORKING_DIR
-
-if [[ "$fullUpdate" == "yes" ]]; then
-    composer update
-    composer update
-
-    $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion
-fi
+#
+# echohead "back to the start: $WORKING_DIR"
+# cd $WORKING_DIR
+#
+# if [[ "$fullUpdate" == "yes" ]]; then
+#     composer update
+#     composer update
+#
+#     $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion
+# fi
 
 echoend;
