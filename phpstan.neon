@@ -13,6 +13,7 @@ parameters:
 #       - '#on an unknown class [a-zA-Z0-9\\_]+#'
         - '#is never read, only written#'
         - '#but returns SilverStripe\\ORM\\DataObject\|null#'
+        - "#PHPDoc tag @property has invalid value#"
 
 #        - '#with incorrect case:#'
 
