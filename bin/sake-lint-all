@@ -126,7 +126,7 @@ if [ -z "$(git status --porcelain)" ]; then
     $SCRIPT_DIR/sake-lint-stan -a $also -l 2 $dir
     cd $WORKING_DIR
 
-    if test -f "$WORKING_DIR/$also"; then
+    if test -f "$also"; then
         echohead "# run the above on $also"
         $SCRIPT_DIR/sake-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
         cd $WORKING_DIR
