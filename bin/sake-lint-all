@@ -144,10 +144,7 @@ if [ -z "$(git status --porcelain)" ]; then
         cd $WORKING_DIR
     fi
 
-    echohead "commit in $WORKING_DIR/$dir and $also"
-
-    $SCRIPT_DIR/sake-git-commit-and-push -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
-    cd $WORKING_DIR
+    echohead "Dont forget to to commit and push"
 
 else
     echobad "Sorry, can not run, there are uncommitted changes"
