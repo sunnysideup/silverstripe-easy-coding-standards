@@ -23,6 +23,7 @@ while (( $# )); do
   shift
 done
 
+help_and_exit() {
     echonice "Directory of script:           $SCRIPT_DIR";
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
@@ -49,6 +50,7 @@ fi
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
 else
     echonice "Could not change directory to $WORKING_DIR";
     help_and_exit;
