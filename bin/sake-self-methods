@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echoplain() {
-    echo $1
+    echo -e " $1"
 }
 
 echonice() {
