@@ -69,7 +69,7 @@ find $WORKING_DIR/$dir -name "*.orig"
 
 if [[ "$dryRun" == "no" ]]; then
     find $WORKING_DIR/$dir -name "*.orig" -exec rm "{}" \;
-    $SCRIPT_DIR/sake-git-commit-and-push $WORKING_DIR/$dir -m "PATCH: removing orig files"
+    $SCRIPT_DIR/sake-git-commit-and-push $dir -m "PATCH: removing orig files"
 fi
 
 echoend;
