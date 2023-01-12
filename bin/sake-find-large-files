@@ -16,7 +16,7 @@ while (( $# )); do
   case $1 in
     -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
+                       help='yes' ;;
     *)                 dir=$1;;
   esac
   shift

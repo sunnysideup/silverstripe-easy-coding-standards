@@ -18,7 +18,7 @@ while (( $# )); do
     -b|--branch)       branch=$2;shift ;;
     -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
+                       help='yes' ;;
     *)                 package=$1;;
   esac
   shift
