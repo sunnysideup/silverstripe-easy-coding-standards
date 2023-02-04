@@ -99,6 +99,13 @@ if test -f "$GIT_DIR/.git/config"; then
     echohead "# current commit"
     git rev-parse --short --verify HEAD
 
+    git merge HEAD &> /dev/null
+    result=$?
+    if [ $result -ne 0 ]
+    then
+        git commit
+    fi
+
     # pull all branches
     git fetch --all
     git pull --all
