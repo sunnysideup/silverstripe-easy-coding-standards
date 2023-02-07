@@ -12,10 +12,12 @@ dir="./"
 server=''
 wwwDataUser='www-data'
 help='no'
+reverse='no'
 while (( $# )); do
   case $1 in
     -w|--www-data-user)         wwwDataUser=$2;shift ;;
     -h|--help)                  help='yes'; shift;;
+    -r|--reverse)               reverse='yes'; shift;;
     -*)                         printf 'Unknown option: %q\n\n' "$1";
                                 help='yes' ;;
     *)                          server=$1;;
@@ -35,6 +37,7 @@ help_and_exit() {
     echohead "Available settings:";
     echonice "-w, --www-data-user            the apache user, default: www-data"
     echonice "-h, --help                     show help information"
+    echonice "-r, --reverse                  CAREFUL: reverse, push to server..."
 
     echohead "Example usage:"
     echonice "sake-ss-rsync-assets my-server:/var/www/website-root";
@@ -48,6 +51,11 @@ if [[ "$help" == "yes" ]]; then
     help_and_exit
 fi
 
+if [[ "$reverse" == "yes" ]]; then
+    echobad "CAREFUL: you are pushing to the server."
+fi
+
+
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
@@ -57,10 +65,18 @@ else
     help_and_exit;
 fi
 
-if [-n "$server"]; then
-    if test -f "$WORKING_DIR/public/assets"; then
+if [ ! -z "$server" ]; then
+    if [ -d "$WORKING_DIR/public/assets/" ]; then
         sudo chown $USER public/assets -R
-        rsync --stats -chavzPr $server/public/assets ./public/assets
+        if [ -w "$WORKING_DIR/public/assets" ]; then
+            if [[ "$reverse" == "yes" ]]; then
+                rsync --stats -chavzPr ./public/assets $server/public/assets
+            else
+                rsync --stats -chavzPr $server/public/assets ./public/assets
+            fi
+        else
+            echobad "Could not write to $WORKING_DIR/public/assets"
+        fi
         sudo chown $wwwDataUser public/assets -R
     else
         echobad "Could not find  $WORKING_DIR/public/assets"
