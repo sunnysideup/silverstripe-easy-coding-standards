@@ -70,9 +70,9 @@ if [ ! -z "$server" ]; then
         sudo chown $USER public/assets -R
         if [ -w "$WORKING_DIR/public/assets" ]; then
             if [[ "$reverse" == "yes" ]]; then
-                rsync --stats -chavzPr ./public/assets $server/public/assets
+                rsync --stats -chavzPr ./public/assets/ $server/public/assets
             else
-                rsync --stats -chavzPr $server/public/assets ./public/assets
+                rsync --stats -chavzPr $server/public/assets/ ./public/assets
             fi
         else
             echobad "Could not write to $WORKING_DIR/public/assets"
