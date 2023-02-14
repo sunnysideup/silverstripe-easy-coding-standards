@@ -79,13 +79,13 @@ if test -f "$GIT_DIR/.git/config"; then
     mybranch=${mybranch##refs/heads/}
     mybranch=${mybranch:-HEAD}
 
-    echohead "# branches that are ahead:"
+    echohead "# branches that are ahead"
     git for-each-ref refs/heads/ --format='%(refname:short)' |
     while read testbranch; do
         AHEAD=$(git rev-list --count $mybranch..$testbranch)
         if [ $AHEAD -gt 0 ]; then
             BEHIND=$(git rev-list --count $testbranch..$mybranch)
-            echonice "$AHEAD $testbranch ($BEHIND behind $mybranch)"
+            echobad "$AHEAD $testbranch ($BEHIND behind $mybranch)"
         fi
     done
 
