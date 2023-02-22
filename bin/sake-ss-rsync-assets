@@ -42,6 +42,9 @@ help_and_exit() {
     echohead "Example usage:"
     echonice "sake-ss-rsync-assets my-server:/var/www/website-root";
 
+    echohead "NOTE";
+    echonice "correct setup is rsync folder/ newfolder (with slash, without slash)"
+
     echofunctions
     exit;
 }
