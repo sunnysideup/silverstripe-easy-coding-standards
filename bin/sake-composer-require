@@ -63,6 +63,12 @@ else
     help_and_exit;
 fi
 
-composer require $package:$branch --prefer-source
+echohead "Consider using";
+echonice "config --global  \"preferred-install.myvendorname/*\" source to set --prefer-source";
+echonice "to enable editing your own packages";
+
+echohead "running: composer require $package:$branch"
+
+composer require $package:$branch
 
 echoend;
