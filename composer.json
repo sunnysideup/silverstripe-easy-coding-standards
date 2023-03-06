@@ -41,6 +41,7 @@
     "bin/sake-git-commit-and-push",
     "bin/sake-git-commit-and-push-vendor-packages",
     "bin/sake-git-info",
+    "bin/sake-git-merge-develop-and-production",
     "bin/sake-git-remove-stale-branches",
     "bin/sake-git-squash-commits",
     "bin/sake-help",
@@ -60,7 +61,6 @@
     "bin/sake-self-methods",
     "bin/sake-ss-add-site",
     "bin/sake-ss-dev-build",
-    "bin/sake-ss-rsync-assets",
-    "bin/sake-git-merge-develop-and-production"
+    "bin/sake-ss-rsync-assets"
   ]
 }

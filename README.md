@@ -10,43 +10,45 @@ Install as global composer package and then try to access the commands, starting
 
 ```shell
 
+# help
+ - sake-help
+
 # composer
-- sake-composer-available-updates
-- sake-composer-update
+ - sake-composer-available-updates
+ - sake-composer-update
 
 # find
-- sake-find-in-files
-- sake-find-large-files
+ - sake-find-in-files
+ - sake-find-large-files
 
 # git
-- sake-git-commit-and-push
-- sake-git-commit-and-push-vendor-packages
-- sake-git-remove-stale-branches
-- sake-git-squash-commits
+ - sake-git-commit-and-push
+ - sake-git-commit-and-push-vendor-packages
+ - sake-git-remove-stale-branches
+ - sake-git-squash-commits
+ - sake-git-merge-develop-and-productions
 
-# help
-- sake-help
 
 # lint
-- sake-lint-all
-- sake-lint-compat
-- sake-lint-ecs
-- sake-lint-js
-- sake-lint-one-file
-- sake-lint-rector
-- sake-lint-remove-origs
-- sake-lint-stan
+ - sake-lint-all
+ - sake-lint-compat
+ - sake-lint-ecs
+ - sake-lint-js
+ - sake-lint-one-file
+ - sake-lint-rector
+ - sake-lint-remove-origs
+ - sake-lint-stan
 
 # webpack
-- sake-npm-build
-- sake-npm-dev
-- sake-npm-install
-- sake-npm-watch
+ - sake-npm-build
+ - sake-npm-dev
+ - sake-npm-install
+ - sake-npm-watch
 
 # silverst
-- sake-ss-add-site
-- sake-ss-dev-build
-- sake-ss-rsync-asset
+ - sake-ss-add-site
+ - sake-ss-dev-build
+ - sake-ss-rsync-asset
 
 ```
 

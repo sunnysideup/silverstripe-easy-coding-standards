@@ -38,7 +38,7 @@ help_and_exit() {
     echonice "-h, --help                           show help information"
 
     echohead "Example usage:"
-    echonice "sake-git-merge-develop-and-productions";
+    echonice "sake-git-merge-develop-and-productions ./";
 
     echofunctions
     exit;
@@ -58,7 +58,7 @@ else
     help_and_exit;
 fi
 
-sake-git-commit "$WORKING_DIR/$dir"
+sake-git-commit-and-push  "$WORKING_DIR/$dir" -m "WIP"
 git checkout develop
 git pull origin develop
 git checkout production
