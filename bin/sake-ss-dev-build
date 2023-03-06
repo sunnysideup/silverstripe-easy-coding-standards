@@ -16,7 +16,7 @@ while (( $# )); do
     -s|--skip-composer)      skipComposer=$2;shift ;;
     -h|--help)               help='yes';shift ;;
     -*)                      printf 'Unknown option: %q\n\n' "$1";
-                             help_and_exit 1 ;;
+                             help='yes' ;;
     *)                       dir=$1;;
   esac
   shift
@@ -60,7 +60,7 @@ fi
 if [[ "$skipComposer" == "yes" ]]; then
     echo "skipping composer"
 else
-    composer install --prefer-source
+    composer install
 fi
 
 # composer install

@@ -30,7 +30,7 @@ while (( $# )); do
     -p|--php-version)        phpVersion=$2;shift ;;
     -h|--help)               help='yes';shift ;;
     -*)                      printf 'Unknown option: %q\n\n' "$1";
-                             help_and_exit 1 ;;
+                             help='yes' ;;
     *)                       dir=$1;;
   esac
   shift
@@ -126,7 +126,7 @@ if [ -z "$(git status --porcelain)" ]; then
     $SCRIPT_DIR/sake-lint-stan -a $also -l 2 $dir
     cd $WORKING_DIR
 
-    if test -f "$WORKING_DIR/$also"; then
+    if test -f "$also"; then
         echohead "# run the above on $also"
         $SCRIPT_DIR/sake-lint-all -m ""  -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
         cd $WORKING_DIR
@@ -144,10 +144,7 @@ if [ -z "$(git status --porcelain)" ]; then
         cd $WORKING_DIR
     fi
 
-    echohead "commit in $WORKING_DIR/$dir and $also"
-
-    $SCRIPT_DIR/sake-git-commit-and-push -m $message  -c $commitAndPush -v $newVersion -a $also -t $alsoDoThemes $dir
-    cd $WORKING_DIR
+    echohead "Dont forget to to commit and push"
 
 else
     echobad "Sorry, can not run, there are uncommitted changes"

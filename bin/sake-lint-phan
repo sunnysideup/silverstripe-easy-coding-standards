@@ -15,14 +15,14 @@ fi
 
 ############################################ SETTINGS
 also='app/_config.php'
-stanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon"
-level=3
+phanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/.phan/config.php"
+phpVersion="8.0"
 help='no'
 while (( $# )); do
   case $1 in
-    -a|--also)         also=$2;shift ;;
     -l|--level)        level=$2;shift ;;
-    -s|--stan-config)  stanConfig=$2;shift ;;
+    -s|--phan-config)  phanConfig=$2;shift ;;
+    -p|--php-version)  phpVersion=$2;shift ;;
     -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
                        help='yes' ;;
@@ -33,23 +33,20 @@ done
 
 help_and_exit() {
 
-    echohead "PHP STAN";
-    echonice "Directory of script:          $SCRIPT_DIR";
-    echonice "Directory to analyse:         $WORKING_DIR/$dir";
+    echohead "PHP PHAN";
+    echonice "Directory of script:              $SCRIPT_DIR";
+    echonice "Directory to analyse:             $WORKING_DIR/$dir";
 
     echohead "Current settings:";
-    echonice "Also check (-a):              $WORKING_DIR/$also";
-    echonice "Level (-l):                   $level (1/6)";
-    echonice "Php stan config file (-s):    $stanConfig";
+    echonice "phan config file (-s):            $phanConfig";
+    echonice "php version (-p):                 $phpVersion";
 
     echohead "Available settings:";
-    echonice "-a, --also                    also lint - e.g. app/_config.php OR otherfolder";
-    echonice "-s, --stan-config             stan config file locaton e.g. ../phpstan.neon";
-    echonice "-l, --level                   level of scrutiny, default: 3";
-    echonice "-h, --help                    show help information"
+    echonice "-s, --phan-config                 stan config file locaton e.g. ../phpstan.neon";
+    echonice "-h, --help                        show help information"
 
     echohead "Example usage:"
-    echonice "sake-lint-stan   -l 2 -a app_more/_config.php -s ../phpstan.neon   foo/bar ";
+    echonice "sake-lint-phan   -l 2 -a app_more/_config.php -s ../.phan/config.php   foo/bar ";
 
     echofunctions
     exit;
@@ -69,10 +66,7 @@ else
     help_and_exit;
 fi
 
-if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sake-lint-stan -a 'nothing-here-hopefully' -l $level -s $stanConfig $also
-fi
 
-$SCRIPT_DIR/phpstan analyse  -l $level -c $stanConfig $WORKING_DIR/$dir
+$SCRIPT_DIR/phan --directory $WORKING_DIR --project-root-directory $WORKING_DIR/$dir --minimum-target-php-version $phpVersion
 
 echoend;

@@ -17,12 +17,13 @@ while (( $# )); do
     -e|--ecs-config)   ecsConfig=$2;shift ;;
     -h|--help)         help='yes';shift ;;
     -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
+                       help='yes' ;;
     *)                 dir=$1;;
   esac
   shift
 done
 
+help_and_exit() {
     echonice "Directory of script:           $SCRIPT_DIR";
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
@@ -49,6 +50,7 @@ fi
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
 else
     echonice "Could not change directory to $WORKING_DIR";
     help_and_exit;
