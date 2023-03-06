@@ -59,6 +59,7 @@
     "bin/sake-self-methods",
     "bin/sake-ss-add-site",
     "bin/sake-ss-dev-build",
-    "bin/sake-ss-rsync-assets"
+    "bin/sake-ss-rsync-assets",
+    "bin/sake-git-merge-develop-and-production"
   ]
 }

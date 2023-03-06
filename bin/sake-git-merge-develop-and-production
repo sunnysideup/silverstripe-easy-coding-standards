@@ -1,0 +1,76 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+while (( $# )); do
+  case $1 in
+    -h|--help)                   help='yes';shift ;;
+    -*)                          printf 'Unknown option: %q\n\n' "$1";
+                                 help_and_exit 1 ;;
+    *)                           dir=$1;;
+  esac
+  shift
+done
+
+if [[ "$message" == "" ]]; then
+    read -p "Commit message: " message
+fi
+if [[ "$message" == "" ]]; then
+    message={git log -1 --pretty=%B}
+fi
+
+help_and_exit() {
+    echohead "Merge previous commits";
+    echonice "Directory of script:                 $SCRIPT_DIR";
+
+    echohead "Current settings:";
+
+    echohead "Available settings:";
+    echonice "-h, --help                           show help information"
+
+    echohead "Example usage:"
+    echonice "sake-git-merge-develop-and-productions";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir";
+    help_and_exit;
+fi
+
+sake-git-commit "$WORKING_DIR/$dir"
+git checkout develop
+git pull origin develop
+git checkout production
+git pull origin production
+git merge develop
+git commit
+git push
+git checkout develop
+git merge production
+git commit
+git push
+git checkout develop
+
+
+echoend;
