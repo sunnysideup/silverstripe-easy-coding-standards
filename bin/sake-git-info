@@ -75,6 +75,13 @@ if test -f "$GIT_DIR/.git/config"; then
     echohead "# unpushed branches"
     git log --branches --not --remotes --no-walk --decorate --oneline
 
+    echohead "# branches ahead of develop"
+    git branch --all --verbose --no-abbrev --no-merged develop --format="%(color:yellow)%(refname:short)%(color:reset) %(color:green)%(committerdate:relative)%(color:reset) %(contents:subject)"
+
+    echohead "# branches ahead of production"
+    git branch --all --verbose --no-abbrev --no-merged production --format="%(color:yellow)%(refname:short)%(color:reset) %(color:green)%(committerdate:relative)%(color:reset) %(contents:subject)"
+
+
     mybranch=$(git symbolic-ref -q HEAD)
     mybranch=${mybranch##refs/heads/}
     mybranch=${mybranch:-HEAD}
