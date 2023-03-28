@@ -11,9 +11,11 @@ dir='./'
 
 ############################################ SETTINGS
 help='no'
+message=""
 while (( $# )); do
   case $1 in
     -h|--help)                   help='yes';shift ;;
+    -m|--message)                message=$2;shift ;;
     -*)                          printf 'Unknown option: %q\n\n' "$1";
                                  help_and_exit 1 ;;
     *)                           dir=$1;;
@@ -22,7 +24,7 @@ while (( $# )); do
 done
 
 if [[ "$message" == "" ]]; then
-    read -p "Commit message: " message
+    message="merge dev and production"
 fi
 if [[ "$message" == "" ]]; then
     message=`git log -1 --pretty=%B`
@@ -36,6 +38,7 @@ help_and_exit() {
 
     echohead "Available settings:";
     echonice "-h, --help                           show help information"
+    echonice "Message (-m):                        $message";
 
     echohead "Example usage:"
     echonice "sake-git-merge-develop-and-productions ./";
@@ -58,18 +61,18 @@ else
     help_and_exit;
 fi
 
-sake-git-commit-and-push  "$WORKING_DIR/$dir" -m "WIP"
+sake-git-commit-and-push  "$WORKING_DIR/$dir" -m "$message"
 git checkout develop
 git pull origin develop
 git checkout production
 git pull origin production
 git merge develop
 git commit
-git push
+git push origin production
 git checkout develop
 git merge production
 git commit
-git push
+git push origin develop
 git checkout develop
 
 
