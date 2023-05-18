@@ -1,0 +1,46 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+while (( $# )); do
+  case $1 in
+    -h|--help)               help='yes';shift ;;
+    -*)                      printf 'Unknown option: %q\n\n' "$1";
+                             help='yes' ;;
+    *)                       dir=$1;;
+  esac
+  shift
+done
+
+
+help_and_exit() {
+
+    echohead "Update VS Code";
+
+    echohead "Available settings:";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-update-vs-code .";
+
+    echofunctions
+    exit;
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+
+
+wget 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64' -O /tmp/code_latest_amd64.deb
+sudo dpkg -i /tmp/code_latest_amd64.deb
