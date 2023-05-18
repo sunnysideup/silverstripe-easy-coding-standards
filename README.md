@@ -45,11 +45,13 @@ Install as global composer package and then try to access the commands, starting
  - sake-npm-install
  - sake-npm-watch
 
-# silverst
+# silverstripe
  - sake-ss-add-site
  - sake-ss-dev-build
  - sake-ss-rsync-asset
 
+# machine maintenance
+ - sake-update-vs-code
 ```
 
 # How to install for one project (not recommended - as it may not work)
