@@ -10,7 +10,7 @@ dir='./'
 
 ############################################ SETTINGS
 
-source "$dir/.env"
+source $dir/.env
 
 help='no'
 name="$SS_DATABASE_NAME"
