@@ -49,6 +49,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-add-site
  - sake-ss-dev-build
  - sake-ss-rsync-asset
+ - sake-ss-dump-database
 
 # machine maintenance
  - sake-update-vs-code
