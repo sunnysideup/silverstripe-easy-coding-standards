@@ -10,8 +10,10 @@ dir='./'
 
 ############################################ SETTINGS
 help='no'
+full='no'
 while (( $# )); do
   case $1 in
+    -f|--full)             full='yes';shift ;;
     -h|--help)             help='yes';shift ;;
     -*)                    printf 'Unknown option: %q\n\n' "$1";
                            help='yes' ;;
@@ -29,6 +31,7 @@ help_and_exit() {
 
     echohead "Available settings:";
     echonice "-h, --help                     show help information"
+    echonice "-f, --full                     run a full git pull and git push on all branches"
 
     echohead "Example usage:"
     echonice "e.g. sake-git-info ";
@@ -53,9 +56,11 @@ else
     help_and_exit;
 fi
 
+echohead "# making sure we have the core branches"
+
+git checkout develop
+
 git fetch --all
-
-
 
 # Check if the develop branch exists
 if [ "$(git branch | grep develop)" == "" ]
@@ -80,6 +85,7 @@ GIT_DIR=$(git rev-parse --show-toplevel)
 
 if test -f "$GIT_DIR/.git/config"; then
 
+    echohead "# check status"
     echohead "fetchin --all"
     git fetch --all
 
@@ -92,65 +98,60 @@ if test -f "$GIT_DIR/.git/config"; then
     echohead "# current commit"
     git rev-parse --short --verify HEAD
 
-    echohead "# last three commits"
-    git log -3
+    echohead "# last commit"
+    git log -1
 
     echohead "# unpushed branches"
     git log --branches --not --remotes --no-walk --decorate --oneline
+
+    echohead "# behind / ahead"
+    # Get all remote branches
+    remote_branches=$(git branch -r)
+    # Red color
+    RED='\033[0;31m'
+    # Green color
+    GREEN='\033[0;32m'
+    # No color
+    NC='\033[0m'
+
+    printf "${NC}%-70s ${RED}%-5s${NC} ${GREEN}%s${NC}\n" "Branch Name" "Behind" "Ahead"
+
+    for branch in $remote_branches
+    do
+    # Skip HEAD
+    if [ "$branch" != "origin/HEAD" ] && [ "$branch" != "->" ]
+    then
+
+        # Check out the branch to compare
+        git checkout -q $branch
+        if [[ "$full" == "yes" ]]; then
+            git pull -q origin $branch
+            git push -q origin $branch
+        fi
+
+        # Get the number of commits the branch is ahead of develop
+        ahead=$(git rev-list --count develop..$branch)
+
+        # Get the number of commits the branch is behind develop
+        behind=$(git rev-list --count $branch..develop)
+
+        # Print formatted output
+        # Check if $ahead is greater than 0
+        if (( $ahead > 0 )); then
+            # Get the date of the last commit
+            last_commit_date=$(git show -s --format=%ci)
+            printf "%-70s ${RED}%-5s${NC} ${GREEN}%s${NC} %s\n" "$branch" "$behind" "$ahead" "$last_commit_date"
+        else
+            printf "%-70s ${RED}%-5s${NC} %s\n" "$branch" "$behind" "$ahead"
+        fi
+    fi
+    done
+
 
 
 else
     echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
 fi
-
-
-# Get all remote branches
-remote_branches=$(git branch -r)
-
-printf "%-40s %-5s %s\n" "Branch Name" "Ahead" "Behind"
-
-for branch in $remote_branches
-do
-  # Skip HEAD
-  if [ $branch != "origin/HEAD" ]
-  then
-    # Check out the branch to compare
-    git checkout -q $branch
-    git pull origin $branch
-    git push origin $branch
-
-    # Get the number of commits the branch is ahead of develop
-    ahead=$(git rev-list --count develop..$branch)
-
-    # Get the number of commits the branch is behind develop
-    behind=$(git rev-list --count $branch..develop)
-
-    # Print formatted output
-    printf "%-40s %-5s %s\n" $branch $ahead $behind
-  fi
-done
-
-
-# Check if the develop branch exists
-if [ "$(git branch | grep develop)" == "" ]
-then
-  # If it does not exist, create and push it
-  echo "Creating and pushing develop branch..."
-  git checkout -b develop master
-  git push origin develop
-fi
-
-# Check if the production branch exists
-if [ "$(git branch | grep production)" == "" ]
-then
-  # If it does not exist, create and push it
-  echo "Creating and pushing production branch..."
-  git checkout -b production develop
-  git push origin production
-fi
-
-# Switch back to develop branch
-git checkout develop
 
 
 echoend;
