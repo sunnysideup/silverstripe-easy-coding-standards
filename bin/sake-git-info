@@ -53,6 +53,29 @@ else
     help_and_exit;
 fi
 
+git fetch --all
+
+
+
+# Check if the develop branch exists
+if [ "$(git branch | grep develop)" == "" ]
+then
+  # If it does not exist, create and push it
+  echo "Creating and pushing develop branch..."
+  git checkout -b develop master
+  git push origin develop
+fi
+
+# Check if the production branch exists
+if [ "$(git branch | grep production)" == "" ]
+then
+  # If it does not exist, create and push it
+  echo "Creating and pushing production branch..."
+  git checkout -b production develop
+  git push origin production
+fi
+
+
 GIT_DIR=$(git rev-parse --show-toplevel)
 
 if test -f "$GIT_DIR/.git/config"; then
@@ -75,29 +98,59 @@ if test -f "$GIT_DIR/.git/config"; then
     echohead "# unpushed branches"
     git log --branches --not --remotes --no-walk --decorate --oneline
 
-    echohead "# branches ahead of develop"
-    git branch --all --verbose --no-abbrev --no-merged develop --format="%(color:yellow)%(refname:short)%(color:reset) %(color:green)%(committerdate:relative)%(color:reset) %(contents:subject)"
-
-    echohead "# branches ahead of production"
-    git branch --all --verbose --no-abbrev --no-merged production --format="%(color:yellow)%(refname:short)%(color:reset) %(color:green)%(committerdate:relative)%(color:reset) %(contents:subject)"
-
-
-    mybranch=$(git symbolic-ref -q HEAD)
-    mybranch=${mybranch##refs/heads/}
-    mybranch=${mybranch:-HEAD}
-
-    echohead "# branches that are ahead"
-    git for-each-ref refs/heads/ --format='%(refname:short)' |
-    while read testbranch; do
-        AHEAD=$(git rev-list --count $mybranch..$testbranch)
-        if [ $AHEAD -gt 0 ]; then
-            BEHIND=$(git rev-list --count $testbranch..$mybranch)
-            echobad "$AHEAD $testbranch ($BEHIND behind $mybranch)"
-        fi
-    done
 
 else
     echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
 fi
+
+
+# Get all remote branches
+remote_branches=$(git branch -r)
+
+printf "%-40s %-5s %s\n" "Branch Name" "Ahead" "Behind"
+
+for branch in $remote_branches
+do
+  # Skip HEAD
+  if [ $branch != "origin/HEAD" ]
+  then
+    # Check out the branch to compare
+    git checkout -q $branch
+    git pull origin $branch
+    git push origin $branch
+
+    # Get the number of commits the branch is ahead of develop
+    ahead=$(git rev-list --count develop..$branch)
+
+    # Get the number of commits the branch is behind develop
+    behind=$(git rev-list --count $branch..develop)
+
+    # Print formatted output
+    printf "%-40s %-5s %s\n" $branch $ahead $behind
+  fi
+done
+
+
+# Check if the develop branch exists
+if [ "$(git branch | grep develop)" == "" ]
+then
+  # If it does not exist, create and push it
+  echo "Creating and pushing develop branch..."
+  git checkout -b develop master
+  git push origin develop
+fi
+
+# Check if the production branch exists
+if [ "$(git branch | grep production)" == "" ]
+then
+  # If it does not exist, create and push it
+  echo "Creating and pushing production branch..."
+  git checkout -b production develop
+  git push origin production
+fi
+
+# Switch back to develop branch
+git checkout develop
+
 
 echoend;
