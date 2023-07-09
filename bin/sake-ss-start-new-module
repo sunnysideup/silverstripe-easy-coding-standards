@@ -10,11 +10,13 @@ source $SCRIPT_DIR/sake-self-methods
 dir='app/src'
 
 ############################################ SETTINGS
+from=''
 package=''
 namespace='no'
 help='no'
 while (( $# )); do
   case $1 in
+    -f|--from)         from=$2;shift ;;
     -p|--package)      package=$2;shift ;;
     -n|--namespace)    also=$2;shift ;;
     -h|--help)         help='yes';shift ;;
@@ -31,16 +33,18 @@ help_and_exit() {
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
     echoline "Current settings:";
+    echonice "from (-f):                     $WORKING_DIR/$also";
     echonice "package (-p):                  $WORKING_DIR/$also";
     echonice "namespace (-n):                $dryRun";
 
     echohead "Available settings:";
+    echonice "-f, --from                     e.g. ../silverstripe-other-module";
     echonice "-p, --package                  e.g. myvendor/mypackage";
     echonice "-n, --namespace                use forward rather than backward slashes"
     echonice "-h, --help                     show help information"
 
     echohead "Example usage:"
-    echonice "sake-ss-start-new-module app -p sunnysideup/repo -n Sunnysideup/App";
+    echonice "sake-ss-start-new-module ./ -f ../silvertripe-module -p sunnysideup/new-module -n Sunnysideup/App ";
 
     echofunctions
     exit;
