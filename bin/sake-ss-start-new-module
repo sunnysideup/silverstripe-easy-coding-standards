@@ -10,11 +10,13 @@ source $SCRIPT_DIR/sake-self-methods
 dir='app/src'
 
 ############################################ SETTINGS
+from=''
 package=''
 namespace='no'
 help='no'
 while (( $# )); do
   case $1 in
+    -f|--from)         from=$2;shift ;;
     -p|--package)      package=$2;shift ;;
     -n|--namespace)    also=$2;shift ;;
     -h|--help)         help='yes';shift ;;
@@ -31,16 +33,18 @@ help_and_exit() {
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
 
     echoline "Current settings:";
+    echonice "from (-f):                     $WORKING_DIR/$also";
     echonice "package (-p):                  $WORKING_DIR/$also";
     echonice "namespace (-n):                $dryRun";
 
     echohead "Available settings:";
+    echonice "-f, --from                     e.g. ../silverstripe-other-module";
     echonice "-p, --package                  e.g. myvendor/mypackage";
     echonice "-n, --namespace                use forward rather than backward slashes"
     echonice "-h, --help                     show help information"
 
     echohead "Example usage:"
-    echonice "sake-lint-remove-origs app -p sunnysideup/repo -n Sunnysideup/App";
+    echonice "sake-ss-start-new-module ./ -f ../silvertripe-module -p sunnysideup/new-module -n Sunnysideup/App ";
 
     echofunctions
     exit;
@@ -60,17 +64,7 @@ else
     help_and_exit;
 fi
 
-
-if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sake-lint-remove-origs -a 'nothing-here-hopefully' -d $dryRun
-fi
-
-find $WORKING_DIR/$dir -name "*.orig"
-
-if [[ "$dryRun" == "no" ]]; then
-    find $WORKING_DIR/$dir -name "*.orig" -exec rm "{}" \;
-    $SCRIPT_DIR/sake-git-commit-and-push $dir -m "PATCH: removing orig files"
-fi
+rsync -av --exclude='.git' $from ./
 
 echoend;
 
