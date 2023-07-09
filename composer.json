@@ -63,6 +63,7 @@
     "bin/sake-ss-dev-build",
     "bin/sake-ss-dump-database",
     "bin/sake-ss-rsync-assets",
+    "bin/sake-ss-start-new-module",
     "sake-update-vs-code"
   ]
 }
