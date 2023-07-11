@@ -69,8 +69,19 @@ else
     echonice "Could not find $from as a directory.";
     help_and_exit;
 fi
+if ! command -v jq &> /dev/null
+then
+    echo "jq could not be found, attempting to install..."
+    sudo apt-get install jq
+fi
 
 rsync -av --exclude='.git' $from ./;
+
+# Extract target string from composer file
+oldPackage=$(jq -r '.name' "$WORKING_DIR/composer.json")
+
+# Replace target string with replacement string in specified directory, recursively
+find "$WORKING_DIR" -type f -exec sed -i "s/$oldPackage/$package/g" {} \;
 
 echoend;
 
