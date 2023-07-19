@@ -34,9 +34,12 @@ while (( $# )); do
   shift
 done
 
+# prompt user for message
 if [[ "$message" == "" ]]; then
     read -p "Commit message: " message
 fi
+
+# get last commit message
 if [[ "$message" == "" ]]; then
     message={git log -1 --pretty=%B}
 fi

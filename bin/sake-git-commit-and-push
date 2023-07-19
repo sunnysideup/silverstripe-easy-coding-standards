@@ -39,6 +39,14 @@ if [[ "$message" == "" ]]; then
     message=`git log -1 --pretty=%B`
 fi
 
+# if the message variable  starts with MAJOR or MINOR or PATCH
+# then set the variable newVersion to the lowercase equivalent
+case "$message" in
+    "MAJOR"*) newVersion="major";;
+    "MINOR"*) newVersion="minor";;
+    "PATCH"*) newVersion="patch";;
+esac
+
 newVersionLowerCase=$(echo ${newVersion} | tr '[:upper:]' '[:lower:]')
 
 
