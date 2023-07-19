@@ -39,6 +39,11 @@ if [[ "$message" == "" ]]; then
     read -p "Commit message: " message
 fi
 
+# get last commit message
+if [[ "$message" == "" ]]; then
+    message="WIP"
+fi
+
 help_and_exit() {
 
     echohead "Checking Vendor Packages for Changes";
