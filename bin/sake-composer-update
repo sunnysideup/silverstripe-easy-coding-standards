@@ -67,7 +67,7 @@ fi
 composer update --prefer-source
 
 if [[ "$commit" == "yes" ]]; then
-    sake-git-commit-and-push . -m "MINOR: composer update"
+    sake-git-commit-and-push . -m "WIP: composer update"
 fi
 
 echoline;
