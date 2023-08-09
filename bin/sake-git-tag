@@ -9,7 +9,7 @@ source $SCRIPT_DIR/sake-self-methods
 if [ "$1" != "" ]; then
     dir=$1;
 else
-    dir='vendor'
+    dir='.'
 fi
 
 ############################################ SETTINGS
@@ -67,12 +67,14 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Check if we're in the correct branch
 if [[ "$CURRENT_BRANCH" != "production" && "$CURRENT_BRANCH" != "master" && "$CURRENT_BRANCH" != "main" ]]; then
-    echonice "Not on production, master, or main branch."
+    echonice "Not on production, master, or main branch. You are on $CURRENT_BRANCH branch. No tag created."
     exit 1
 fi
+echonice "You are on $CURRENT_BRANCH branch. "
 
 # Get latest tag
 LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+echonice "CURRENT TAG: $LATEST_TAG"
 
 # If no tags are found, just create a base tag
 if [[ -z "$LATEST_TAG" ]]; then
@@ -92,6 +94,9 @@ PATCH=0
 
 # Check each commit message
 while read -r COMMIT; do
+
+    echonice "CHECKING COMMIT: $COMMIT"
+
     if [[ $COMMIT == MAJOR* ]]; then
         MAJOR=1
     elif [[ $COMMIT == MINOR* ]]; then
@@ -120,7 +125,9 @@ else
 fi
 
 git tag "$NEW_TAG"
+
 echonice "New tag $NEW_TAG created."
+
 git push --tags --ipv4
 git tag -v
 
