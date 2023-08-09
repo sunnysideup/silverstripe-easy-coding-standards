@@ -44,6 +44,7 @@
     "bin/sake-git-merge-develop-and-production",
     "bin/sake-git-remove-stale-branches",
     "bin/sake-git-squash-commits",
+    "bin/sake-git-tag",
     "bin/sake-help",
     "bin/sake-lint-all",
     "bin/sake-lint-compat",
@@ -65,5 +66,8 @@
     "bin/sake-ss-rsync-assets",
     "bin/sake-ss-start-new-module",
     "sake-update-vs-code"
-  ]
+  ],
+  "config": {
+    "sort-packages": true
+  }
 }

@@ -1,0 +1,187 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+if [ "$1" != "" ]; then
+    dir=$1;
+else
+    dir='vendor'
+fi
+
+############################################ SETTINGS
+help='no'
+while (( $# )); do
+  case $1 in
+    -h|--help)             help='yes';shift ;;
+    -*)                    printf 'Unknown option: %q\n\n' "$1";
+                           help='yes' ;;
+    *)                     dir=$1;;
+  esac
+  shift
+done
+
+
+help_and_exit() {
+
+    echohead "Checking Vendor Packages for Changes";
+    echonice "Directory of script:           $SCRIPT_DIR";
+    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+
+    echohead "Current settings:";
+
+    echohead "Available settings:";
+    echonice "-h, --help                     show help information"
+
+    echohead "Example usage:"
+    echonice "sake-git-tag .";
+
+    echofunctions
+    exit;
+}
+
+
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echonice "Could not change directory to $WORKING_DIR";
+    help_and_exit;
+fi
+
+
+git fetch --all --ipv4
+
+# Get current branch name
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Check if we're in the correct branch
+if [[ "$CURRENT_BRANCH" != "production" && "$CURRENT_BRANCH" != "master" && "$CURRENT_BRANCH" != "main" ]]; then
+    echonice "Not on production, master, or main branch."
+    exit 1
+fi
+
+# Get latest tag
+LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+
+# If no tags are found, just create a base tag
+if [[ -z "$LATEST_TAG" ]]; then
+    git tag "1.0.0"
+    git push --tags
+    echonice "Base tag 1.0.0 created."
+    exit 0
+fi
+
+# Get the list of commit messages since the last tag
+COMMIT_MESSAGES=$(git log "$LATEST_TAG"..HEAD --pretty=format:%s)
+
+# Initialize version bump types
+MAJOR=0
+MINOR=0
+PATCH=0
+
+# Check each commit message
+while read -r COMMIT; do
+    if [[ $COMMIT == MAJOR* ]]; then
+        MAJOR=1
+    elif [[ $COMMIT == MINOR* ]]; then
+        MINOR=1
+    elif [[ $COMMIT == PATCH* ]]; then
+        PATCH=1
+    fi
+done <<< "$COMMIT_MESSAGES"
+
+# Extract current version numbers
+IFS='.' read -ra ADDR <<< "$LATEST_TAG"
+CUR_MAJOR="${ADDR[0]}"
+CUR_MINOR="${ADDR[1]}"
+CUR_PATCH="${ADDR[2]}"
+
+# Create the new tag based on version bumps
+if [[ "$MAJOR" -eq 1 ]]; then
+    NEW_TAG="$((CUR_MAJOR + 1)).0.0"
+elif [[ "$MINOR" -eq 1 ]]; then
+    NEW_TAG="$CUR_MAJOR.$((CUR_MINOR + 1)).0"
+elif [[ "$PATCH" -eq 1 ]]; then
+    NEW_TAG="$CUR_MAJOR.$CUR_MINOR.$((CUR_PATCH + 1))"
+else
+    echonice "No commit messages indicating version bump. No tag created."
+    exit 0
+fi
+
+git tag "$NEW_TAG"
+echonice "New tag $NEW_TAG created."
+git push --tags --ipv4
+git tag -v
+
+echoend;
+
+
+
+
+
+    # if [[ "$newVersionLowerCase" == "patch" || "$newVersionLowerCase" == "minor" || "$newVersionLowerCase" == "major" ]]; then
+
+    #     git fetch --all --ipv4
+
+    #     git tag --column
+    #     OLD_TAG=$(git tag | sort -V | tail -1)
+    #     # RES=$(git show-ref --tags)
+    #     # if [ -z "$RES" ]; then
+    #     #     OLD_TAG=1.0.0
+    #     # else
+    #     #     OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
+    #     # fi
+
+    #     echohead "Found old Tag";
+    #     echonice "$OLD_TAG";
+    #     echoline;
+
+    #     # Build array from version string.
+    #     a=( ${OLD_TAG//./ } )
+
+    #     # Increment version numbers as requested.
+    #     if [ ${#a[@]} -ne 3 ]
+    #     then
+    #         echobad "ERROR $OLD_TAG (current tag) can not be parsed!"
+    #         exit 1
+    #     fi
+
+    #     if [[ "$newVersionLowerCase" == "major" ]]; then
+    #       ((a[0]++))
+    #       a[1]=0
+    #       a[2]=0
+    #     fi
+
+    #     if [[ "$newVersionLowerCase" == "minor" ]]; then
+    #       ((a[1]++))
+    #       a[2]=0
+    #     fi
+
+    #     if [[ "$newVersionLowerCase" == "patch" ]]; then
+    #       ((a[2]++))
+    #     fi
+
+    #     NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
+
+    #     echohead "Found new Tag ($newVersionLowerCase)";
+    #     echonice "$NEW_TAG";
+    #     echoline;
+
+    #     git tag -a $NEW_TAG -m "auto-generated linter tag"
+
+    #     git push --tags --ipv4
+
+    #     git tag -v
+
+    # fi

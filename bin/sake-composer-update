@@ -64,6 +64,7 @@ if [[ "$force" == "yes" ]]; then
     rm vendor -rf
 fi
 
+composer config sort-packages true
 composer update --prefer-source
 
 if [[ "$commit" == "yes" ]]; then

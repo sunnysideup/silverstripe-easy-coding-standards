@@ -11,7 +11,7 @@ dir='./'
 ############################################ SETTINGS
 commitAndPush="yes"
 message=""
-newVersion='no'
+newVersion='yes'
 also='nothing-here-hopefully'
 alsoDoThemes='no'
 statusOnly='no'
@@ -36,18 +36,9 @@ if [[ "$message" == "" ]]; then
     read -p "Commit message: " message
 fi
 if [[ "$message" == "" ]]; then
-    message=`git log -1 --pretty=%B`
+    message="WIP"
 fi
 
-# if the message variable  starts with MAJOR or MINOR or PATCH
-# then set the variable newVersion to the lowercase equivalent
-case "$message" in
-    "MAJOR"*) newVersion="major";;
-    "MINOR"*) newVersion="minor";;
-    "PATCH"*) newVersion="patch";;
-esac
-
-newVersionLowerCase=$(echo ${newVersion} | tr '[:upper:]' '[:lower:]')
 
 
 help_and_exit() {
@@ -58,7 +49,7 @@ help_and_exit() {
     echohead "Current settings:";
     echonice "Commit and Push (-c):          $commitAndPush";
     echonice "Message (-m):                  $message";
-    echonice "Create New Tag (-v):           $newVersionLowercase";
+    echonice "New Version (-v):              $newVersion";
     echonice "Also check (-a):               $WORKING_DIR/$also";
     echonice "Status Only (-s):              $statusOnly";
     echonice "Also include themes (-t):      $alsoDoThemes";
@@ -150,62 +141,6 @@ if test -f "$GIT_DIR/.git/config"; then
         git push origin $(git rev-parse --abbrev-ref HEAD)  --ipv4
     fi
 
-    if [[ "$newVersionLowerCase" == "patch" || "$newVersionLowerCase" == "minor" || "$newVersionLowerCase" == "major" ]]; then
-
-        git fetch --all --ipv4
-
-        git tag --column
-        OLD_TAG=$(git tag | sort -V | tail -1)
-        # RES=$(git show-ref --tags)
-        # if [ -z "$RES" ]; then
-        #     OLD_TAG=1.0.0
-        # else
-        #     OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
-        # fi
-
-        echohead "Found old Tag";
-        echonice "$OLD_TAG";
-        echoline;
-
-        # Build array from version string.
-        a=( ${OLD_TAG//./ } )
-
-        # Increment version numbers as requested.
-        if [ ${#a[@]} -ne 3 ]
-        then
-            echobad "ERROR $OLD_TAG (current tag) can not be parsed!"
-            exit 1
-        fi
-
-        if [[ "$newVersionLowerCase" == "major" ]]; then
-          ((a[0]++))
-          a[1]=0
-          a[2]=0
-        fi
-
-        if [[ "$newVersionLowerCase" == "minor" ]]; then
-          ((a[1]++))
-          a[2]=0
-        fi
-
-        if [[ "$newVersionLowerCase" == "patch" ]]; then
-          ((a[2]++))
-        fi
-
-        NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
-
-        echohead "Found new Tag ($newVersionLowerCase)";
-        echonice "$NEW_TAG";
-        echoline;
-
-        git tag -a $NEW_TAG -m "auto-generated linter tag"
-
-        git push --tags --ipv4
-
-        git tag -v
-
-    fi
-
     echohead "# check git status"
     git status
     echoline;
@@ -221,6 +156,10 @@ if test -f "$GIT_DIR/.git/config"; then
         echobad "There are changes to push";
     fi
     echoline;
+
+    if [[ "$newVersion" == "yes" ]]; then
+        $SCRIPT_DIR/sake-git-tag $WORKING_DIR
+    fi
 
     if test -f "$WORKING_DIR/$also"; then
         $SCRIPT_DIR/sake-git-commit-and-push-vendor-packages -m "'$message'" -t no -c $commitAndPush $WORKING_DIR/$also

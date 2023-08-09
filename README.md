@@ -25,8 +25,9 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-commit-and-push
  - sake-git-commit-and-push-vendor-packages
  - sake-git-remove-stale-branches
- - sake-git-squash-commits
  - sake-git-merge-develop-and-productions
+ - sake-git-squash-commits
+ - sake-git-tag
 
 
 # lint
