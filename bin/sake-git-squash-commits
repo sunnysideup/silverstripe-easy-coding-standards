@@ -88,8 +88,11 @@ if [[ "$allCommits" == "yes" ]]; then
     # Get the name of the current branch
     current_branch=$(git symbolic-ref --short HEAD)
 
-    # Create a new branch for safety
-    git checkout -b new_branch
+    # Create a backup branch in case you need to revert
+    # git checkout -b ${current_branch}_backup
+
+    # Switch back to the main branch
+    git checkout $current_branch
 
     # Reset to the initial commit
     git reset $(git rev-list --max-parents=0 HEAD)
@@ -97,13 +100,6 @@ if [[ "$allCommits" == "yes" ]]; then
     # Recommit everything as a single commit
     git add .
     git commit -m "$message"
-
-    # Switch back to the original branch and merge changes
-    git checkout $current_branch
-    git merge new_branch
-
-    # Delete the temporary branch
-    git branch -D new_branch
 
     # If you've pushed to a remote before and want to force push, uncomment the line below:
     git push origin $current_branch --force
