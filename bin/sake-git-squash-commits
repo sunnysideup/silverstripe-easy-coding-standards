@@ -14,17 +14,36 @@ numberOfCommits=0
 message=""
 doToday="no"
 help='no'
-while (( $# )); do
-  case $1 in
-    -n|--number-of-commits)      numberOfCommits=$2;shift ;;
-    -m|--message)                message=$2;shift ;;
-    -t|--today)                  doToday='yes';shift ;;
-    -h|--help)                   help='yes';shift ;;
-    -*)                          printf 'Unknown option: %q\n\n' "$1";
-                                 help='yes' ;;
-    *)                           dir=$1;;
-  esac
-  shift
+allCommits='no'
+while (($#)); do
+    case $1 in
+    -n | --number-of-commits)
+        numberOfCommits=$2
+        shift
+        ;;
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -t | --today)
+        doToday='yes'
+        shift
+        ;;
+    -z | --all)
+        allCommits='yes'
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 if [[ "$message" == "" ]]; then
@@ -35,26 +54,27 @@ if [[ "$message" == "" ]]; then
 fi
 
 help_and_exit() {
-    echohead "Merge previous commits";
-    echonice "Directory of script:                 $SCRIPT_DIR";
+    echohead "Merge previous commits"
+    echonice "Directory of script:                 $SCRIPT_DIR"
 
-    echohead "Current settings:";
-    echonice "Directory to analyse:                $WORKING_DIR/$dir";
-    echonice "Number of commits to merge:          $numberOfCommits";
-    echonice "Message (-m):                        $message";
-    echonice "Do Today (-t):                       $doToday";
+    echohead "Current settings:"
+    echonice "Directory to analyse:                $WORKING_DIR/$dir"
+    echonice "Number of commits to merge:          $numberOfCommits"
+    echonice "Message (-m):                        $message"
+    echonice "Do Today (-t):                       $doToday"
 
-    echohead "Available settings:";
+    echohead "Available settings:"
     echonice "-t, --today                          message for new commit, default: WIP"
     echonice "-n, --number-of-commits              number of commits to merge, default: 0"
     echonice "-m, --message                        message for new commit, default: WIP"
+    echonice "-z, --all                            merge all commits"
     echonice "-h, --help                           show help information"
 
     echohead "Example usage:"
-    echonice "sake-git-squash-commits ./ -t 'yes' -m 'MAJOR: overhaul of everything'";
+    echonice "sake-git-squash-commits ./ -t 'yes' -m 'MAJOR: overhaul of everything'"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -62,16 +82,42 @@ if [[ "$help" == "yes" ]]; then
     help_and_exit
 fi
 
+############################################ ALL
+if [[ "$allCommits" == "yes" ]]; then
+
+    # Create a new branch for safety
+    git checkout -b new_branch
+
+    # Reset to the initial commit
+    git reset $(git rev-list --max-parents=0 HEAD)
+
+    # Recommit everything as a single commit
+    git add .
+    git commit -m "All changes squashed into one"
+
+    # If you want to apply this to your main branch, uncomment the lines below:
+    # git checkout master
+    # git merge new_branch
+
+    # If you've pushed to a remote before and want to force push, uncomment the line below:
+
+    git push --force
+
+    echonice "All commits have been squashed into one."
+    echoend
+    exit
+fi
+
 ############################################ CODE
 
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
-todaysCount=`git log --since="4am"  --oneline | wc -l`
+todaysCount=$(git log --since="4am" --oneline | wc -l)
 
 echohead "List of commits for today"
 git log --since="4am" --oneline
@@ -92,4 +138,4 @@ else
     echohead "Nothing to squash, please use -t or -n option"
 fi
 
-echoend;
+echoend
