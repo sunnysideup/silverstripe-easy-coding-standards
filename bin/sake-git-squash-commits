@@ -84,9 +84,10 @@ fi
 
 ############################################ ALL
 if [[ "$allCommits" == "yes" ]]; then
+    current_branch=$(git symbolic-ref --short HEAD)
 
     # Create a new branch for safety
-    git checkout -b new_branch
+    git checkout -b tmp_branch
 
     # Reset to the initial commit
     git reset $(git rev-list --max-parents=0 HEAD)
@@ -96,12 +97,12 @@ if [[ "$allCommits" == "yes" ]]; then
     git commit -m "All changes squashed into one"
 
     # If you want to apply this to your main branch, uncomment the lines below:
-    # git checkout master
-    # git merge new_branch
+    git checkout $current_branch
+    git merge tmp_branch
 
     # If you've pushed to a remote before and want to force push, uncomment the line below:
 
-    git push --force
+    git push origin $current_branch --force
 
     echonice "All commits have been squashed into one."
     echoend
