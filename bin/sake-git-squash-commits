@@ -84,27 +84,31 @@ fi
 
 ############################################ ALL
 if [[ "$allCommits" == "yes" ]]; then
+
+    # Get the name of the current branch
     current_branch=$(git symbolic-ref --short HEAD)
 
     # Create a new branch for safety
-    git checkout -b tmp_branch
+    git checkout -b new_branch
 
     # Reset to the initial commit
     git reset $(git rev-list --max-parents=0 HEAD)
 
     # Recommit everything as a single commit
     git add .
-    git commit -m "All changes squashed into one"
+    git commit -m "$message"
 
-    # If you want to apply this to your main branch, uncomment the lines below:
+    # Switch back to the original branch and merge changes
     git checkout $current_branch
-    git merge tmp_branch
+    git merge new_branch
+
+    # Delete the temporary branch
+    git branch -D new_branch
 
     # If you've pushed to a remote before and want to force push, uncomment the line below:
-
     git push origin $current_branch --force
 
-    echonice "All commits have been squashed into one."
+    echonice "All commits in $current_branch have been squashed into one. Temporary branch deleted."
     echoend
     exit
 fi
