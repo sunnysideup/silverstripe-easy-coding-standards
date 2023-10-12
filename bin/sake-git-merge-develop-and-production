@@ -63,6 +63,7 @@ fi
 
 sake-git-commit-and-push  "$WORKING_DIR/$dir" -m "$message"
 git checkout develop
+sake-git-commit-and-push  "$WORKING_DIR/$dir" -m "$message"
 git pull origin develop
 git checkout production
 git pull origin production
