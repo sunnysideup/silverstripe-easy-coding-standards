@@ -29,6 +29,8 @@ echohead() {
         string="#$string"
     fi
     echo ""
+    echo ""
+    echo ""
     echoline
     echo -e "\033[95m $string\033[0m"
     echoline
