@@ -5,29 +5,28 @@ echoplain() {
 }
 
 echonice() {
-   echo -e " \033[0;33m$1 \033[0m";
+    echo -e " \033[0;33m$1 \033[0m"
 }
 
-echogood(){
-   echo -e " \033[0;32m$1 \033[0m";
+echogood() {
+    echo -e " \033[0;32m$1 \033[0m"
 }
-
-
 
 echobad() {
-   echo -e "\033[1;32;41m ---------------------------------------- \033[0m";
-   echo -e " \033[1;32;41m ERROR: $1 \033[0m";
-   echo -e "\033[1;32;41m ---------------------------------------- \033[0m";
+    echo -e "\033[1;32;41m ---------------------------------------- \033[0m"
+    echo -e " \033[1;32;41m ERROR: $1 \033[0m"
+    echo -e "\033[1;32;41m ---------------------------------------- \033[0m"
 }
 
 echoline() {
-    echonice '----------------------------------------';
+    echonice '----------------------------------------'
 }
 
 echohead() {
     echo ""
     echoline
-    echonice "$1"
+    echo "\033[33m" . $1 . "\033[0m"
+    echogood "$1"
     echoline
 }
 
@@ -49,7 +48,7 @@ echofunctions() {
 
 echolistoffunctions() {
     echohead 'List of Available Functions'
-    for entry in `ls $SCRIPT_DIR`; do
+    for entry in $(ls $SCRIPT_DIR); do
         echonice " -  $entry"
     done
     echonice "To show the options for a specific command, run:"
@@ -57,4 +56,4 @@ echolistoffunctions() {
     echonice "e.g. sake-lint-all -h"
 }
 
-echofunctions;
+echofunctions

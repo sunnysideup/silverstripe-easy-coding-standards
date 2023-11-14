@@ -16,18 +16,36 @@ statusOnly='no'
 fullUpdate='yes'
 help='no'
 
-while (( $# )); do
-  case $1 in
-    -m|--message)          message=$2; shift ;;
-    -c|--commit-and-push)  commitAndPush=$2; shift ;;
-    -v|--new-version)      newVersion=$2; shift ;;
-    -s|--status-only)      statusOnly=$2; shift ;;
-    -f|--full-update)      fullUpdate=$2; shift ;;
-    -h|--help)             help='yes'; ;;
-    -*)                    printf 'Unknown option: %q\n\n' "$1"; help='yes' ;;
-    *)                     dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -c | --commit-and-push)
+        commitAndPush=$2
+        shift
+        ;;
+    -v | --new-version)
+        newVersion=$2
+        shift
+        ;;
+    -s | --status-only)
+        statusOnly=$2
+        shift
+        ;;
+    -f | --full-update)
+        fullUpdate=$2
+        shift
+        ;;
+    -h | --help) help='yes' ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 # prompt user for message
@@ -39,30 +57,30 @@ fi
 message=${message:-"WIP"}
 
 help_and_exit() {
-    echohead "Checking Vendor Packages for Changes";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    echohead "Checking Vendor Packages for Changes"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Message (-m):                  $message";
-    echonice "Commit and Push (-c):          $commitAndPush";
-    echonice "Create New tag (-v):           $newVersion";
-    echonice "Status Only (-s):              $statusOnly";
-    echonice "Full Composer Update (-f):     $fullUpdate";
+    echohead "Current settings:"
+    echonice "Message (-m):                  $message"
+    echonice "Commit and Push (-c):          $commitAndPush"
+    echonice "Create New tag (-v):           $newVersion"
+    echonice "Status Only (-s):              $statusOnly"
+    echonice "Full Composer Update (-f):     $fullUpdate"
 
-    echohead "Available settings:";
-    echonice "-m, --message                  message - e.g. Lint, default: WIP";
-    echonice "-c, --commit-and-push          commit and push also? default: yes";
-    echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no";
+    echohead "Available settings:"
+    echonice "-m, --message                  message - e.g. Lint, default: WIP"
+    echonice "-c, --commit-and-push          commit and push also? default: yes"
+    echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no"
     echonice "-s, --status-only              check if there are changes git folder present, default: no"
     echonice "-f, --full-update              run a full composer update afterwards and commit, default: yes"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:";
-    echonice "sake-git-commit-and-push-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch -f no   vendor/my-vendor-name";
+    echohead "Example usage:"
+    echonice "sake-git-commit-and-push-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch -f no   vendor/my-vendor-name"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -71,7 +89,7 @@ help_and_exit() {
 ############################################ CODE
 [[ ! -d "$WORKING_DIR" ]] && echonice "Could not change directory to $WORKING_DIR" && help_and_exit
 
-echohead "Removing folders that do not need to be there ..."
+echohead "Removing vendor folders that do not need to be there ..."
 find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
 sake-lint-remove-origs "$dir"
 
@@ -93,7 +111,7 @@ process_directory() {
             echonice "No changes in $directory"
         fi
     fi
-    cd - > /dev/null
+    cd - >/dev/null
 }
 
 has_git_changes() {
