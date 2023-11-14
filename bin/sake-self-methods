@@ -25,7 +25,7 @@ echoline() {
 echohead() {
     echo ""
     echoline
-    echo "\033[33m" . $1 . "\033[0m"
+    echo -e "\033[33m" . $1 . "\033[0m"
     echogood "$1"
     echoline
 }
