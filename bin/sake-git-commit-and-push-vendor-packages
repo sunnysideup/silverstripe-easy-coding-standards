@@ -6,11 +6,7 @@ WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
 
 ############################################ DIR
-if [ "$1" != "" ]; then
-    dir=$1;
-else
-    dir='vendor'
-fi
+dir=${1:-'vendor'}
 
 ############################################ SETTINGS
 commitAndPush='yes'
@@ -19,33 +15,30 @@ newVersion='no'
 statusOnly='no'
 fullUpdate='yes'
 help='no'
+
 while (( $# )); do
   case $1 in
-    -m|--message)          message=$2;shift ;;
-    -c|--commit-and-push)  commitAndPush=$2;shift ;;
-    -v|--new-version)      newVersion=$2;shift ;;
-    -s|--status-only)      statusOnly=$2;shift ;;
-    -f|--full-update)      fullUpdate=$2;shift ;;
-    -h|--help)             help='yes';shift ;;
-    -*)                    printf 'Unknown option: %q\n\n' "$1";
-                           help='yes' ;;
+    -m|--message)          message=$2; shift ;;
+    -c|--commit-and-push)  commitAndPush=$2; shift ;;
+    -v|--new-version)      newVersion=$2; shift ;;
+    -s|--status-only)      statusOnly=$2; shift ;;
+    -f|--full-update)      fullUpdate=$2; shift ;;
+    -h|--help)             help='yes'; ;;
+    -*)                    printf 'Unknown option: %q\n\n' "$1"; help='yes' ;;
     *)                     dir=$1;;
   esac
   shift
 done
 
 # prompt user for message
-if [[ "$message" == "" ]]; then
+if [[ -z "$message" ]]; then
     read -p "Commit message: " message
 fi
 
-# get last commit message
-if [[ "$message" == "" ]]; then
-    message="WIP"
-fi
+# default message if still empty
+message=${message:-"WIP"}
 
 help_and_exit() {
-
     echohead "Checking Vendor Packages for Changes";
     echonice "Directory of script:           $SCRIPT_DIR";
     echonice "Directory to analyse:          $WORKING_DIR/$dir";
@@ -65,86 +58,67 @@ help_and_exit() {
     echonice "-f, --full-update              run a full composer update afterwards and commit, default: yes"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
+    echohead "Example usage:";
     echonice "sake-git-commit-and-push-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch -f no   vendor/my-vendor-name";
 
     echofunctions
     exit;
 }
 
-
-
 ############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
+[[ "$help" == "yes" ]] && help_and_exit
 
 ############################################ CODE
-
-if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
-else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
-fi
+[[ ! -d "$WORKING_DIR" ]] && echonice "Could not change directory to $WORKING_DIR" && help_and_exit
 
 echohead "Removing folders that do not need to be there ..."
+find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
+sake-lint-remove-origs "$dir"
 
-find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"
-find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"  -exec rm "{}" -rf  \;
-sake-lint-remove-origs $dir
+process_directory() {
+    local directory=$1
+    echohead "### DOING: $directory"
+    cd "$directory" || return
 
-
-echohead "going to look for folders in $WORKING_DIR/themes"
-
-find $WORKING_DIR/themes -mindepth 1 -maxdepth 1 -type d -print0 |
-    while IFS= read -r -d '' line; do
-
-        echohead "### DOING: $line"  ;
-        cd "$line";
-        test="$line/.git/config"
-        if [[ ! -f "$line/.git/config" ]]; then
-            echobad "$line IS NOT A GIT REPO";
-        else
+    if [[ ! -f "$directory/.git/config" ]]; then
+        echobad "$directory IS NOT A GIT REPO"
+    else
+        if has_git_changes; then
             if [[ "$statusOnly" == "yes" ]]; then
-                echonice '000sa0df'
                 git status -s
             else
-                $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
+                $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
             fi
+        else
+            echonice "No changes in $directory"
         fi
-        cd -
+    fi
+    cd - > /dev/null
+}
 
+has_git_changes() {
+    if [[ -n $(git status -s) ]]; then
+        return 0 # There are changes
+    else
+        return 1 # No changes
+    fi
+}
+
+echohead "going to look for folders in $WORKING_DIR/themes"
+find "$WORKING_DIR/themes" -mindepth 1 -maxdepth 1 -type d -print0 |
+    while IFS= read -r -d '' line; do
+        process_directory "$line"
     done
 
 echohead "going to look for folders in $WORKING_DIR/$dir"
-
-find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
+find "$WORKING_DIR/$dir" -mindepth 1 -maxdepth 1 -type d -print0 |
     while IFS= read -r -d '' line; do
-
-        echohead "### DOING: $line"  ;
-        cd "$line";
-        test="$line/.git/config"
-        echonice "Checking for /.git/config"
-        if [[ ! -f "$test" ]]; then
-            echobad "$line IS NOT A GIT REPO";
-        else
-            if [[ "$statusOnly" == "yes" ]]; then
-                git status -s
-            else
-                $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
-            fi
-        fi
-        cd -
-
+        process_directory "$line"
     done
 
 echohead "back to the start: $WORKING_DIR"
-cd $WORKING_DIR
+cd "$WORKING_DIR"
 
-if [[ "$fullUpdate" == "yes" ]]; then
-    sake-composer-update
-    $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion
-fi
+[[ "$fullUpdate" == "yes" ]] && sake-composer-update && $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
 
-echoend;
+echoend
