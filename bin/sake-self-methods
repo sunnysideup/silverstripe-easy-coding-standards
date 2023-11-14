@@ -49,6 +49,7 @@ fxHasRun=0
 
 echofunctions() {
     if [[ $fxHasRun != 1 ]]; then
+        fxHasRun=1
         echohead 'Available Functions? Run ...'
         echogood "sake-help"
         echoline
