@@ -26,7 +26,7 @@ echohead() {
     string=$1
 
     if [[ $string != \#* ]]; then
-        string="#$string"
+        string="# $string"
     fi
     echo ""
     echo ""
