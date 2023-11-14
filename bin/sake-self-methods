@@ -23,9 +23,14 @@ echoline() {
 }
 
 echohead() {
+    string=$1
+
+    if [[ $string != \#* ]]; then
+        string="#$string"
+    fi
     echo ""
     echoline
-    echo -e "\033[95m $1\033[0m"
+    echo -e "\033[95m $string\033[0m"
     echoline
 }
 
@@ -39,9 +44,8 @@ echoend() {
 }
 
 echofunctions() {
-    echohead 'List of Available Functions'
-    echonice "To get a list of available options, run: "
-    echoplain "sake-help"
+    echohead 'Available Functions? Run ...'
+    echogood "sake-help"
     echoline
 }
 
