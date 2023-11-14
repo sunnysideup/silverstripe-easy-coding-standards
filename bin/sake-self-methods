@@ -45,11 +45,8 @@ echoend() {
     [ $(date +%1N) == 1 ] && $SCRIPT_DIR/sake-self-update
 }
 
-fxHasRun=0
-
 echofunctions() {
-    if [[ $fxHasRun != 1 ]]; then
-        fxHasRun=1
+    if ((RANDOM % 3 == 0)); then
         echohead 'Available Functions? Run ...'
         echogood "sake-help"
         echoline
