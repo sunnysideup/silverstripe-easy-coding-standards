@@ -74,7 +74,7 @@ if [[ "$CURRENT_BRANCH" != "production" && "$CURRENT_BRANCH" != "master" && "$CU
     echonice "No tag created."
     exit 1
 fi
-echonice "You are on $CURRENT_BRANCH branch. "
+echonice "BRANCH: $CURRENT_BRANCH"
 
 # Get latest tag
 LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
