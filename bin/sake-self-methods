@@ -24,6 +24,8 @@ echoline() {
 
 echohead() {
     echo ""
+    echo ""
+    echo ""
     echoline
     echo -e "\033[95m $1\033[0m"
     echoline
