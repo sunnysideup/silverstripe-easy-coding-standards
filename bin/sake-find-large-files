@@ -12,33 +12,44 @@ dir='./'
 
 ############################################ SETTINGS
 help='no'
-while (( $# )); do
-  case $1 in
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
-  esac
-  shift
+minSize="100M"
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -m | --min-size)
+        minSize=$2
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
 
-    echohead "Find Large Files";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    echohead "Find Large Files"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+    echonice "Min Size:                      $minSize"
 
-    echohead "Available settings:";
+    echohead "Available settings:"
     echonice "-h, --help                     show help information"
+    echonice "-m, --min-size                 minimum size to be picked up"
 
     echohead "Example usage:"
-    echonice "sake-find-large-files ./";
+    echonice "sake-find-large-files -m 200M ./"
 
     echofunctions
-    exit;
+    exit
 }
-
-
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -50,10 +61,10 @@ fi
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
-find $WORKING_DIR/$dir -xdev -type f -size +100M -exec du -sh {} ';' | sort -rh | head -n50
+find $WORKING_DIR/$dir -xdev -type f -size +$minSize -exec du -sh {} ';' | sort -rh | head -n50
 
-echoend;
+echoend

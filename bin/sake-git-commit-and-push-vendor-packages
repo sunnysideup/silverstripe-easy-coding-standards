@@ -91,7 +91,9 @@ help_and_exit() {
 
 echohead "Removing vendor folders that do not need to be there ..."
 find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
-sake-lint-remove-origs "$dir"
+
+echohead "Removing orig files"
+sake-lint-remove-origs -d yes "$dir"
 
 process_directory() {
     local directory=$1
@@ -137,6 +139,6 @@ find "$WORKING_DIR/$dir" -mindepth 1 -maxdepth 1 -type d -print0 |
 echohead "back to the start: $WORKING_DIR"
 cd "$WORKING_DIR"
 
-[[ "$fullUpdate" == "yes" ]] && sake-composer-update && $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
+[[ "$fullUpdate" == "yes" ]] && sake-composer-update && sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
 
 echoend
