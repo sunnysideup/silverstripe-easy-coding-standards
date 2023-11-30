@@ -51,6 +51,15 @@ help_and_exit() {
     exit
 }
 
+# Function to find directories larger than a specified size
+findLargeDirs() {
+    local sizeThreshold=$1
+    find . -type d -exec du -sh {} + | awk -v size="${sizeThreshold}" '$1 > size'
+}
+
+# Usage: ./script.sh 100M
+# This will find directories larger than 100MB
+
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
     help_and_exit
@@ -66,5 +75,6 @@ else
 fi
 
 find $WORKING_DIR/$dir -xdev -type f -size +$minSize -exec du -sh {} ';' | sort -rh | head -n50
+findLargeDirs $minSize
 
 echoend
