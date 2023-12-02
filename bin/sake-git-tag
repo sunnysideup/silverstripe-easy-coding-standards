@@ -77,7 +77,7 @@ fi
 echonice "BRANCH: $CURRENT_BRANCH"
 
 # Get latest tag
-LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
 echonice "CURRENT TAG: $LATEST_TAG"
 
 # If no tags are found, just create a base tag
@@ -131,6 +131,10 @@ fi
 git tag "$NEW_TAG"
 
 echonice "NEW TAG: $NEW_TAG"
+
+echo "Latest tag: $LATEST_TAG"
+echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
+echo "New tag: $NEW_TAG"
 
 git push --tags --ipv4
 git tag -v
