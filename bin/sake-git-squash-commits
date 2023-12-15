@@ -29,8 +29,10 @@ while (($#)); do
         doToday='yes'
         shift
         ;;
-    -z | --all)
-        allCommits='yes'
+    -z | --zall)
+        if [ "$2" = "yes" ]; then
+            allCommits="yes"
+        fi
         shift
         ;;
     -h | --help)
@@ -61,13 +63,14 @@ help_and_exit() {
     echonice "Directory to analyse:                $WORKING_DIR/$dir"
     echonice "Number of commits to merge:          $numberOfCommits"
     echonice "Message (-m):                        $message"
-    echonice "Do Today (-t):                       $doToday"
+    echonice "Do today (-t):                       $doToday"
+    echonice "Do all commits (-z):                 $allCommits"
 
     echohead "Available settings:"
-    echonice "-t, --today                          message for new commit, default: WIP"
     echonice "-n, --number-of-commits              number of commits to merge, default: 0"
     echonice "-m, --message                        message for new commit, default: WIP"
-    echonice "-z, --all                            merge all commits"
+    echonice "-t, --today                          squash commits today, default: no"
+    echonice "-z, --zall                           merge all commits, MUST BE SET TO yes, default: no"
     echonice "-h, --help                           show help information"
 
     echohead "Example usage:"
