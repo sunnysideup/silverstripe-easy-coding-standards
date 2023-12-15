@@ -75,6 +75,7 @@ help_and_exit() {
 
     echohead "Example usage:"
     echonice "sake-git-squash-commits ./ -t 'yes' -m 'MAJOR: overhaul of everything'"
+    echonice "sake-git-squash-commits ./ -z 'yes' -m 'MERGE ALL COMMITS'"
 
     echofunctions
     exit
@@ -108,6 +109,17 @@ if [[ "$allCommits" == "yes" ]]; then
     git push origin $current_branch --force
 
     echonice "All commits in $current_branch have been squashed into one. Temporary branch deleted."
+
+    # Fetch all the tags from the remote repository
+    git fetch --tags
+
+    # Delete all local tags
+    git tag -l | xargs git tag -d
+
+    # Delete all remote tags
+    git tag -l | xargs -n 1 git push --delete origin
+
+    echonice "All local and remote tags have been deleted."
     echoend
     exit
 fi
