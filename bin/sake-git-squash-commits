@@ -113,11 +113,24 @@ if [[ "$allCommits" == "yes" ]]; then
     # Fetch all the tags from the remote repository
     git fetch --tags
 
-    # Delete all local tags
-    git tag -l | xargs git tag -d
+    # Store a list of all tags
+    tags=$(git tag -l)
 
-    # Delete all remote tags
-    git tag -l | xargs -n 1 git push --delete origin
+    # Check if there are local tags and delete them
+    if [ -n "$tags" ]; then
+        echo "$tags" | xargs git tag -d
+        echo "Local tags deleted."
+    else
+        echo "No local tags to delete."
+    fi
+
+    # Check if there are remote tags and delete them
+    if [ -n "$tags" ]; then
+        echo "$tags" | xargs -n 1 git push --delete origin
+        echo "Remote tags deleted."
+    else
+        echo "No remote tags to delete."
+    fi
 
     echonice "All local and remote tags have been deleted."
     echoend
