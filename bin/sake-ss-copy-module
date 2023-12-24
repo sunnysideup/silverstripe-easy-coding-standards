@@ -1,1 +1,2 @@
-rsync -av --exclude='.git' /path/to/source/directory/ /path/to/destination/directory/
+#rsync -av --exclude='.git' /path/to/source/directory/ /path/to/destination/directory/
+echo " to be completed "
