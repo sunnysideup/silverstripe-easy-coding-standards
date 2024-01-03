@@ -17,6 +17,9 @@ if test -f "$COMPOSER_DIR/composer.json"; then
     echo " UPDATING IN:"
     echo " $(pwd)"
     echo "===================================================="
+    cd vendor/sunnysideup/easy-coding-standards
+    sake-git-commit-and-push . -m "WIP"
+    cd -
     composer update sunnysideup/easy-coding-standards --prefer-source
 else
     echo "===================================================="
