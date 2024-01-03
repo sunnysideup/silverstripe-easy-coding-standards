@@ -58,6 +58,9 @@ description=$(echo $description | tr -d '|')
 # Remove the vendor part and store it as packageShortName
 packageShortName=$(echo $package | sed 's/.*\///')
 
+# add silverstripe- to the packageShortName
+packageShortNameWithSilverstripe= "silverstripe-$packageShortName"
+
 # Add "silverstripe-" after the "/" and store it as packageWithSilverstripe
 packageWithSilverstripe=$(echo $package | sed 's/\//\/silverstripe-/')
 
@@ -72,6 +75,7 @@ help_and_exit() {
     echonice "--fullName (-f):                 $fullName"
     echonice "--description (-d):              $description"
     echonice "package short name:              $packageShortName"
+    echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
     echonice "package with silverstripe:       $packageWithSilverstripe"
 
     echohead "Example usage:"
@@ -121,14 +125,14 @@ check_gh_auth() {
 check_gh_auth
 
 # Create a new repository on GitHub
-gh repo create $packageShortName --public
+gh repo create $packageShortNameWithSilverstripe --public
 
 # Clone the template repository into the new repository
-git clone git@github.com:sunnysideup/$packageShortName $packageShortName
-if [ -d "$packageShortName" ]; then
-    cd $packageShortName
+git clone git@github.com:sunnysideup/$packageShortNameWithSilverstripe $packageShortNameWithSilverstripe
+if [ -d "$packageShortNameWithSilverstripe" ]; then
+    cd $packageShortNameWithSilverstripe
 else
-    echonice "Could not change directory to '$packageShortName'"
+    echonice "Could not change directory to '$packageShortNameWithSilverstripe'"
     help_and_exit
 fi
 
@@ -145,7 +149,8 @@ find . -type f -exec sed -i "s|sunnysideup/silverstripe-skeleton|$packageWithSil
 find . -type f -exec sed -i "s|sunnysideup/skeleton|$package|g" {} +
 find . -type f -exec sed -i "s|Sunnysideup\\\\\\\\Skeleton|$namespace|g" {} +
 find . -type f -exec sed -i "s|skeleton-description|$description|g" {} +
-find . -type f -exec sed -i "s|skeleton|$packageShortName|g" {} +
+find . -type f -exec sed -i "s|skeleton|$packageShortNameWithSilverstripe|g" {} +
+find . -type f -exec sed -i "s|skeleton|$packageShortNameWithSilverstripe|g" {} +
 
 # Move the configuration file
 mv _config/skeleton.yml.example _config/$packageShortName.yml.example
