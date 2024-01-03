@@ -159,4 +159,40 @@ git add .
 git commit -m "HELLO WORLD COMMIT"
 git push origin main
 
+# Fetch the URL of the remote Git repository
+packageUrl=$(git config --get remote.origin.url)
+
+# Check if the package URL was retrieved successfully
+if [ -z "$packageUrl" ]; then
+    echobad "Error: Could not retrieve package URL from Git repository."
+    exit 1
+fi
+
+#
+$envFileLocation = '~/.config/composer/.env'
+
+# Check if .env file exists
+if [ ! -f $envFileLocation ]; then
+    echobad "Error: .env file not found."
+    exit 1
+fi
+
+# Load the .env file
+source $envFileLocation
+
+# Check if credentials are set
+if [ -z "$PACKAGIST_USERNAME" ] || [ -z "$PACKAGIST_API_TOKEN" ]; then
+    echobad "Error: Packagist credentials (PACKAGIST_USERNAME, PACKAGIST_API_TOKEN) not set in $envDir file."
+    exit 1
+fi
+
+# Submit or update the package on Packagist
+response=$(curl -X POST "https://packagist.org/api/update-package?username=$PACKAGIST_USERNAME&apiToken=$PACKAGIST_API_TOKEN" -H "Content-Type: application/json" -d "{\"repository\":{\"url\":\"$packageUrl\"}}")
+
+# Optional: Check response or log it
+echo $response
+
+# Navigate back to the original directory
+cd -
+
 echoend
