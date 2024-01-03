@@ -4,50 +4,81 @@
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 ############################################ DIR
-dir='app/src'
+dir='./'
 
 ############################################ SETTINGS
-from=''
+description=''
+fullName=''
 package=''
-namespace='no'
+namespace=''
 help='no'
-while (( $# )); do
-  case $1 in
-    -f|--from)         from=$2;shift ;;
-    -p|--package)      package=$2;shift ;;
-    -n|--namespace)    also=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -p | --package)
+        package=$2
+        shift
+        ;;
+    -n | --namespace)
+        namespace=$2
+        shift
+        ;;
+    -f | --fullName)
+        fullName=$2
+        shift
+        ;;
+    -d | --description)
+        description=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
+[ -z "$package" ] && read -p "Enter package (e.g. sunnysideup/abc): " package || package=$package
+[ -z "$namespace" ] && read -p "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
+[ -z "$fullName" ] && read -p "Enter full name (e.g. My Abc Module): " fullName || fullName=$fullName
+[ -z "$description" ] && read -p "Enter description (e.g. Does the ABC): " description || description=$description
+
+package=$(echo $package | tr -d '|')
+namespace=$(echo $namespace | tr -d '|')
+fullName=$(echo $fullName | tr -d '|')
+description=$(echo $description | tr -d '|')
+
+# Remove the vendor part and store it as packageShortName
+packageShortName=$(echo $package | sed 's/.*\///')
+
+# Add "silverstripe-" after the "/" and store it as packageWithSilverstripe
+packageWithSilverstripe=$(echo $package | sed 's/\//\/silverstripe-/')
+
 help_and_exit() {
-    echohead "Remove Origs";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    echohead "Make a new module"
+    echonice "Directory of script:             $SCRIPT_DIR"
+    echonice "Directory to analyse:            $WORKING_DIR/$dir"
 
-    echoline "Current settings:";
-    echonice "from (-f):                     $WORKING_DIR/$also";
-    echonice "package (-p):                  $WORKING_DIR/$also";
-    echonice "namespace (-n):                $dryRun";
-
-    echohead "Available settings:";
-    echonice "-f, --from                     e.g. ../silverstripe-other-module";
-    echonice "-p, --package                  e.g. myvendor/mypackage";
-    echonice "-n, --namespace                use forward rather than backward slashes"
-    echonice "-h, --help                     show help information"
+    echoline "Current settings:"
+    echonice "--package (-p):                  $package"
+    echonice "--namespace (-n):                $namespace"
+    echonice "--fullName (-f):                 $fullName"
+    echonice "--description (-d):              $description"
+    echonice "package short name:              $packageShortName"
+    echonice "package with silverstripe:       $packageWithSilverstripe"
 
     echohead "Example usage:"
-    echonice "sake-ss-start-new-module ./ -f ../silvertripe-module -p sunnysideup/new-module -n Sunnysideup/App ";
+    echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module'"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -60,29 +91,72 @@ fi
 if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
-if [ -d "$from" ]; then
-    // do nothing
+
+check_gh_installed() {
+    if ! command -v gh &>/dev/null; then
+        echobad "GitHub CLI not installed. Installing now..."
+        sudo apt-get update
+        sudo apt-get install gh
+    else
+        echonice "GitHub CLI is installed."
+    fi
+}
+check_gh_installed
+
+check_gh_auth() {
+    if ! gh auth status &>/dev/null; then
+        echobad "You are not logged in to GitHub CLI."
+        echonice "Attempting to log in..."
+        gh auth login
+    else
+        echonice "You are already logged in to GitHub CLI."
+    fi
+}
+
+# ... rest of your script ...
+
+check_gh_auth
+
+# Create a new repository on GitHub
+gh repo create $packageShortName --public
+
+# Clone the template repository into the new repository
+git clone git@github.com:sunnysideup/$packageShortName $packageShortName
+if [ -d "$packageShortName" ]; then
+    cd $packageShortName
 else
-    echonice "Could not find $from as a directory.";
-    help_and_exit;
-fi
-if ! command -v jq &> /dev/null
-then
-    echo "jq could not be found, attempting to install..."
-    sudo apt-get install jq
+    echonice "Could not change directory to '$packageShortName'"
+    help_and_exit
 fi
 
-rsync -av --exclude='.git' $from ./;
+# Clone the template repository into a temporary directory
+tmpDir=$(mktemp -d) # Create a temporary directory
+git clone git@github.com:sunnysideup/silverstripe-module.git "$tmpDir"
 
-# Extract target string from composer file
-oldPackage=$(jq -r '.name' "$WORKING_DIR/composer.json")
+# Copy the contents to the new repository directory
+rsync -av --exclude='.git' $tmpDir/* ./
+rm -rf "$tmpDir" # Remove the temporary directory
 
-# Replace target string with replacement string in specified directory, recursively
-find "$WORKING_DIR" -type f -exec sed -i "s/$oldPackage/$package/g" {} \;
+# Replace instances of the template strings with the provided variables
+find . -type f -exec sed -i "s|sunnysideup/silverstripe-skeleton|$packageWithSilverstripe|g" {} +
+find . -type f -exec sed -i "s|sunnysideup/skeleton|$package|g" {} +
+find . -type f -exec sed -i "s|Sunnysideup\\\\\\\\Skeleton|$namespace|g" {} +
+find . -type f -exec sed -i "s|skeleton-description|$description|g" {} +
+find . -type f -exec sed -i "s|skeleton|$packageShortName|g" {} +
 
-echoend;
+# Move the configuration file
+mv _config/skeleton.yml.example _config/$packageShortName.yml.example
 
+# Move the sake scripts
+mv bin/sake-npm-watch-skeleton.sh bin/sake-npm-watch-$packageShortName.sh
+mv bin/sake-npm-build-skeleton.sh bin/sake-npm-build-$packageShortName.sh
 
+# Add changes to git and push them
+git add .
+git commit -m "HELLO WORLD COMMIT"
+git push origin main
+
+echoend
