@@ -13,36 +13,44 @@ package=''
 ############################################ SETTINGS
 branch='*@dev'
 help='no'
-while (( $# )); do
-  case $1 in
-    -b|--branch)       branch=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 package=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -b | --branch)
+        branch=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) package=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
 
-    echohead "Composer Require";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Composer Require"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Package:                       $package";
-    echonice "Branch:                        $branch";
+    ECHOHEAD "Current settings:"
+    echonice "Package:                       $package"
+    echonice "Branch:                        $branch"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-b, --branch                   branch, default: *@dev"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-composer-require silverstripe/cms -b 4.x-dev";
+    ECHOHEAD "Example usage:"
+    echonice "sake-composer-require silverstripe/cms -b 4.x-dev"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -59,17 +67,17 @@ fi
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
-echohead "Consider using:";
-echonice "composer config --global  \"preferred-install.myvendorname/*\" source";
-echonice "to set --prefer-source - enabling editing your own packages";
+ECHOHEAD "Consider using:"
+echonice "composer config --global  \"preferred-install.myvendorname/*\" source"
+echonice "to set --prefer-source - enabling editing your own packages"
 
 composer config sort-packages true
-echohead "running: composer require $package:$branch"
+ECHOHEAD "running: composer require $package:$branch"
 
 composer require $package:$branch --prefer-source
 
-echoend;
+echoend

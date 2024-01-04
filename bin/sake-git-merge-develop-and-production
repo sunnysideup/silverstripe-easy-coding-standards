@@ -12,39 +12,47 @@ dir='./'
 ############################################ SETTINGS
 help='no'
 message=""
-while (( $# )); do
-  case $1 in
-    -h|--help)                   help='yes';shift ;;
-    -m|--message)                message=$2;shift ;;
-    -*)                          printf 'Unknown option: %q\n\n' "$1";
-                                 help_and_exit 1 ;;
-    *)                           dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help_and_exit 1
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 if [[ "$message" == "" ]]; then
     message="merge dev and production"
 fi
 if [[ "$message" == "" ]]; then
-    message=`git log -1 --pretty=%B`
+    message=$(git log -1 --pretty=%B)
 fi
 
 help_and_exit() {
-    echohead "Merge previous commits";
-    echonice "Directory of script:                 $SCRIPT_DIR";
+    ECHOHEAD "Merge previous commits"
+    echonice "Directory of script:                 $SCRIPT_DIR"
 
-    echohead "Current settings:";
+    ECHOHEAD "Current settings:"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-h, --help                           show help information"
-    echonice "Message (-m):                        $message";
+    echonice "Message (-m):                        $message"
 
-    echohead "Example usage:"
-    echonice "sake-git-merge-develop-and-productions ./";
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-merge-develop-and-productions ./"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -57,13 +65,13 @@ fi
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
-sake-git-commit-and-push  "$WORKING_DIR/$dir" -m "$message"
+sake-git-commit-and-push "$WORKING_DIR/$dir" -m "$message"
 git checkout develop
-sake-git-commit-and-push  "$WORKING_DIR/$dir" -m "$message"
+sake-git-commit-and-push "$WORKING_DIR/$dir" -m "$message"
 git pull origin develop
 git checkout production
 git pull origin production
@@ -76,5 +84,4 @@ git commit
 git push origin develop
 git checkout develop
 
-
-echoend;
+echoend

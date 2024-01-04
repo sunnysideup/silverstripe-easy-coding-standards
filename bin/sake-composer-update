@@ -13,37 +13,48 @@ force='no'
 commit='yes'
 help='no'
 
-while (( $# )); do
-  case $1 in
-    -f|--force)        force=$2;shift ;;
-    -c|--commit)       commit=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -f | --force)
+        force=$2
+        shift
+        ;;
+    -c | --commit)
+        commit=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
-    echohead "Composer Update";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Composer Update"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Force (-f|--force):            $force";
-    echonice "Commit result:                 $commit";
+    ECHOHEAD "Current settings:"
+    echonice "Force (-f|--force):            $force"
+    echonice "Commit result:                 $commit"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-f, --force                    delete vendor folder, default: 'no'"
     echonice "-c, --commit                   also commit, default: 'yes'"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-composer-update . -f 'yes' -c 'no'";
+    ECHOHEAD "Example usage:"
+    echonice "sake-composer-update . -f 'yes' -c 'no'"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -56,8 +67,8 @@ fi
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
 if [[ "$force" == "yes" ]]; then
@@ -71,20 +82,20 @@ if [[ "$commit" == "yes" ]]; then
     sake-git-commit-and-push . -m "WIP: composer update"
 fi
 
-echoline;
+echoline
 
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
 find 'vendor' -mindepth 2 -maxdepth 2 -type d -print0 |
     while IFS= read -r -d '' line; do
         if [ ! -d "$line/.git" ]; then
-            echobad "CHECKED OUT AS DIST: $line ... consider --prefer-source if you want to change them."  ;
+            echobad "CHECKED OUT AS DIST: $line ... consider --prefer-source if you want to change them."
         fi
     done
 
-echoend;
+echoend

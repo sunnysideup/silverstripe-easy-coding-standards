@@ -58,6 +58,7 @@
     "bin/sake-npm-dev",
     "bin/sake-npm-install",
     "bin/sake-npm-watch",
+    "bin/sake-scrutinizer-add",
     "bin/sake-self-update",
     "bin/sake-self-methods",
     "bin/sake-ss-add-site",

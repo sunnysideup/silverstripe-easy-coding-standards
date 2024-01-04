@@ -9,10 +9,11 @@ source $SCRIPT_DIR/sake-self-methods
 dir='./'
 
 ############################################ SETTINGS
-description=''
-fullName=''
 package=''
 namespace=''
+fullName=''
+description=''
+keywords=''
 help='no'
 while (($#)); do
     case $1 in
@@ -32,6 +33,10 @@ while (($#)); do
         description=$2
         shift
         ;;
+    -k | --keywords)
+        keywords=$2
+        shift
+        ;;
     -h | --help)
         help='yes'
         shift
@@ -49,11 +54,13 @@ done
 [ -z "$namespace" ] && read -p "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
 [ -z "$fullName" ] && read -p "Enter full name (e.g. My Abc Module): " fullName || fullName=$fullName
 [ -z "$description" ] && read -p "Enter description (e.g. Does the ABC): " description || description=$description
+[ -z "$keywords" ] && read -p "Enter keywords, separated by a commna (e.g. foo, bar): " keywords || keywords=$keywords
 
 package=$(echo $package | tr -d '|')
 namespace=$(echo $namespace | tr -d '|')
 fullName=$(echo $fullName | tr -d '|')
 description=$(echo $description | tr -d '|')
+keywords=$(echo $keywords | tr -d '|')
 
 # Remove the vendor part and store it as packageShortName
 packageShortName=$(echo $package | sed 's/.*\///')
@@ -65,7 +72,7 @@ packageShortNameWithSilverstripe= "silverstripe-$packageShortName"
 packageWithSilverstripe=$(echo $package | sed 's/\//\/silverstripe-/')
 
 help_and_exit() {
-    echohead "Make a new module"
+    ECHOHEAD "Make a new module"
     echonice "Directory of script:             $SCRIPT_DIR"
     echonice "Directory to analyse:            $WORKING_DIR/$dir"
 
@@ -78,7 +85,7 @@ help_and_exit() {
     echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
     echonice "package with silverstripe:       $packageWithSilverstripe"
 
-    echohead "Example usage:"
+    ECHOHEAD "Example usage:"
     echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module'"
 
     echofunctions
@@ -95,33 +102,12 @@ fi
 if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR"
+    echobad "Could not change directory to $WORKING_DIR"
     help_and_exit
 fi
 
-check_gh_installed() {
-    if ! command -v gh &>/dev/null; then
-        echobad "GitHub CLI not installed. Installing now..."
-        sudo apt-get update
-        sudo apt-get install gh
-    else
-        echonice "GitHub CLI is installed."
-    fi
-}
-check_gh_installed
-
-check_gh_auth() {
-    if ! gh auth status &>/dev/null; then
-        echobad "You are not logged in to GitHub CLI."
-        echonice "Attempting to log in..."
-        gh auth login
-    else
-        echonice "You are already logged in to GitHub CLI."
-    fi
-}
-
-# ... rest of your script ...
-
+installpackage "gh"
+installpackage "gq"
 check_gh_auth
 
 # Create a new repository on GitHub
@@ -141,6 +127,7 @@ tmpDir=$(mktemp -d) # Create a temporary directory
 git clone git@github.com:sunnysideup/silverstripe-module.git "$tmpDir"
 
 # Copy the contents to the new repository directory
+rm -rf "$tmpDir/.git" # Remove the .git directory
 rsync -av --exclude='.git' $tmpDir/* ./
 rm -rf "$tmpDir" # Remove the temporary directory
 
@@ -148,9 +135,11 @@ rm -rf "$tmpDir" # Remove the temporary directory
 find . -type f -exec sed -i "s|sunnysideup/silverstripe-skeleton|$packageWithSilverstripe|g" {} +
 find . -type f -exec sed -i "s|sunnysideup/skeleton|$package|g" {} +
 find . -type f -exec sed -i "s|Sunnysideup\\\\\\\\Skeleton|$namespace|g" {} +
+find . -type f -exec sed -i "s|Sunnysideup\\\\Skeleton|$namespace|g" {} +
+find . -type f -exec sed -i "s|skeleton-fullname|$fullName|g" {} +
 find . -type f -exec sed -i "s|skeleton-description|$description|g" {} +
-find . -type f -exec sed -i "s|skeleton|$packageShortNameWithSilverstripe|g" {} +
-find . -type f -exec sed -i "s|skeleton|$packageShortNameWithSilverstripe|g" {} +
+find . -type f -exec sed -i "s|silverstripe-skeleton|$packageShortNameWithSilverstripe|g" {} +
+find . -type f -exec sed -i "s|skeleton|$packageShortName|g" {} +
 
 # Move the configuration file
 mv _config/skeleton.yml.example _config/$packageShortName.yml.example
@@ -159,10 +148,29 @@ mv _config/skeleton.yml.example _config/$packageShortName.yml.example
 mv bin/sake-npm-watch-skeleton.sh bin/sake-npm-watch-$packageShortName.sh
 mv bin/sake-npm-build-skeleton.sh bin/sake-npm-build-$packageShortName.sh
 
+# Call the function to ensure jq is installed
+installpackage "jq"
+
+# Rest of your script...
+
+# Sample keywords string
+
+# Convert string to an array, trimming whitespace
+IFS=',' read -ra ADDR <<<"$keywords"
+for i in "${!ADDR[@]}"; do
+    ADDR[$i]=$(echo ${ADDR[$i]} | xargs)
+done
+
+# Convert the array to a JSON array
+json_array=$(printf '%s\n' "${ADDR[@]}" | jq -R . | jq -s .)
+
 # Add changes to git and push them
 git add .
-git commit -m "HELLO WORLD COMMIT"
+git commit -m "FIRST COMMIT: build from template - github.com/sunnysideup/silverstripe-module"
 git push origin main
+
+# Update composer.json
+jq '.keywords = '"$json_array" composer.json >temp.json && mv temp.json composer.json
 
 # Fetch the URL of the remote Git repository
 packageUrl=$(git config --get remote.origin.url)
@@ -173,21 +181,9 @@ if [ -z "$packageUrl" ]; then
     exit 1
 fi
 
-#
-$envFileLocation = '~/.config/composer/.env'
-
-# Check if .env file exists
-if [ ! -f $envFileLocation ]; then
-    echobad "Error: .env file not found."
-    exit 1
-fi
-
-# Load the .env file
-source $envFileLocation
-
 # Check if credentials are set
 if [ -z "$PACKAGIST_USERNAME" ] || [ -z "$PACKAGIST_API_TOKEN" ]; then
-    echobad "Error: Packagist credentials (PACKAGIST_USERNAME, PACKAGIST_API_TOKEN) not set in $envDir file."
+    echobad "Error: Packagist credentials (PACKAGIST_USERNAME, PACKAGIST_API_TOKEN) not set in $envFileLocation file."
     exit 1
 fi
 
@@ -195,7 +191,9 @@ fi
 response=$(curl -X POST "https://packagist.org/api/update-package?username=$PACKAGIST_USERNAME&apiToken=$PACKAGIST_API_TOKEN" -H "Content-Type: application/json" -d "{\"repository\":{\"url\":\"$packageUrl\"}}")
 
 # Optional: Check response or log it
-echo $response
+ECHOHEAD $response
+
+addtoscrutinizer $packageWithSilverstripe
 
 # Navigate back to the original directory
 cd -

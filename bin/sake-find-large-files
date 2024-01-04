@@ -35,16 +35,16 @@ done
 
 help_and_exit() {
 
-    echohead "Find Large Files"
+    ECHOHEAD "Find Large Files"
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
     echonice "Min Size:                      $minSize"
 
-    echohead "Available settings:"
+    ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
     echonice "-m, --min-size                 minimum size to be picked up"
 
-    echohead "Example usage:"
+    ECHOHEAD "Example usage:"
     echonice "sake-find-large-files -m 200M ./"
 
     echofunctions

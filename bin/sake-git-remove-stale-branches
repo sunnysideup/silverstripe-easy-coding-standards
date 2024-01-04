@@ -12,36 +12,43 @@ dir='./'
 ############################################ SETTINGS
 dryRun='no'
 help='no'
-while (( $# )); do
-  case $1 in
-    -d|--dry-run)      dryRun=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -d | --dry-run)
+        dryRun=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
-    echohead "Remove Stale Branches";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Remove Stale Branches"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Excluded are:                  master|develop|dev|production|feature/pre-develop";
+    ECHOHEAD "Current settings:"
+    echonice "Excluded are:                  master|develop|dev|production|feature/pre-develop"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-d, --dry-run                  test only, default: no !!!"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-git-remove-stale-branches ./";
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-remove-stale-branches ./"
 
     echofunctions
-    exit;
+    exit
 }
-
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -53,8 +60,8 @@ fi
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
 if [[ "$dryRun" == "no" ]]; then
@@ -63,4 +70,4 @@ else
     git branch --merged | egrep -v "(^\*|master|develop|dev|production|live|feature/pre-develop)"
 fi
 
-echoend;
+echoend

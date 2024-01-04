@@ -1,0 +1,71 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+echo $COMPOSER_RUNTIME_BIN_DIR
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+add='no'
+
+while (($#)); do
+    case $1 in
+    -a | --add)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Add all github packages to scrutinizer"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-a, --add                      $add"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-scrutinize-add -a yes "
+
+    echofunctions
+    exit
+}
+
+installpackage "jq"
+check_gh_auth
+
+# Get a list of your public GitHub repositories (names only)
+github_repos=$(gh repo list --json nameWithOwner --jq '.[].nameWithOwner' --visibility public | sort)
+
+# Get a list of your Scrutinizer repositories
+# Replace the following command with the actual way to retrieve your Scrutinizer repositories
+scrutinizer_repos=$(curl -s -H "Authorization: token $SCRUTINIZER_API_TOKEN" \
+    "https://scrutinizer-ci.com/api/repositories" | jq '.[].name' | sort)
+
+# Find repositories present in GitHub but not in Scrutinizer
+repos_not_in_scrutinizer=$(comm -23 <(echo "$github_repos") <(echo "$scrutinizer_repos"))
+
+# Check if there are any repositories not in Scrutinizer
+if [ -z "$repos_not_in_scrutinizer" ]; then
+    echonice "All GitHub repositories are listed on Scrutinizer."
+else
+    echobad "GitHub repositories not listed on Scrutinizer:"
+    # Loop through each repo not in Scrutinizer and list them
+    for repo in $repos_not_in_scrutinizer; do
+        ECHOHEAD $repo
+        # add to scrutinizer
+        addtoscrutinizer $repo
+    done
+fi

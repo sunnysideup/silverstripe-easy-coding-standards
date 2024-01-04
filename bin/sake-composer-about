@@ -12,32 +12,37 @@ package=''
 
 ############################################ SETTINGS
 help='no'
-while (( $# )); do
-  case $1 in
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 package=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) package=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
-    echohead "Composer About a Package";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Composer About a Package"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Package:                       $package";
+    ECHOHEAD "Current settings:"
+    echonice "Package:                       $package"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-composer-about silverstripe/cms";
+    ECHOHEAD "Example usage:"
+    echonice "sake-composer-about silverstripe/cms"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -54,10 +59,10 @@ fi
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
 composer depends $package
 
-echoend;
+echoend

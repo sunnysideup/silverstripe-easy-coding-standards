@@ -7,50 +7,54 @@ source $SCRIPT_DIR/sake-self-methods
 
 ############################################ DIR
 if [ "$1" != "" ]; then
-    dir=$1;
+    dir=$1
 else
     dir='app/client/src'
 fi
 
 ############################################ SETTINGS EXTRA
-while getopts a: flag
-do
+while getopts a: flag; do
     case "${flag}" in
-        a) dir=${OPTARG};;
+    a) dir=${OPTARG} ;;
     esac
 done
 
 ############################################ SETTINGS
 help='no'
-while (( $# )); do
-  case $1 in
-    -h|--help)        help='yes';shift ;;
-    -*)               printf 'Unknown option: %q\n\n' "$1";
-                      help='yes' ;;
-    *)                dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
 
-    echohead "JS Standard";
-    echonice "Make sure you have intalled and updated:";
-    echonice "sudo npm install standard --global";
+    ECHOHEAD "JS Standard"
+    echonice "Make sure you have intalled and updated:"
+    echonice "sudo npm install standard --global"
 
-    echohead "Current settings:";
-    echonice "files to analyse:             $WORKING_DIR/$dir/*.js";
+    ECHOHEAD "Current settings:"
+    echonice "files to analyse:             $WORKING_DIR/$dir/*.js"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-h, --help                    show help information"
 
-    echohead "Example usage:"
-    echonice "sake-lint-js .";
-    echonice "sake-lint-js app/client/javascript";
+    ECHOHEAD "Example usage:"
+    echonice "sake-lint-js ."
+    echonice "sake-lint-js app/client/javascript"
     echonice "sake-lint-js foo/bar"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -63,10 +67,10 @@ fi
 if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
 
 standard --fix $dir/*.js
 
-echoend;
+echoend

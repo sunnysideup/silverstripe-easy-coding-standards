@@ -52,6 +52,8 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-rsync-asset
  - sake-ss-dump-database
  - sake-ss-start-new-module
+# scrutinizer
+ - sake-scrutinizer-add
 
 # machine maintenance
  - sake-update-vs-code
@@ -61,29 +63,35 @@ Install as global composer package and then try to access the commands, starting
 
 1. open your terminal
 2. browse to root folder of your project and type:
- ```shell
+
+```shell
 composer require --dev sunnysideup/easy-coding-standards:dev-master
- ```
+```
 
 ## global install (recommended - more likely to work)
 
 1. open your terminal and type
+
 ```shell
 composer global require sunnysideup/easy-coding-standards:dev-master
 ```
 
 2. then add path to `~/.bashrc` (or otherwise):
-choose the appropriate one ...
+   choose the appropriate one ...
+
 ```shell
 PATH=~/.composer/vendor/bin:$PATH
 PATH=~/.config/composer/vendor/bin:$PATH
 ```
+
 This will make the global composer `vendor/bin` available anywhere (use with care!).
 
 3. To enable it, run:
+
 ```shell
 source ~/.bashrc
 ```
+
 or restart your computer.
 
 4. Now you should be able to run it from anywhere like this:
@@ -91,9 +99,11 @@ or restart your computer.
 ```shell
 sake-lint-ecs [dir]
 ```
+
 (this command, and all the other commands listed above).
 
 # How to use:
+
 Commands should be run from the root directory of your project.
 
 To find out the options for a specific command:
@@ -103,6 +113,7 @@ sake-my-command -h
 ```
 
 ## Not installed globally?
+
 If not installed globally, then you should add `vendor/bin/` in front of the commands.
 
 ```shell

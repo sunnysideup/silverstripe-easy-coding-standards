@@ -11,32 +11,36 @@ dir='./'
 
 ############################################ SETTINGS
 help='no'
-while (( $# )); do
-  case $1 in
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
 
-    echohead "Composer Updates Available";
-    echonice "Directory of script:          $SCRIPT_DIR";
-    echonice "Directory to analyse:         $WORKING_DIR/$dir";
+    ECHOHEAD "Composer Updates Available"
+    echonice "Directory of script:          $SCRIPT_DIR"
+    echonice "Directory to analyse:         $WORKING_DIR/$dir"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-h, --help                    show help information"
 
-    echohead "Example usage:"
-    echonice "sake-composer-available-updates";
+    ECHOHEAD "Example usage:"
+    echonice "sake-composer-available-updates"
 
     echofunctions
-    exit;
+    exit
 }
-
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -53,14 +57,14 @@ fi
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
-echohead "Easy to update"
+ECHOHEAD "Easy to update"
 composer show -oD
 
-echohead "Other notifications"
+ECHOHEAD "Other notifications"
 composer outdated
 
-echoend;
+echoend

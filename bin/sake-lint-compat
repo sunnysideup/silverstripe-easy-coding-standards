@@ -13,51 +13,59 @@ dir='app/src'
 ############################################ SETTINGS
 phpVersion="8.0"
 help='no'
-while (( $# )); do
+while (($#)); do
   case $1 in
-    -p|--php-version)  phpVersion=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
+  -p | --php-version)
+    phpVersion=$2
+    shift
+    ;;
+  -h | --help)
+    help='yes'
+    shift
+    ;;
+  -*)
+    printf 'Unknown option: %q\n\n' "$1"
+    help='yes'
+    ;;
+  *) dir=$1 ;;
   esac
   shift
 done
 
 help_and_exit() {
 
-    echohead "Running PHP Compatability";
-    echonice "directory of script:           $SCRIPT_DIR";
-    echonice "directory to analyse:          $WORKING_DIR/$dir";
+  ECHOHEAD "Running PHP Compatability"
+  echonice "directory of script:           $SCRIPT_DIR"
+  echonice "directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "PHP Version (-p):              $phpVersion";
-    echonice "Also Check (-a):               $also";
+  ECHOHEAD "Current settings:"
+  echonice "PHP Version (-p):              $phpVersion"
+  echonice "Also Check (-a):               $also"
 
-    echohead "Available settings:";
-    echonice "-p, --php-version              php version, default: 8.0";
-    echonice "-a, --also                     also lint, e.g. app/_config.php OR mysite";
-    echonice "-h, --help                     show help information"
+  ECHOHEAD "Available settings:"
+  echonice "-p, --php-version              php version, default: 8.0"
+  echonice "-a, --also                     also lint, e.g. app/_config.php OR mysite"
+  echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-lint-compat   -p 7.4   foo/bar ";
+  ECHOHEAD "Example usage:"
+  echonice "sake-lint-compat   -p 7.4   foo/bar "
 
-    echofunctions
-    exit;
+  echofunctions
+  exit
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-    help_and_exit
+  help_and_exit
 fi
 
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
+  cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
+  echobad "Could not change directory to $WORKING_DIR"
+  help_and_exit
 fi
 
 $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/php-compatibility"
@@ -66,4 +74,4 @@ $SCRIPT_DIR/phpcs --config-set severity 1
 $SCRIPT_DIR/phpcs --config-show
 $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion
 
-echoend;
+echoend

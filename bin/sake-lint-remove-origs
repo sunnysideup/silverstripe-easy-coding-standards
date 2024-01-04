@@ -13,37 +13,48 @@ dir='app/src'
 also=''
 dryRun='no'
 help='no'
-while (( $# )); do
-  case $1 in
-    -a|--also)         also=$2;shift ;;
-    -d|--dry-run)      dryRun=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -a | --also)
+        also=$2
+        shift
+        ;;
+    -d | --dry-run)
+        dryRun=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
-    echohead "Remove Origs";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Remove Origs"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echoline "Current settings:";
-    echonice "Also check (-a):               $WORKING_DIR/$also";
-    echonice "Is test only (-d):             $dryRun";
+    echoline "Current settings:"
+    echonice "Also check (-a):               $WORKING_DIR/$also"
+    echonice "Is test only (-d):             $dryRun"
 
-    echohead "Available settings:";
-    echonice "-a, --also                     also lint - e.g. app/_config.php OR app OR mysite";
+    ECHOHEAD "Available settings:"
+    echonice "-a, --also                     also lint - e.g. app/_config.php OR app OR mysite"
     echonice "-d, --dry-run                  is test only (default NO!)"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-lint-remove-origs app -a other/dir -d yes";
+    ECHOHEAD "Example usage:"
+    echonice "sake-lint-remove-origs app -a other/dir -d yes"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -56,10 +67,9 @@ fi
 if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
-
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/sake-lint-remove-origs -a 'nothing-here-hopefully' -d $dryRun
@@ -72,4 +82,4 @@ if [[ "$dryRun" == "no" ]]; then
     $SCRIPT_DIR/sake-git-commit-and-push $dir -m "PATCH: removing orig files"
 fi
 
-echoend;
+echoend

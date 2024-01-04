@@ -14,37 +14,48 @@ dir="./"
 webpackDir='themes/sswebpack_engine_only/'
 themeDir=''
 help='no'
-while (( $# )); do
-  case $1 in
-    -w|--webpack-dir)  webpackDir=$2;shift ;;
-    -t|--theme-dir)    themeDir=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -w | --webpack-dir)
+        webpackDir=$2
+        shift
+        ;;
+    -t | --theme-dir)
+        themeDir=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
-    echohead "NPM dev";
-    echonice "Directory of script:          $SCRIPT_DIR";
-    echonice "Directory to install:         $WORKING_DIR/$dir";
+    ECHOHEAD "NPM dev"
+    echonice "Directory of script:          $SCRIPT_DIR"
+    echonice "Directory to install:         $WORKING_DIR/$dir"
 
-    echohead "Current settings:"
-    echonice "Webpack dir (-w):             $WORKING_DIR/$webpackDir";
-    echonice "Theme dir (-t):               $WORKING_DIR/$themeDir";
+    ECHOHEAD "Current settings:"
+    echonice "Webpack dir (-w):             $WORKING_DIR/$webpackDir"
+    echonice "Theme dir (-t):               $WORKING_DIR/$themeDir"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-w, --webpack-dir             directory where webpack lives"
     echonice "-t, --theme-dir               add --theme-dir to npm command"
     echonice "-h, --help                    show help information"
 
-    echohead "Example usage:"
-    echonice "sake-npm-dev -t themes/client";
+    ECHOHEAD "Example usage:"
+    echonice "sake-npm-dev -t themes/client"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -57,8 +68,8 @@ fi
 if [ -d "$WORKING_DIR/$webpackDir" ]; then
     cd $WORKING_DIR/$webpackDir
 else
-    echonice "Could not change directory to $WORKING_DIR/$webpackDir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$webpackDir"
+    help_and_exit
 fi
 
 if [ "$themeDir" != "" ]; then
@@ -69,4 +80,4 @@ fi
 
 cd $WORKING_DIR
 
-echoend;
+echoend

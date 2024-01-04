@@ -8,7 +8,7 @@ source $SCRIPT_DIR/sake-self-methods
 ############################################ DIR
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 if [ "$1" != "" ]; then
-    dir=$1;
+    dir=$1
 else
     dir='app/src'
 fi
@@ -18,38 +18,52 @@ also='app/_config.php'
 phanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/.phan/config.php"
 phpVersion="8.0"
 help='no'
-while (( $# )); do
-  case $1 in
-    -l|--level)        level=$2;shift ;;
-    -s|--phan-config)  phanConfig=$2;shift ;;
-    -p|--php-version)  phpVersion=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help='yes' ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -l | --level)
+        level=$2
+        shift
+        ;;
+    -s | --phan-config)
+        phanConfig=$2
+        shift
+        ;;
+    -p | --php-version)
+        phpVersion=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
 
-    echohead "PHP PHAN";
-    echonice "Directory of script:              $SCRIPT_DIR";
-    echonice "Directory to analyse:             $WORKING_DIR/$dir";
+    ECHOHEAD "PHP PHAN"
+    echonice "Directory of script:              $SCRIPT_DIR"
+    echonice "Directory to analyse:             $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "phan config file (-s):            $phanConfig";
-    echonice "php version (-p):                 $phpVersion";
+    ECHOHEAD "Current settings:"
+    echonice "phan config file (-s):            $phanConfig"
+    echonice "php version (-p):                 $phpVersion"
 
-    echohead "Available settings:";
-    echonice "-s, --phan-config                 stan config file locaton e.g. ../phpstan.neon";
+    ECHOHEAD "Available settings:"
+    echonice "-s, --phan-config                 stan config file locaton e.g. ../phpstan.neon"
     echonice "-h, --help                        show help information"
 
-    echohead "Example usage:"
-    echonice "sake-lint-phan   -l 2 -a app_more/_config.php -s ../.phan/config.php   foo/bar ";
+    ECHOHEAD "Example usage:"
+    echonice "sake-lint-phan   -l 2 -a app_more/_config.php -s ../.phan/config.php   foo/bar "
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -62,11 +76,10 @@ fi
 if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
-
 
 $SCRIPT_DIR/phan --directory $WORKING_DIR --project-root-directory $WORKING_DIR/$dir --minimum-target-php-version $phpVersion
 
-echoend;
+echoend

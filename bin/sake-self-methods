@@ -1,5 +1,17 @@
 #!/bin/bash
 
+#
+$envFileLocation = '~/.config/composer/.env'
+
+# Check if .env file exists
+if [ ! -f $envFileLocation ]; then
+    echobad "Error: .env file not found. here: $envFileLocation"
+    exit 1
+fi
+
+# Load the .env file
+source $envFileLocation
+
 echoplain() {
     echo -e " $1"
 }
@@ -22,7 +34,7 @@ echoline() {
     echonice '----------------------------------------'
 }
 
-echohead() {
+ECHOHEAD() {
     string=$1
 
     if [[ $string != \#* ]]; then
@@ -47,20 +59,58 @@ echoend() {
 
 echofunctions() {
     if ((RANDOM % 3 == 0)); then
-        echohead 'Available Functions? Run ...'
+        ECHOHEAD 'Available Functions? Run ...'
         echogood "sake-help"
         echoline
     fi
 }
 
 echolistoffunctions() {
-    echohead 'List of Available Functions'
+    ECHOHEAD 'List of Available Functions'
     for entry in $(ls $SCRIPT_DIR); do
         echonice " -  $entry"
     done
     echonice "To show the options for a specific command, run:"
     echo "[command] -h"
     echonice "e.g. sake-lint-all -h"
+}
+
+addtoscrutinizer() {
+    packageWithSilverstripe=$1
+    # add to scrutinizer
+    if [ -z "$SCRUTINIZER_API_TOKEN" ]; then
+        echobad "Error: Scrutinizer credentials (SCRUTINIZER_API_TOKEN) not set in $envFileLocation file."
+        exit 1
+    fi
+    # Submit the GitHub repository to Scrutinizer
+    response=$(curl -X POST "https://scrutinizer-ci.com/api/repositories/g" \
+        -H "Authorization: token $SCRUTINIZER_API_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"name\":\"$packageWithSilverstripe\"}")
+    # Check response or log it
+    ECHOHEAD $response
+}
+
+# Function to check if $package is installed
+installpackage() {
+    $package=$1
+    if ! command -v $package &>/dev/null; then
+        echobad "$package is not installed. Installing now..."
+        sudo apt-get update && sudo apt-get install $package
+    else
+        echonice "$package is installed."
+    fi
+}
+
+# check if gh is authenticated
+check_gh_auth() {
+    if ! gh auth status &>/dev/null; then
+        echobad "You are not logged in to GitHub CLI."
+        echonice "Attempting to log in..."
+        gh auth login
+    else
+        echonice "You are already logged in to GitHub CLI."
+    fi
 }
 
 echofunctions

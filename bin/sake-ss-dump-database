@@ -14,38 +14,43 @@ source $dir/.env
 
 help='no'
 name="$SS_DATABASE_NAME"
-while (( $# )); do
+while (($#)); do
   case $1 in
-    -n|--db-name)            name=$2;shift ;;
-    -h|--help)               help='yes';shift ;;
-    -*)                      printf 'Unknown option: %q\n\n' "$1";
-                             help='yes' ;;
-    *)                       dir=$1;;
+  -n | --db-name)
+    name=$2
+    shift
+    ;;
+  -h | --help)
+    help='yes'
+    shift
+    ;;
+  -*)
+    printf 'Unknown option: %q\n\n' "$1"
+    help='yes'
+    ;;
+  *) dir=$1 ;;
   esac
   shift
 done
 
-
 help_and_exit() {
 
-    echohead "Dump database";
+  ECHOHEAD "Dump database"
 
-    echohead "Available settings:";
-    echonice "-h, --help                     show help information"
-    echonice "-n, --db-name                  name for file"
+  ECHOHEAD "Available settings:"
+  echonice "-h, --help                     show help information"
+  echonice "-n, --db-name                  name for file"
 
-    echohead "Example usage:"
-    echonice "sake-ss-dump-database -n mydatabase";
+  ECHOHEAD "Example usage:"
+  echonice "sake-ss-dump-database -n mydatabase"
 
-    echofunctions
-    exit;
+  echofunctions
+  exit
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-    help_and_exit
+  help_and_exit
 fi
 
 sspak save . "$name.sspak" --db
-
-

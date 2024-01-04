@@ -11,36 +11,43 @@ dir='./'
 ############################################ SETTINGS
 skipComposer="no"
 help='no'
-while (( $# )); do
-  case $1 in
-    -s|--skip-composer)      skipComposer=$2;shift ;;
-    -h|--help)               help='yes';shift ;;
-    -*)                      printf 'Unknown option: %q\n\n' "$1";
-                             help='yes' ;;
-    *)                       dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -s | --skip-composer)
+        skipComposer=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
-
 
 help_and_exit() {
 
-    echohead "Dev/Build";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Dev/Build"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "-s, --skip-composer            $skipComposer";
+    ECHOHEAD "Current settings:"
+    echonice "-s, --skip-composer            $skipComposer"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-s, --skip-composer            skip composer install, default: no !!!"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-ss-dev-build .";
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-dev-build ."
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -53,8 +60,8 @@ fi
 if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
 
 if [[ "$skipComposer" == "yes" ]]; then
@@ -93,4 +100,4 @@ fi
 # dev-build
 sudo -u www-data vendor/bin/sake dev/build flush=all
 
-echoend;
+echoend

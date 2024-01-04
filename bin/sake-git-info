@@ -11,36 +11,40 @@ dir='./'
 ############################################ SETTINGS
 help='no'
 full='no'
-while (( $# )); do
-  case $1 in
-    -f|--full)             full='yes';shift ;;
-    -h|--help)             help='yes';shift ;;
-    -*)                    printf 'Unknown option: %q\n\n' "$1";
-                           help='yes' ;;
-    *)                     dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -f | --full)
+        full='yes'
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
 done
 
-
-
 help_and_exit() {
-    echohead "Git info";
-    echonice "directory of script:           $SCRIPT_DIR";
-    echonice "directory to commit:           $WORKING_DIR/$dir";
+    ECHOHEAD "Git info"
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to commit:           $WORKING_DIR/$dir"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
     echonice "-f, --full                     run a full git pull and git push on all branches"
 
-    echohead "Example usage:"
-    echonice "e.g. sake-git-info ";
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-git-info "
 
     echofunctions
-    exit;
+    exit
 }
-
-
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -52,59 +56,56 @@ fi
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir";
-    help_and_exit;
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
-echohead "# making sure we have the core branches"
+ECHOHEAD "# making sure we have the core branches"
 
 git checkout develop
 
 git fetch --all
 
 # Check if the develop branch exists
-if [ "$(git branch | grep develop)" == "" ]
-then
-  # If it does not exist, create and push it
-  echo "Creating and pushing develop branch..."
-  git checkout -b develop master
-  git push origin develop
+if [ "$(git branch | grep develop)" == "" ]; then
+    # If it does not exist, create and push it
+    echo "Creating and pushing develop branch..."
+    git checkout -b develop master
+    git push origin develop
 fi
 
 # Check if the production branch exists
-if [ "$(git branch | grep production)" == "" ]
-then
-  # If it does not exist, create and push it
-  echo "Creating and pushing production branch..."
-  git checkout -b production develop
-  git push origin production
+if [ "$(git branch | grep production)" == "" ]; then
+    # If it does not exist, create and push it
+    echo "Creating and pushing production branch..."
+    git checkout -b production develop
+    git push origin production
 fi
-
 
 GIT_DIR=$(git rev-parse --show-toplevel)
 
 if test -f "$GIT_DIR/.git/config"; then
 
-    echohead "# check status"
-    echohead "fetchin --all"
+    ECHOHEAD "# check status"
+    ECHOHEAD "fetchin --all"
     git fetch --all
 
     # set the right way to look at testbranches
     git config push.default matching
 
-    echohead "# check git status"
+    ECHOHEAD "# check git status"
     git status
 
-    echohead "# current commit"
+    ECHOHEAD "# current commit"
     git rev-parse --short --verify HEAD
 
-    echohead "# last commit"
+    ECHOHEAD "# last commit"
     git log -1
 
-    echohead "# unpushed branches"
+    ECHOHEAD "# unpushed branches"
     git log --branches --not --remotes --no-walk --decorate --oneline
 
-    echohead "# behind / ahead"
+    ECHOHEAD "# behind / ahead"
     # Get all remote branches
     remote_branches=$(git branch -r)
     # Red color
@@ -116,42 +117,37 @@ if test -f "$GIT_DIR/.git/config"; then
 
     printf "${NC}%-70s ${RED}%-5s${NC} ${GREEN}%s${NC}\n" "Branch Name" "Behind" "Ahead"
 
-    for branch in $remote_branches
-    do
-    # Skip HEAD
-    if [ "$branch" != "origin/HEAD" ] && [ "$branch" != "->" ]
-    then
+    for branch in $remote_branches; do
+        # Skip HEAD
+        if [ "$branch" != "origin/HEAD" ] && [ "$branch" != "->" ]; then
 
-        # Check out the branch to compare
-        git checkout -q $branch
-        if [[ "$full" == "yes" ]]; then
-            git pull -q origin $branch
-            git push -q origin $branch
+            # Check out the branch to compare
+            git checkout -q $branch
+            if [[ "$full" == "yes" ]]; then
+                git pull -q origin $branch
+                git push -q origin $branch
+            fi
+
+            # Get the number of commits the branch is ahead of develop
+            ahead=$(git rev-list --count develop..$branch)
+
+            # Get the number of commits the branch is behind develop
+            behind=$(git rev-list --count $branch..develop)
+
+            # Print formatted output
+            # Check if $ahead is greater than 0
+            if (($ahead > 0)); then
+                # Get the date of the last commit
+                last_commit_date=$(git show -s --format=%ci)
+                printf "%-70s ${RED}%-5s${NC} ${GREEN}%s${NC} %s\n" "$branch" "$behind" "$ahead" "$last_commit_date"
+            else
+                printf "%-70s ${RED}%-5s${NC} %s\n" "$branch" "$behind" "$ahead"
+            fi
         fi
-
-        # Get the number of commits the branch is ahead of develop
-        ahead=$(git rev-list --count develop..$branch)
-
-        # Get the number of commits the branch is behind develop
-        behind=$(git rev-list --count $branch..develop)
-
-        # Print formatted output
-        # Check if $ahead is greater than 0
-        if (( $ahead > 0 )); then
-            # Get the date of the last commit
-            last_commit_date=$(git show -s --format=%ci)
-            printf "%-70s ${RED}%-5s${NC} ${GREEN}%s${NC} %s\n" "$branch" "$behind" "$ahead" "$last_commit_date"
-        else
-            printf "%-70s ${RED}%-5s${NC} %s\n" "$branch" "$behind" "$ahead"
-        fi
-    fi
     done
 
-
-
 else
-    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO"
 fi
 
-
-echoend;
+echoend

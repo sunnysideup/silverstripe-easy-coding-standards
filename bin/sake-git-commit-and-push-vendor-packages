@@ -57,18 +57,18 @@ fi
 message=${message:-"WIP"}
 
 help_and_exit() {
-    echohead "Checking Vendor Packages for Changes"
+    ECHOHEAD "Checking Vendor Packages for Changes"
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:"
+    ECHOHEAD "Current settings:"
     echonice "Message (-m):                  $message"
     echonice "Commit and Push (-c):          $commitAndPush"
     echonice "Create New tag (-v):           $newVersion"
     echonice "Status Only (-s):              $statusOnly"
     echonice "Full Composer Update (-f):     $fullUpdate"
 
-    echohead "Available settings:"
+    ECHOHEAD "Available settings:"
     echonice "-m, --message                  message - e.g. Lint, default: WIP"
     echonice "-c, --commit-and-push          commit and push also? default: yes"
     echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no"
@@ -76,7 +76,7 @@ help_and_exit() {
     echonice "-f, --full-update              run a full composer update afterwards and commit, default: yes"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
+    ECHOHEAD "Example usage:"
     echonice "sake-git-commit-and-push-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch -f no   vendor/my-vendor-name"
 
     echofunctions
@@ -87,17 +87,17 @@ help_and_exit() {
 [[ "$help" == "yes" ]] && help_and_exit
 
 ############################################ CODE
-[[ ! -d "$WORKING_DIR" ]] && echonice "Could not change directory to $WORKING_DIR" && help_and_exit
+[[ ! -d "$WORKING_DIR" ]] && echobad "Could not change directory to $WORKING_DIR" && help_and_exit
 
-echohead "Removing vendor folders that do not need to be there ..."
+ECHOHEAD "Removing vendor folders that do not need to be there ..."
 find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
 
-echohead "Removing orig files"
+ECHOHEAD "Removing orig files"
 sake-lint-remove-origs -d yes "$dir"
 
 process_directory() {
     local directory=$1
-    echohead "### DOING: $directory"
+    ECHOHEAD "### DOING: $directory"
     cd "$directory" || return
 
     if [[ ! -f "$directory/.git/config" ]]; then
@@ -124,19 +124,19 @@ has_git_changes() {
     fi
 }
 
-echohead "going to look for folders in $WORKING_DIR/themes"
+ECHOHEAD "going to look for folders in $WORKING_DIR/themes"
 find "$WORKING_DIR/themes" -mindepth 1 -maxdepth 1 -type d -print0 |
     while IFS= read -r -d '' line; do
         process_directory "$line"
     done
 
-echohead "going to look for folders in $WORKING_DIR/$dir"
+ECHOHEAD "going to look for folders in $WORKING_DIR/$dir"
 find "$WORKING_DIR/$dir" -mindepth 1 -maxdepth 1 -type d -print0 |
     while IFS= read -r -d '' line; do
         process_directory "$line"
     done
 
-echohead "back to the start: $WORKING_DIR"
+ECHOHEAD "back to the start: $WORKING_DIR"
 cd "$WORKING_DIR"
 
 [[ "$fullUpdate" == "yes" ]] && sake-composer-update && sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion

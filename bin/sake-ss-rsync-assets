@@ -13,40 +13,51 @@ server=''
 wwwDataUser='www-data'
 help='no'
 reverse='no'
-while (( $# )); do
-  case $1 in
-    -w|--www-data-user)         wwwDataUser=$2;shift ;;
-    -h|--help)                  help='yes'; shift;;
-    -r|--reverse)               reverse='yes'; shift;;
-    -*)                         printf 'Unknown option: %q\n\n' "$1";
-                                help='yes' ;;
-    *)                          server=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -w | --www-data-user)
+        wwwDataUser=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -r | --reverse)
+        reverse='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) server=$1 ;;
+    esac
+    shift
 done
 
 help_and_exit() {
 
-    echohead "Rsync assets from server";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to copy from:        $server/public/assets";
-    echonice "Directory to copy to:          $WORKING_DIR/public/assets";
+    ECHOHEAD "Rsync assets from server"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to copy from:        $server/public/assets"
+    echonice "Directory to copy to:          $WORKING_DIR/public/assets"
 
-    echonice "Apache user (-w):              $wwwDataUser";
+    echonice "Apache user (-w):              $wwwDataUser"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-w, --www-data-user            the apache user, default: www-data"
     echonice "-h, --help                     show help information"
     echonice "-r, --reverse                  CAREFUL: reverse, push to server..."
 
-    echohead "Example usage:"
-    echonice "sake-ss-rsync-assets my-server:/var/www/website-root";
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-rsync-assets my-server:/var/www/website-root"
 
-    echohead "NOTE";
+    ECHOHEAD "NOTE"
     echonice "correct setup is rsync folder/ newfolder (with slash, without slash)"
 
     echofunctions
-    exit;
+    exit
 }
 
 ############################################ HELP ONLY
@@ -58,14 +69,13 @@ if [[ "$reverse" == "yes" ]]; then
     echobad "CAREFUL: you are pushing to the server."
 fi
 
-
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
 
 if [ ! -z "$server" ]; then
@@ -88,4 +98,4 @@ else
     echobad "no server specified $server"
 fi
 
-echoend;
+echoend

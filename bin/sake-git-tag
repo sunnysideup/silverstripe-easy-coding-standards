@@ -31,16 +31,16 @@ done
 
 help_and_exit() {
 
-    echohead "Checking Vendor Packages for Changes"
+    ECHOHEAD "Checking Vendor Packages for Changes"
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:"
+    ECHOHEAD "Current settings:"
 
-    echohead "Available settings:"
+    ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
+    ECHOHEAD "Example usage:"
     echonice "sake-git-tag ."
 
     echofunctions
@@ -57,13 +57,13 @@ fi
 if [ -d "$WORKING_DIR" ]; then
     cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR"
+    echobad "Could not change directory to $WORKING_DIR"
     help_and_exit
 fi
 
 git fetch --all --ipv4
 
-echohead "Creating Tag (if required)"
+ECHOHEAD "Creating Tag (if required)"
 # Get current branch name
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
@@ -154,7 +154,7 @@ echoend
 #     #     OLD_TAG=$(git describe --tags --abbrev=0 | awk -F. '{OFS="."; $NF+=0; print $0}')
 #     # fi
 
-#     echohead "Found old Tag";
+#     ECHOHEAD "Found old Tag";
 #     echonice "$OLD_TAG";
 #     echoline;
 
@@ -185,7 +185,7 @@ echoend
 
 #     NEW_TAG="${a[0]}.${a[1]}.${a[2]}";
 
-#     echohead "Found new Tag ($newVersionLowerCase)";
+#     ECHOHEAD "Found new Tag ($newVersionLowerCase)";
 #     echonice "$NEW_TAG";
 #     echoline;
 

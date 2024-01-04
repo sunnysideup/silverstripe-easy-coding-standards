@@ -11,50 +11,58 @@ dir='./'
 ############################################ SETTINGS
 more="no"
 help='no'
-while (( $# )); do
+while (($#)); do
   case $1 in
-    -m|--more)               more=$2;shift ;;
-    -h|--help)               help='yes';shift ;;
-    -*)                      printf 'Unknown option: %q\n\n' "$1";
-                             help='yes' ;;
-    *)                       dir=$1;;
+  -m | --more)
+    more=$2
+    shift
+    ;;
+  -h | --help)
+    help='yes'
+    shift
+    ;;
+  -*)
+    printf 'Unknown option: %q\n\n' "$1"
+    help='yes'
+    ;;
+  *) dir=$1 ;;
   esac
   shift
 done
 
 help_and_exit() {
 
-    echohead "self help";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+  ECHOHEAD "self help"
+  echonice "Directory of script:           $SCRIPT_DIR"
+  echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "More (-m|--more):              $more";
+  ECHOHEAD "Current settings:"
+  echonice "More (-m|--more):              $more"
 
-    echohead "Available settings:";
-    echonice "-m, --more                     show MORE help information"
+  ECHOHEAD "Available settings:"
+  echonice "-m, --more                     show MORE help information"
 
-    echohead "Example usage:"
-    echonice "e.g. sake-help -m yes";
+  ECHOHEAD "Example usage:"
+  echonice "e.g. sake-help -m yes"
 
-    echofunctions
-    exit;
+  echofunctions
+  exit
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-    help_and_exit
+  help_and_exit
 fi
 
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
+  cd $WORKING_DIR
 else
-    echonice "Could not change directory to $WORKING_DIR";
-    help_and_exit;
+  echobad "Could not change directory to $WORKING_DIR"
+  help_and_exit
 fi
 
 echolistoffunctions
 
-echoend;
+echoend

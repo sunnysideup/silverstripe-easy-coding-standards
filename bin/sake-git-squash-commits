@@ -56,24 +56,24 @@ if [[ "$message" == "" ]]; then
 fi
 
 help_and_exit() {
-    echohead "Merge previous commits"
+    ECHOHEAD "Merge previous commits"
     echonice "Directory of script:                 $SCRIPT_DIR"
 
-    echohead "Current settings:"
+    ECHOHEAD "Current settings:"
     echonice "Directory to analyse:                $WORKING_DIR/$dir"
     echonice "Number of commits to merge:          $numberOfCommits"
     echonice "Message (-m):                        $message"
     echonice "Do today (-t):                       $doToday"
     echonice "Do all commits (-z):                 $allCommits"
 
-    echohead "Available settings:"
+    ECHOHEAD "Available settings:"
     echonice "-n, --number-of-commits              number of commits to merge, default: 0"
     echonice "-m, --message                        message for new commit, default: WIP"
     echonice "-t, --today                          squash commits today, default: no"
     echonice "-z, --zall                           merge all commits, MUST BE SET TO yes, default: no"
     echonice "-h, --help                           show help information"
 
-    echohead "Example usage:"
+    ECHOHEAD "Example usage:"
     echonice "sake-git-squash-commits ./ -t 'yes' -m 'MAJOR: overhaul of everything'"
     echonice "sake-git-squash-commits ./ -z 'yes' -m 'MERGE ALL COMMITS'"
 
@@ -148,10 +148,10 @@ fi
 
 todaysCount=$(git log --since="4am" --oneline | wc -l)
 
-echohead "List of commits for today"
+ECHOHEAD "List of commits for today"
 git log --since="4am" --oneline
 
-echohead "Number of commits today:"
+ECHOHEAD "Number of commits today:"
 git shortlog -s -n --all --no-merges --since="4am"
 
 if [[ "$doToday" == "yes" ]]; then
@@ -164,7 +164,7 @@ if [ $numberOfCommits \> 0 ]; then
     git add . -A
     git push --force-with-lease
 else
-    echohead "Nothing to squash, please use -t or -n option"
+    ECHOHEAD "Nothing to squash, please use -t or -n option"
 fi
 
 echoend
