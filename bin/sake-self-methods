@@ -1,17 +1,5 @@
 #!/bin/bash
 
-#
-$envFileLocation = '~/.config/composer/.env'
-
-# Check if .env file exists
-if [ ! -f $envFileLocation ]; then
-    echobad "Error: .env file not found. here: $envFileLocation"
-    exit 1
-fi
-
-# Load the .env file
-source $envFileLocation
-
 echoplain() {
     echo -e " $1"
 }
@@ -112,5 +100,17 @@ check_gh_auth() {
         echonice "You are already logged in to GitHub CLI."
     fi
 }
+
+# get .env variables
+envFileLocation="$HOME/.config/composer/.env"
+
+# Check if .env file exists
+if [ ! -f $envFileLocation ]; then
+    echobad ".env file not found here: $envFileLocation"
+    exit 1
+fi
+
+# Load the .env file
+source $envFileLocation
 
 echofunctions
