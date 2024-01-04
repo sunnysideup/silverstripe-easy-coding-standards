@@ -14,56 +14,56 @@ webpackDir='themes/sswebpack_engine_only/'
 themeDir=''
 help='no'
 while (($#)); do
-  case $1 in
-  -w | --webpack-dir)
-    webpackDir=$2
+    case $1 in
+    -w | --webpack-dir)
+        webpackDir=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
     shift
-    ;;
-  -h | --help)
-    help='yes'
-    shift
-    ;;
-  -*)
-    printf 'Unknown option: %q\n\n' "$1"
-    help='yes'
-    ;;
-  *) dir=$1 ;;
-  esac
-  shift
 done
 
 help_and_exit() {
-  ECHOHEAD "NPM install"
-  echonice "Directory of script:          $SCRIPT_DIR"
-  echonice "Directory to install:         $WORKING_DIR/$dir"
+    ECHOHEAD "NPM install"
+    echonice "Directory of script:          $SCRIPT_DIR"
+    echonice "Directory to install:         $WORKING_DIR/$dir"
 
-  ECHOHEAD "Current settings:"
-  echonice "Webpack dir (-w):             $WORKING_DIR/$webpackDir"
+    ECHOHEAD "Current settings:"
+    echonice "Webpack dir (-w):             $WORKING_DIR/$webpackDir"
 
-  ECHOHEAD "Available settings:"
-  echonice "-w, --webpack-dir             directory where webpack lives"
-  echonice "-h, --help                    show help information"
+    ECHOHEAD "Available settings:"
+    echonice "-w, --webpack-dir             directory where webpack lives"
+    echonice "-h, --help                    show help information"
 
-  ECHOHEAD "Example usage:"
-  echonice "sake-npm-install themes/client"
+    ECHOHEAD "Example usage:"
+    echonice "sake-npm-install themes/client"
 
-  echofunctions
-  exit
+    echofunctions
+    exit
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-  help_and_exit
+    help_and_exit
 fi
 
 ############################################ CODE
 ECHOHEAD 'installing webpack'
 
 if [ -d "$WORKING_DIR/$webpackDir" ]; then
-  cd $WORKING_DIR/$webpackDir
+    cd $WORKING_DIR/$webpackDir
 else
-  echonice "Could not change directory to $WORKING_DIR/$webpackDir"
-  help_and_exit
+    echonice "Could not change directory to $WORKING_DIR/$webpackDir"
+    help_and_exit
 fi
 
 npm i

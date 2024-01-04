@@ -12,59 +12,59 @@ dir="./app/src"
 also='app/_config.php'
 ecsConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.php"
 while (($#)); do
-  case $1 in
-  -a | --also)
-    also=$2
+    case $1 in
+    -a | --also)
+        also=$2
+        shift
+        ;;
+    -e | --ecs-config)
+        ecsConfig=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
     shift
-    ;;
-  -e | --ecs-config)
-    ecsConfig=$2
-    shift
-    ;;
-  -h | --help)
-    help='yes'
-    shift
-    ;;
-  -*)
-    printf 'Unknown option: %q\n\n' "$1"
-    help='yes'
-    ;;
-  *) dir=$1 ;;
-  esac
-  shift
 done
 
 help_and_exit() {
-  echonice "Directory of script:           $SCRIPT_DIR"
-  echonice "Directory to analyse:          $WORKING_DIR/$dir"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-  ECHOHEAD "Current settings:"
-  echonice "Also check (-a):               $WORKING_DIR/$also"
-  echonice "Ecs config file (-e):          $ecsConfig"
+    ECHOHEAD "Current settings:"
+    echonice "Also check (-a):               $WORKING_DIR/$also"
+    echonice "Ecs config file (-e):          $ecsConfig"
 
-  ECHOHEAD "Available settings:"
-  echonice "-e, --ecs-config               ecs config file locaton"
-  echonice "-h, --help                     show help information"
+    ECHOHEAD "Available settings:"
+    echonice "-e, --ecs-config               ecs config file locaton"
+    echonice "-h, --help                     show help information"
 
-  ECHOHEAD "Example usage:"
-  echonice "sake-lint-ecs foo/bar "
+    ECHOHEAD "Example usage:"
+    echonice "sake-lint-ecs foo/bar "
 
-  echofunctions
-  exit
+    echofunctions
+    exit
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-  help_and_exit
+    help_and_exit
 fi
 
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
-  cd $WORKING_DIR
+    cd $WORKING_DIR
 else
-  echobad "Could not change directory to $WORKING_DIR"
-  help_and_exit
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
 
 $SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig

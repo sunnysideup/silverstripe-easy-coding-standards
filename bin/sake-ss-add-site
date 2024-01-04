@@ -11,49 +11,49 @@ dir='./'
 ############################################ SETTINGS
 help='no'
 while (($#)); do
-  case $1 in
-  -h | --help)
-    help='yes'
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
     shift
-    ;;
-  -*)
-    printf 'Unknown option: %q\n\n' "$1"
-    help='yes'
-    ;;
-  *) dir=$1 ;;
-  esac
-  shift
 done
 
 help_and_exit() {
 
-  ECHOHEAD "add-site"
-  echonice "Directory of script:           $SCRIPT_DIR"
-  echonice "Directory to analyse:          $WORKING_DIR/$dir"
+    ECHOHEAD "add-site"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-  ECHOHEAD "Available settings:"
-  echonice "-h, --help                     show help information"
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
 
-  ECHOHEAD "Example usage:"
-  echonice "e.g. sake-ss-add-site ./  "
-  echonice "... run in the destination folder"
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-ss-add-site ./  "
+    echonice "... run in the destination folder"
 
-  echofunctions
-  exit
+    echofunctions
+    exit
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-  help_and_exit
+    help_and_exit
 fi
 
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
-  cd $WORKING_DIR
+    cd $WORKING_DIR
 else
-  echobad "Could not change directory to $WORKING_DIR"
-  help_and_exit
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
 
 # dev-build

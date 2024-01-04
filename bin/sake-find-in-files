@@ -11,55 +11,55 @@ dir='./'
 ############################################ SETTINGS
 help='no'
 while (($#)); do
-  case $1 in
-  -f | --find)
-    find=$2
+    case $1 in
+    -f | --find)
+        find=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
     shift
-    ;;
-  -h | --help)
-    help='yes'
-    shift
-    ;;
-  -*)
-    printf 'Unknown option: %q\n\n' "$1"
-    help='yes'
-    ;;
-  *) dir=$1 ;;
-  esac
-  shift
 done
 
 help_and_exit() {
-  ECHOHEAD "Grep search - find in files"
-  echonice "Directory of script:           $SCRIPT_DIR"
-  echonice "Directory to analyse:          $WORKING_DIR/$dir"
+    ECHOHEAD "Grep search - find in files"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-  ECHOHEAD "Current settings:"
-  echonice "Find string (-f|--find):       $find"
+    ECHOHEAD "Current settings:"
+    echonice "Find string (-f|--find):       $find"
 
-  ECHOHEAD "Available settings:"
-  echonice "-f, --find                   string you are looking for"
-  echonice "-h, --help                   show help information"
+    ECHOHEAD "Available settings:"
+    echonice "-f, --find                   string you are looking for"
+    echonice "-h, --help                   show help information"
 
-  ECHOHEAD "Example usage:"
-  echonice "e.g. sake-find-in-files app/src -f 'piece of code'"
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-find-in-files app/src -f 'piece of code'"
 
-  echofunctions
-  exit
+    echofunctions
+    exit
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-  help_and_exit
+    help_and_exit
 fi
 
 ############################################ CODE
 
 if [ -d "$WORKING_DIR/$dir" ]; then
-  cd $WORKING_DIR/$dir
+    cd $WORKING_DIR/$dir
 else
-  echonice "Could not change directory to $WORKING_DIR/$dir"
-  help_and_exit
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
 fi
 
 # dev-build

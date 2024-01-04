@@ -11,37 +11,37 @@ dir='./'
 ############################################ SETTINGS
 help='no'
 while (($#)); do
-  case $1 in
-  -h | --help)
-    help='yes'
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
     shift
-    ;;
-  -*)
-    printf 'Unknown option: %q\n\n' "$1"
-    help='yes'
-    ;;
-  *) dir=$1 ;;
-  esac
-  shift
 done
 
 help_and_exit() {
 
-  ECHOHEAD "Update VS Code"
+    ECHOHEAD "Update VS Code"
 
-  ECHOHEAD "Available settings:"
-  echonice "-h, --help                     show help information"
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
 
-  ECHOHEAD "Example usage:"
-  echonice "sake-update-vs-code ."
+    ECHOHEAD "Example usage:"
+    echonice "sake-update-vs-code ."
 
-  echofunctions
-  exit
+    echofunctions
+    exit
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-  help_and_exit
+    help_and_exit
 fi
 
 wget 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64' -O /tmp/code_latest_amd64.deb
