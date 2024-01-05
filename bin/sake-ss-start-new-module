@@ -109,6 +109,9 @@ fi
 installpackage "gh"
 installpackage "gq"
 check_gh_auth
+check_for_env_var "SCRUTINIZER_API_TOKEN"
+check_for_env_var "PACKAGIST_USERNAME"
+check_for_env_var "PACKAGIST_API_TOKEN"
 
 # Create a new repository on GitHub
 gh repo create $packageShortNameWithSilverstripe --public
@@ -178,12 +181,6 @@ packageUrl=$(git config --get remote.origin.url)
 # Check if the package URL was retrieved successfully
 if [ -z "$packageUrl" ]; then
     echobad "Error: Could not retrieve package URL from Git repository."
-    exit 1
-fi
-
-# Check if credentials are set
-if [ -z "$PACKAGIST_USERNAME" ] || [ -z "$PACKAGIST_API_TOKEN" ]; then
-    echobad "Error: Packagist credentials (PACKAGIST_USERNAME, PACKAGIST_API_TOKEN) not set in $envFileLocation file."
     exit 1
 fi
 

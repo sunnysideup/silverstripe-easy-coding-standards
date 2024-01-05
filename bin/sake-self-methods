@@ -1,5 +1,7 @@
 #!/bin/bash
 
+envFileLocation="$HOME/.config/composer/.env"
+
 echoplain() {
     echo -e " $1"
 }
@@ -67,21 +69,48 @@ addtoscrutinizer() {
     packageWithSilverstripe=$1
     # add to scrutinizer
     if [ -z "$SCRUTINIZER_API_TOKEN" ]; then
-        echobad "Error: Scrutinizer credentials (SCRUTINIZER_API_TOKEN) not set in $envFileLocation file."
+        echobad "Scrutinizer credentials (SCRUTINIZER_API_TOKEN) not set in $envFileLocation file."
         exit 1
     fi
-    # Submit the GitHub repository to Scrutinizer
-    response=$(curl -X POST "https://scrutinizer-ci.com/api/repositories/g" \
-        -H "Authorization: token $SCRUTINIZER_API_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d "{\"name\":\"$packageWithSilverstripe\"}")
-    # Check response or log it
-    ECHOHEAD $response
+    if [ -z "$packageWithSilverstripe" ]; then
+        echobad "Package to be added (packageWithSilverstripe) not provided."
+        exit 1
+    fi
+    # # Submit the GitHub repository to Scrutinizer
+    # response=$(curl -X POST "https://scrutinizer-ci.com/api/repositories/g" \
+    #     -H "Authorization: token $SCRUTINIZER_API_TOKEN" \
+    #     -H "Content-Type: application/json" \
+    #     -d "{\"name\":\"$packageWithSilverstripe\"}")
+    # # Check response or log it
+    # ECHOHEAD $response
+
+    scrutinizerApiPath="https://scrutinizer-ci.com/api"
+    endPoint="repositories/g?access_token=${SCRUTINIZER_API_TOKEN}"
+    url="${scrutinizerApiPath}/${endPoint}"
+
+    # Create the POST fields
+    postFields="{\"name\": \"${packageWithSilverstripe}\"}"
+
+    # Make the curl request
+    curlResult=$(curl -L -s -o /dev/null -w "%{http_code}" -X POST -d "$postFields" -H "Content-Type: application/json" "$url")
+
+    # Check the result
+    if [ "$curlResult" != "200" ] && [ "$curlResult" != "201" ]; then
+        echobad "Could not add ${packageWithSilverstripe} to Scrutinizer (HTTP code: $curlResult)"
+        # Make the curl request and show all details
+        curlResult=$(curl -L -X POST -d "$postFields" -H "Content-Type: application/json" "$url")
+
+        # Output the result
+        echobad "$curlResult"
+        return
+    else
+        echonice "${packageWithSilverstripe} added to Scrutinizer successfully."
+    fi
 }
 
 # Function to check if $package is installed
 installpackage() {
-    $package=$1
+    package=$1
     if ! command -v $package &>/dev/null; then
         echobad "$package is not installed. Installing now..."
         sudo apt-get update && sudo apt-get install $package
@@ -100,9 +129,17 @@ check_gh_auth() {
         echonice "You are already logged in to GitHub CLI."
     fi
 }
+check_for_env_var() {
+    envVarName=$1
+    envVarValue="${!envVarName}"
+
+    if [ -z "$envVarValue" ]; then
+        echobad "Error: Environment variable $envVarName not set in $envFileLocation file."
+        exit 1
+    fi
+}
 
 # get .env variables
-envFileLocation="$HOME/.config/composer/.env"
 
 # Check if .env file exists
 if [ ! -f $envFileLocation ]; then
