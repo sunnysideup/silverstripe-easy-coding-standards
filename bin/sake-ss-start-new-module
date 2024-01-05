@@ -185,10 +185,11 @@ if [ -z "$packageUrl" ]; then
 fi
 
 # Submit or update the package on Packagist
-response=$(curl -X POST "https://packagist.org/api/update-package?username=$PACKAGIST_USERNAME&apiToken=$PACKAGIST_API_TOKEN" -H "Content-Type: application/json" -d "{\"repository\":{\"url\":\"$packageUrl\"}}")
+response=$(curl -X POST "https://packagist.org/api/create-package?username=$PACKAGIST_USERNAME&apiToken=$PACKAGIST_API_TOKEN" -H "Content-Type: application/json" -d "{\"repository\":{\"url\":\"$packageUrl\"}}")
 
 # Optional: Check response or log it
-ECHOHEAD "$response"
+ECHOHEAD "PACKAGIST RESPONSE"
+echonice "$response"
 
 addtoscrutinizer $packageWithSilverstripe
 
