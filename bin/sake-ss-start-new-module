@@ -136,7 +136,7 @@ git clone git@github.com:sunnysideup/silverstripe-module.git "$tmpDir"
 
 # Copy the contents to the new repository directory
 rm -rf "$tmpDir/.git" # Remove the .git directory
-rsync -av --exclude='.git' $tmpDir/* ./
+rsync -av --exclude='.git' "${tmpDir}/" ./
 rm -rf "$tmpDir" # Remove the temporary directory
 
 # Replace instances of the template strings with the provided variables
