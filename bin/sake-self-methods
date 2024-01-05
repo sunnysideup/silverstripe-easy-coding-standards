@@ -129,6 +129,7 @@ check_gh_auth() {
         echonice "You are already logged in to GitHub CLI."
     fi
 }
+
 check_for_env_var() {
     envVarName=$1
     envVarValue="${!envVarName}"

@@ -66,10 +66,12 @@ keywords=$(echo $keywords | tr -d '|')
 packageShortName=$(echo $package | sed 's/.*\///')
 
 # add silverstripe- to the packageShortName
-packageShortNameWithSilverstripe= "silverstripe-$packageShortName"
+packageShortNameWithSilverstripe="silverstripe-$packageShortName"
 
 # Add "silverstripe-" after the "/" and store it as packageWithSilverstripe
 packageWithSilverstripe=$(echo $package | sed 's/\//\/silverstripe-/')
+escaped_namespace=$(echo "$namespace" | sed 's/\\/\\\\/g')
+double_escaped_namespace=$(echo "$escaped_namespace" | sed 's/\\/\\\\/g')
 
 help_and_exit() {
     ECHOHEAD "Make a new module"
@@ -107,11 +109,14 @@ else
 fi
 
 installpackage "gh"
-installpackage "gq"
+installpackage "jq"
 check_gh_auth
 check_for_env_var "SCRUTINIZER_API_TOKEN"
 check_for_env_var "PACKAGIST_USERNAME"
 check_for_env_var "PACKAGIST_API_TOKEN"
+echonice "package short name:              $packageShortName"
+echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
+echonice "package with silverstripe:       $packageWithSilverstripe"
 
 # Create a new repository on GitHub
 gh repo create $packageShortNameWithSilverstripe --public
@@ -137,8 +142,8 @@ rm -rf "$tmpDir" # Remove the temporary directory
 # Replace instances of the template strings with the provided variables
 find . -type f -exec sed -i "s|sunnysideup/silverstripe-skeleton|$packageWithSilverstripe|g" {} +
 find . -type f -exec sed -i "s|sunnysideup/skeleton|$package|g" {} +
-find . -type f -exec sed -i "s|Sunnysideup\\\\\\\\Skeleton|$namespace|g" {} +
-find . -type f -exec sed -i "s|Sunnysideup\\\\Skeleton|$namespace|g" {} +
+find . -type f -exec sed -i "s|Sunnysideup\\\\\\\\Skeleton|$double_escaped_namespace|g" {} +
+find . -type f -exec sed -i "s|Sunnysideup\\\\Skeleton|$escaped_namespace|g" {} +
 find . -type f -exec sed -i "s|skeleton-fullname|$fullName|g" {} +
 find . -type f -exec sed -i "s|skeleton-description|$description|g" {} +
 find . -type f -exec sed -i "s|silverstripe-skeleton|$packageShortNameWithSilverstripe|g" {} +
@@ -150,11 +155,6 @@ mv _config/skeleton.yml.example _config/$packageShortName.yml.example
 # Move the sake scripts
 mv bin/sake-npm-watch-skeleton.sh bin/sake-npm-watch-$packageShortName.sh
 mv bin/sake-npm-build-skeleton.sh bin/sake-npm-build-$packageShortName.sh
-
-# Call the function to ensure jq is installed
-installpackage "jq"
-
-# Rest of your script...
 
 # Sample keywords string
 
@@ -188,7 +188,7 @@ fi
 response=$(curl -X POST "https://packagist.org/api/update-package?username=$PACKAGIST_USERNAME&apiToken=$PACKAGIST_API_TOKEN" -H "Content-Type: application/json" -d "{\"repository\":{\"url\":\"$packageUrl\"}}")
 
 # Optional: Check response or log it
-ECHOHEAD $response
+ECHOHEAD "$response"
 
 addtoscrutinizer $packageWithSilverstripe
 
