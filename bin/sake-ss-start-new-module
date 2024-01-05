@@ -51,7 +51,7 @@ while (($#)); do
 done
 
 [ -z "$package" ] && read -p "Enter package (e.g. sunnysideup/abc): " package || package=$package
-[ -z "$namespace" ] && read -p "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
+[ -z "$namespace" ] && read -p -r "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
 [ -z "$fullName" ] && read -p "Enter full name (e.g. My Abc Module): " fullName || fullName=$fullName
 [ -z "$description" ] && read -p "Enter description (e.g. Does the ABC): " description || description=$description
 [ -z "$keywords" ] && read -p "Enter keywords, separated by a commna (e.g. foo, bar): " keywords || keywords=$keywords
@@ -161,19 +161,19 @@ mv bin/sake-npm-build-skeleton.sh bin/sake-npm-build-$packageShortName.sh
 # Convert string to an array, trimming whitespace
 IFS=',' read -ra ADDR <<<"$keywords"
 for i in "${!ADDR[@]}"; do
-    ADDR[$i]=$(echo ${ADDR[$i]} | xargs)
+    ADDR[$i]=$(echo "${ADDR[$i]}" | xargs)
 done
 
 # Convert the array to a JSON array
-json_array=$(printf '%s\n' "${ADDR[@]}" | jq -R . | jq -s .)
+json_array=$(jq -n --argjson arr "$(printf '%s\n' "${ADDR[@]}" | jq -Rc . | jq -s .)" '$arr')
+
+# Update composer.json
+jq --argjson arr "$json_array" '.keywords = $arr' composer.json >temp.json && mv temp.json composer.json
 
 # Add changes to git and push them
 git add .
 git commit -m "FIRST COMMIT: build from template - github.com/sunnysideup/silverstripe-module"
 git push origin main
-
-# Update composer.json
-jq '.keywords = '"$json_array" composer.json >temp.json && mv temp.json composer.json
 
 # Fetch the URL of the remote Git repository
 packageUrl=$(git config --get remote.origin.url)
