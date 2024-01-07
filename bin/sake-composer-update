@@ -85,13 +85,6 @@ fi
 
 echoline
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
-else
-    echonice "Could not change directory to $WORKING_DIR/$dir"
-    help_and_exit
-fi
-
 matchingDirs=$(get_my_repos "$WORKING_DIR")
 for dir in $matchingDirs; do
     if [ ! -d "$dir/.git" ]; then
