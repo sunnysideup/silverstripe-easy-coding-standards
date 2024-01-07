@@ -96,7 +96,7 @@ ECHOHEAD "Removing vendor folders that do not need to be there ..."
 find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
 
 ECHOHEAD "Removing orig files"
-sake-lint-remove-origs -d yes "$dir"
+sake-lint-remove-origs "$dir"
 
 process_directory() {
     local directory=$1
