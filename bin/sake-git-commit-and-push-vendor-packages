@@ -89,6 +89,9 @@ help_and_exit() {
 ############################################ CODE
 [[ ! -d "$WORKING_DIR" ]] && echobad "Could not change directory to $WORKING_DIR" && help_and_exit
 
+check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
+installpackage "jq"
+
 ECHOHEAD "Removing vendor folders that do not need to be there ..."
 find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
 
@@ -124,20 +127,48 @@ has_git_changes() {
     fi
 }
 
-ECHOHEAD "going to look for folders in $WORKING_DIR/themes"
-find "$WORKING_DIR/themes" -mindepth 1 -maxdepth 1 -type d -print0 |
-    while IFS= read -r -d '' line; do
-        process_directory "$line"
-    done
+# Paths to vendor directory and composer.lock
+vendorDir="$WORKING_DIR/vendor"
+composerLock="$WORKING_DIR/composer.lock"
 
-ECHOHEAD "going to look for folders in $WORKING_DIR/$dir"
-find "$WORKING_DIR/$dir" -mindepth 1 -maxdepth 1 -type d -print0 |
-    while IFS= read -r -d '' line; do
-        process_directory "$line"
-    done
+# URL to match
 
-ECHOHEAD "back to the start: $WORKING_DIR"
-cd "$WORKING_DIR"
+# Extract package names and source URLs from composer.lock
+packages=$(jq -r '.packages[] | "\(.name) \(.source.url)"' $composerLock)
+
+# Initialize an array for package directories
+declare -a packageDirs
+
+# Fill the array with directories that are git repositories and match the URL
+while read -r packageName packageUrl; do
+    packageDir="$vendorDir/$packageName"
+    if [ -d "$packageDir/.git" ]; then
+        remoteUrl=$(git -C "$packageDir" config --get remote.origin.url)
+        if [[ "$remoteUrl" == *"$GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"* ]]; then
+            packageDirs+=("$packageDir")
+        fi
+    fi
+done <<<"$packages"
+
+# Loop through the array and check for modifications
+for dir in "${packageDirs[@]}"; do
+    process_directory "$dir"
+done
+
+# ECHOHEAD "going to look for folders in $WORKING_DIR/themes"
+# find "$WORKING_DIR/themes" -mindepth 1 -maxdepth 1 -type d -print0 |
+#     while IFS= read -r -d '' line; do
+#         process_directory "$line"
+#     done
+
+# ECHOHEAD "going to look for folders in $WORKING_DIR/$dir"
+# find "$WORKING_DIR/$dir" -mindepth 1 -maxdepth 1 -type d -print0 |
+#     while IFS= read -r -d '' line; do
+#         process_directory "$line"
+#     done
+
+# ECHOHEAD "back to the start: $WORKING_DIR"
+# cd "$WORKING_DIR"
 
 [[ "$fullUpdate" == "yes" ]] && sake-composer-update && sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
 
