@@ -63,6 +63,7 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 ############################################ CODE
+check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
 
 if [ -d "$WORKING_DIR/$dir" ]; then
     cd $WORKING_DIR/$dir
@@ -91,11 +92,11 @@ else
     help_and_exit
 fi
 
-find 'vendor' -mindepth 2 -maxdepth 2 -type d -print0 |
-    while IFS= read -r -d '' line; do
-        if [ ! -d "$line/.git" ]; then
-            echobad "CHECKED OUT AS DIST: $line ... consider --prefer-source if you want to change them."
-        fi
-    done
+matchingDirs=$(get_my_repos "$WORKING_DIR")
+for dir in $matchingDirs; do
+    if [ ! -d "$dir/.git" ]; then
+        echobad "CHECKED OUT AS DIST: $dir ... consider --prefer-source if you want to change them."
+    fi
+done
 
 echoend
