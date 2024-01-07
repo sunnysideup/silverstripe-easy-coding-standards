@@ -143,9 +143,7 @@ check_for_env_var() {
 # USE LIKE THIS: matchingDirs=$(get_my_repos "$WORKING_DIR")
 
 get_my_repos() {
-    check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
-    installpackage "jq"
-    $WORKING_DIR=$1
+    WORKING_DIR=$1
     # Paths to vendor directory and composer.lock
     vendorDir="$WORKING_DIR/vendor"
     composerLock="$WORKING_DIR/composer.lock"
