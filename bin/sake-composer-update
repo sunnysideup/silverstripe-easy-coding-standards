@@ -79,10 +79,6 @@ fi
 composer config sort-packages true
 composer update --prefer-source
 
-if [[ "$commit" == "yes" ]]; then
-    sake-git-commit-and-push . -m "WIP: composer update"
-fi
-
 echoline
 
 matchingDirs=$(get_my_repos "$WORKING_DIR")
@@ -91,5 +87,11 @@ for dir in $matchingDirs; do
         echobad "CHECKED OUT AS DIST: $dir ... consider --prefer-source if you want to change them."
     fi
 done
+
+echoline
+
+if [[ "$commit" == "yes" ]]; then
+    sake-git-commit-and-push . -m "WIP: composer update"
+fi
 
 echoend
