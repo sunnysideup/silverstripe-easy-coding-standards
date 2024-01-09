@@ -1,28 +1,28 @@
 parameters:
-
     excludePaths:
         - /tests/*
-        - */tests/*
-        - */_dev/*
+        - '*/tests/*'
+        - '*/_dev/*'
 
     inferPrivatePropertyTypeFromConstructor: true
 
     ignoreErrors:
-        - '#Access to an undefined property#'
-        - '#Call to an undefined method#'
-#       - '#on an unknown class [a-zA-Z0-9\\_]+#'
-        - '#is never read, only written#'
         - '#but returns SilverStripe\\ORM\\DataObject\|null#'
-        - "#PHPDoc tag @property has invalid value#"
+        # - '#is never read, only written#'
+        # - '#with incorrect case:#'
+        # - '#Access to an undefined property#'
+        # - '#Call to an undefined method#'
+        # - '#on an unknown class [a-zA-Z0-9\\_]+#'
+        # - '#Call to an undefined method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
+        # - '#Call to an undefined static method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
+        # - '#PHPDoc tag @property has invalid value#'
 
-#        - '#with incorrect case:#'
+    autoload_directories:
+        - %currentWorkingDirectory%/app/src
 
-#    autoload_directories:
-#        - %currentWorkingDirectory%/app/src
-
-#    excludes_analyse:
-#        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
-#        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
+    excludes_analyse:
+        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
+        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
 
     scanDirectories:
-      - %currentWorkingDirectory%
+        - %currentWorkingDirectory%

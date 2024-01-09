@@ -187,8 +187,7 @@ if test -f "$GIT_DIR/.git/config"; then
         $SCRIPT_DIR/sake-git-commit-and-push-vendor-packages -m "'$message'" -t no -c $commitAndPush $WORKING_DIR/themes
     fi
 else
-    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO"
-    echobad "Also, $GIT_DIR IS is not a git repo"
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO so I can not commit the changes."
 fi
 
 echoend
