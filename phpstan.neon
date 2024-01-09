@@ -1,7 +1,4 @@
 parameters:
-    autoload_directories:
-        - %currentWorkingDirectory%/app/src
-
     excludePaths:
         - /tests/*
         - '*/tests/*'
