@@ -3,11 +3,14 @@ parameters:
         - /tests/*
         - '*/tests/*'
         - '*/_dev/*'
+        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
+        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
 
     inferPrivatePropertyTypeFromConstructor: true
 
     ignoreErrors:
         - '#but returns SilverStripe\\ORM\\DataObject\|null#'
+        - '#Access to an undefined property SilverStripe\\Core\\Config\\Config_ForClass#'
         # - '#is never read, only written#'
         # - '#with incorrect case:#'
         # - '#Access to an undefined property#'
@@ -17,12 +20,8 @@ parameters:
         # - '#Call to an undefined static method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
         # - '#PHPDoc tag @property has invalid value#'
 
-    autoload_directories:
-        - %currentWorkingDirectory%/app/src
-
-    excludes_analyse:
-        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
-        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
+    # autoloadDirectories:
+    #     - %currentWorkingDirectory%/app/src
 
     scanDirectories:
         - %currentWorkingDirectory%
