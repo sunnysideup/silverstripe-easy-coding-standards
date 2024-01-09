@@ -1,4 +1,7 @@
 parameters:
+    autoload_directories:
+        - %currentWorkingDirectory%/app/src
+
     excludePaths:
         - /tests/*
         - '*/tests/*'
@@ -10,6 +13,7 @@ parameters:
 
     ignoreErrors:
         - '#but returns SilverStripe\\ORM\\DataObject\|null#'
+<<<<<<< HEAD
         - '#Access to an undefined property SilverStripe\\Core\\Config\\Config_ForClass#'
         # - '#is never read, only written#'
         # - '#with incorrect case:#'
@@ -22,6 +26,20 @@ parameters:
 
     # autoloadDirectories:
     #     - %currentWorkingDirectory%/app/src
+=======
+
+    excludes_analyse:
+        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
+        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
+>>>>>>> f6e7e03e76444738b369a330689e078b54cb8ee3
 
     scanDirectories:
         - %currentWorkingDirectory%
+# - '#is never read, only written#'
+# - '#with incorrect case:#'
+# - '#Access to an undefined property#'
+# - '#Call to an undefined method#'
+# - '#on an unknown class [a-zA-Z0-9\\_]+#'
+# - '#Call to an undefined method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
+# - '#Call to an undefined static method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
+# - '#PHPDoc tag @property has invalid value#'
