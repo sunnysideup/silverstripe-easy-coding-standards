@@ -108,6 +108,11 @@ if [ -z "$currentBranch" ]; then
     fi
 fi
 
+ECHOHEAD "Current branch: $currentBranch"
+
+git checkout $currentBranch
+git pull origin $currentBranch
+
 ############################################ ALL
 if [[ "$allCommits" == "yes" ]]; then
 
@@ -172,7 +177,7 @@ fi
 
 ############################################ ALL
 if [[ "$allCommitsInBranch" == "yes" ]]; then
-    git rebase -i --root
+
     # Find the branch it was branched from (common ancestor)
     baseBranch=$(git merge-base --fork-point origin/main "$currentBranch" 2>/dev/null || echo "origin/main")
 
