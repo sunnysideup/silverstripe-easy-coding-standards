@@ -10,26 +10,20 @@ parameters:
 
     ignoreErrors:
         - '#but returns SilverStripe\\ORM\\DataObject\|null#'
-        - '#Access to an undefined property SilverStripe\\Core\\Config\\Config_ForClass#'
+        - '#Call to an undefined method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
+        - '#Access to an undefined property#'
         # - '#is never read, only written#'
         # - '#with incorrect case:#'
         # - '#Access to an undefined property#'
         # - '#Call to an undefined method#'
         # - '#on an unknown class [a-zA-Z0-9\\_]+#'
-        # - '#Call to an undefined method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
         # - '#Call to an undefined static method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
         # - '#PHPDoc tag @property has invalid value#'
+        # - '#Access to an undefined property SilverStripe\\Core\\Config\\Config_ForClass#'
+        # - '#Access to an undefined property SilverStripe\\ORM\\DataObject#'
 
     # autoloadDirectories:
     #     - %currentWorkingDirectory%/app/src
 
     scanDirectories:
         - %currentWorkingDirectory%
-# - '#is never read, only written#'
-# - '#with incorrect case:#'
-# - '#Access to an undefined property#'
-# - '#Call to an undefined method#'
-# - '#on an unknown class [a-zA-Z0-9\\_]+#'
-# - '#Call to an undefined method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
-# - '#Call to an undefined static method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
-# - '#PHPDoc tag @property has invalid value#'
