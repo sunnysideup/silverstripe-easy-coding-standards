@@ -97,12 +97,12 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 # Get the current Git branch
-current_branch=$(git branch --show-current)
+currentBranch=$(git branch --show-current)
 
 # Check if a branch is found
-if [ -z "$current_branch" ]; then
-    current_branch=$(git symbolic-ref --short HEAD)
-    if [ -z "$current_branch" ]; then
+if [ -z "$currentBranch" ]; then
+    currentBranch=$(git symbolic-ref --short HEAD)
+    if [ -z "$currentBranch" ]; then
         echo "No current branch found."
         exit 1
     fi
@@ -117,7 +117,7 @@ if [[ "$allCommits" == "yes" ]]; then
     if [ "$confirmation" = "yes" ]; then
 
         # Switch back to the main branch
-        git checkout $current_branch
+        git checkout $currentBranch
 
         # Reset to the initial commit
         git reset $(git rev-list --max-parents=0 HEAD)
@@ -127,9 +127,9 @@ if [[ "$allCommits" == "yes" ]]; then
         git commit -m "$message"
         read -p "Do you want to force push the changes to the remote? (yes/no): " pushConfirmation
         if [ "$pushConfirmation" = "yes" ]; then
-            git push origin $current_branch --force
+            git push origin $currentBranch --force
 
-            echonice "All commits in $current_branch have been squashed into one. Temporary branch deleted."
+            echonice "All commits in $currentBranch have been squashed into one. Temporary branch deleted."
 
             # Fetch all the tags from the remote repository
             git fetch --tags
@@ -173,18 +173,21 @@ fi
 ############################################ ALL
 if [[ "$allCommitsInBranch" == "yes" ]]; then
     git rebase -i --root
+    # Find the branch it was branched from (common ancestor)
+    baseBranch=$(git merge-base --fork-point origin/main "$currentBranch" 2>/dev/null || echo "origin/main")
 
     # Confirm with the user
-    read -p "Current branch is '$current_branch'. Do you want to squash all commits on this branch? (yes/no): " confirmation
+    read -p "Do you want to squash all unique commits on '$currentBranch' ahead of $baseBranch into a single commit? (yes/no): " confirmation
 
     if [ "$confirmation" = "yes" ]; then
-        ECHOHEAD "Starting interactive rebase..."
-        git rebase -i --root
+        echonice "Squashing commits..."
+        git reset --soft "$baseBranch"
+        git commit -m "$message"
 
         # Confirm to push
         read -p "Do you want to force push the changes to the remote? (yes/no): " pushConfirmation
         if [ "$pushConfirmation" = "yes" ]; then
-            git push origin "$current_branch" --force
+            git push origin "$currentBranch" --force
             ECHOHEAD "Changes have been force pushed. Kia kaha!"
         else
             ECHOHEAD "Force push cancelled."
