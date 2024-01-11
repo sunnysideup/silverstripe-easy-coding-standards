@@ -15,6 +15,7 @@ message=""
 doToday="no"
 help='no'
 allCommits='no'
+allCommitsInBranch='no'
 while (($#)); do
     case $1 in
     -n | --number-of-commits)
@@ -29,7 +30,13 @@ while (($#)); do
         doToday='yes'
         shift
         ;;
-    -z | --zall)
+    -b | --branch--merge-all-commits)
+        if [ "$2" = "yes" ]; then
+            allCommitsInBranch="yes"
+        fi
+        shift
+        ;;
+    -z | --ze-entire-project)
         if [ "$2" = "yes" ]; then
             allCommits="yes"
         fi
@@ -64,18 +71,21 @@ help_and_exit() {
     echonice "Number of commits to merge:          $numberOfCommits"
     echonice "Message (-m):                        $message"
     echonice "Do today (-t):                       $doToday"
+    echonice "Do all commits (-z):                 $allCommitsInBranch"
     echonice "Do all commits (-z):                 $allCommits"
 
     ECHOHEAD "Available settings:"
     echonice "-n, --number-of-commits              number of commits to merge, default: 0"
     echonice "-m, --message                        message for new commit, default: WIP"
     echonice "-t, --today                          squash commits today, default: no"
-    echonice "-z, --zall                           merge all commits, MUST BE SET TO yes, default: no"
+    echonice "-b, --branch--merge-all-commits      merge all commits for current branch, MUST BE SET TO yes, default: no"
+    echonice "-z, --ze-entire-project              merge all commits, MUST BE SET TO yes, default: no"
     echonice "-h, --help                           show help information"
 
     ECHOHEAD "Example usage:"
     echonice "sake-git-squash-commits ./ -t 'yes' -m 'MAJOR: overhaul of everything'"
     echonice "sake-git-squash-commits ./ -z 'yes' -m 'MERGE ALL COMMITS'"
+    echonice "sake-git-squash-commits ./ -b 'yes' -m 'MINOR: my new feature description'"
 
     echofunctions
     exit
@@ -86,53 +96,107 @@ if [[ "$help" == "yes" ]]; then
     help_and_exit
 fi
 
+# Get the current Git branch
+current_branch=$(git branch --show-current)
+
+# Check if a branch is found
+if [ -z "$current_branch" ]; then
+    current_branch=$(git symbolic-ref --short HEAD)
+    if [ -z "$current_branch" ]; then
+        echo "No current branch found."
+        exit 1
+    fi
+fi
+
 ############################################ ALL
 if [[ "$allCommits" == "yes" ]]; then
 
-    # Get the name of the current branch
-    current_branch=$(git symbolic-ref --short HEAD)
+    # Confirm with the user
+    read -p "Do you want to squash all commits on this project? (yes/no): " confirmation
 
-    # Create a backup branch in case you need to revert
-    # git checkout -b ${current_branch}_backup
+    if [ "$confirmation" = "yes" ]; then
 
-    # Switch back to the main branch
-    git checkout $current_branch
+        # Switch back to the main branch
+        git checkout $current_branch
 
-    # Reset to the initial commit
-    git reset $(git rev-list --max-parents=0 HEAD)
+        # Reset to the initial commit
+        git reset $(git rev-list --max-parents=0 HEAD)
 
-    # Recommit everything as a single commit
-    git add .
-    git commit -m "$message"
+        # Recommit everything as a single commit
+        git add .
+        git commit -m "$message"
+        read -p "Do you want to force push the changes to the remote? (yes/no): " pushConfirmation
+        if [ "$pushConfirmation" = "yes" ]; then
+            git push origin $current_branch --force
 
-    # If you've pushed to a remote before and want to force push, uncomment the line below:
-    git push origin $current_branch --force
+            echonice "All commits in $current_branch have been squashed into one. Temporary branch deleted."
 
-    echonice "All commits in $current_branch have been squashed into one. Temporary branch deleted."
+            # Fetch all the tags from the remote repository
+            git fetch --tags
 
-    # Fetch all the tags from the remote repository
-    git fetch --tags
+            # Store a list of all tags
+            tags=$(git tag -l)
 
-    # Store a list of all tags
-    tags=$(git tag -l)
+            # Check if there are local tags and delete them
+            if [ -n "$tags" ]; then
+                echonice "$tags" | xargs git tag -d
+                echonice "Local tags deleted."
+            else
+                echonice "No local tags to delete."
+            fi
 
-    # Check if there are local tags and delete them
-    if [ -n "$tags" ]; then
-        echo "$tags" | xargs git tag -d
-        echo "Local tags deleted."
+            # Check if there are remote tags and delete them
+            if [ -n "$tags" ]; then
+                echonice "$tags" | xargs -n 1 git push --delete origin
+                echonice "Remote tags deleted."
+            else
+                echonice "No remote tags to delete."
+            fi
+        else
+            ECHOHEAD "Force push cancelled."
+            echoend
+            exit 0
+        fi
+        # If you've pushed to a remote before and want to force push, uncomment the line below:
+
+        ECHOHEAD "All local and remote tags have been deleted."
+        echoend
+        exit
     else
-        echo "No local tags to delete."
+        ECHOHEAD "Operation cancelled."
+        echoend
+        exit 0
     fi
 
-    # Check if there are remote tags and delete them
-    if [ -n "$tags" ]; then
-        echo "$tags" | xargs -n 1 git push --delete origin
-        echo "Remote tags deleted."
+fi
+
+############################################ ALL
+if [[ "$allCommitsInBranch" == "yes" ]]; then
+    git rebase -i --root
+
+    # Confirm with the user
+    read -p "Current branch is '$current_branch'. Do you want to squash all commits on this branch? (yes/no): " confirmation
+
+    if [ "$confirmation" = "yes" ]; then
+        ECHOHEAD "Starting interactive rebase..."
+        git rebase -i --root
+
+        # Confirm to push
+        read -p "Do you want to force push the changes to the remote? (yes/no): " pushConfirmation
+        if [ "$pushConfirmation" = "yes" ]; then
+            git push origin "$current_branch" --force
+            ECHOHEAD "Changes have been force pushed. Kia kaha!"
+        else
+            ECHOHEAD "Force push cancelled."
+            echoend
+            exit 0
+        fi
     else
-        echo "No remote tags to delete."
+        ECHOHEAD "Operation cancelled."
+        echoend
+        exit 0
     fi
 
-    echonice "All local and remote tags have been deleted."
     echoend
     exit
 fi
