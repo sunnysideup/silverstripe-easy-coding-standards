@@ -187,13 +187,15 @@ check_commit_message() {
     # List of allowed prefixes
     PREFIXES=("API" "NEW" "ENH" "FIX" "DOC" "DEP" "TLN" "MNT" "Merge")
 
-    # Read the first line of the commit message
-    read -r firstLine <"$message"
+    # Extract the first line of the commit message
+    firstLine=$(echo "$message" | head -n 1)
 
     # Check if the commit message starts with an allowed prefix
     for prefix in "${PREFIXES[@]}"; do
         if [[ "$firstLine" == "$prefix"* ]]; then
-            exit $message
+            ECHOHEAD "Commit Message:"
+            echonice "$message"
+            return 0
         fi
     done
 

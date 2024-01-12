@@ -65,7 +65,7 @@ help_and_exit() {
     exit
 }
 
-message = $(check_commit_message "$message")
+message=$(check_commit_message "$message")
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
