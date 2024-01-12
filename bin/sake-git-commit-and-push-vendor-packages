@@ -70,7 +70,7 @@ help_and_exit() {
     echonice "Full Composer Update (-f):     $fullUpdate"
 
     ECHOHEAD "Available settings:"
-    echonice "-m, --message                  message - e.g. Lint, default: MNT"
+    echonice "-m, --message                  message - e.g. MNT: Lint, defaults to last message"
     echonice "-c, --commit-and-push          commit and push also? default: yes"
     echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no"
     echonice "-s, --status-only              check if there are changes git folder present, default: no"
