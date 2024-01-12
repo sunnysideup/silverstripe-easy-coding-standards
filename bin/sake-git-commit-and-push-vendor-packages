@@ -49,7 +49,7 @@ while (($#)); do
 done
 
 # prompt user for message
-message = $(check_commit_message $message)
+message = $(check_commit_message "$message")
 
 help_and_exit() {
     ECHOHEAD "Checking Vendor Packages for Changes"

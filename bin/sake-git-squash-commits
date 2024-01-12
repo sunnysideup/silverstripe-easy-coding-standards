@@ -60,7 +60,7 @@ while (($#)); do
     shift
 done
 
-message = $(check_commit_message $message)
+message = $(check_commit_message "$message")
 
 help_and_exit() {
     ECHOHEAD "Merge previous commits"

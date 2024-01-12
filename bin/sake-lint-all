@@ -112,7 +112,7 @@ if [[ "$help" == "yes" ]]; then
     help_and_exit
 fi
 
-message = $(check_commit_message $message)
+message = $(check_commit_message "$message")
 
 ############################################ CODE
 
