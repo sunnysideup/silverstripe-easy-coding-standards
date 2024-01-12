@@ -90,7 +90,7 @@ done
 echoline
 
 if [[ "$commit" == "yes" ]]; then
-    sake-git-commit-and-push . -m "WIP: composer update"
+    sake-git-commit-and-push . -m "DEP: composer update"
 fi
 
 echoend

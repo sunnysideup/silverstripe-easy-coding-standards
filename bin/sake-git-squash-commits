@@ -83,7 +83,7 @@ help_and_exit() {
 
     ECHOHEAD "Available settings:"
     echonice "-n, --number-of-commits              number of commits to merge, default: 0"
-    echonice "-m, --message                        message for new commit, default: WIP"
+    echonice "-m, --message                        message for new commit, defaults to last message"
     echonice "-t, --today                          squash commits today, default: no"
     echonice "-b, --branch--merge-all-commits      merge all commits for current branch, MUST BE SET TO yes, default: no"
     echonice "-i, --into-branch                    target branch, default: origin/HEAD"

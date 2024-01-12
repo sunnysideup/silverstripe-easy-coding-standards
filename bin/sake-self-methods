@@ -198,7 +198,7 @@ check_commit_message() {
         fi
     done
 
-    echobad "Commit message does not start with an allowed prefix."
+    echobad "Commit message ($message) does not start with an allowed prefix."
     echonice "Allowed prefixes are: ${PREFIXES[*]}"
     return 1
 }

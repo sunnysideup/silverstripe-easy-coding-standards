@@ -79,7 +79,7 @@ help_and_exit() {
 
     ECHOHEAD "Available settings:"
     echonice "-c, --commit-and-push          commit and push also? default: yes !!!"
-    echonice "-m, --message                  commit message, default: WIP"
+    echonice "-m, --message                  commit message, defaults to last message used"
     echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no"
     echonice "-a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup"
     echonice "-s, --status-only              status only, default: no !!!"
