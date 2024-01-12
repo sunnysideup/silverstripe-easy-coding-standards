@@ -41,11 +41,13 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-contribute-step-2 my-framework-patch"
+    echonice "sake-git-contribute-step-1 my-framework-patch"
 
     echofunctions
     exit
 }
+
+check_for_env_var "GIT_HUB_USER_NAME"
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -60,18 +62,15 @@ else
     echobad "Could not change directory to $WORKING_DIR"
     help_and_exit
 fi
-check_for_env_var "githubUsername"
-
-githubUsername = "$githubUsername"
 
 # Get necessary information from the user
 read -p "Enter the full Git repository URL (e.g., https://github.com/silverstripe/silverstripe-framework.git): " repoUrl
-read -p "Enter your GitHub username: - defaults to $githubUsername" githubUsername
+read -p "Enter your GitHub username: - defaults to $GIT_HUB_USER_NAME" githubUsername
 read -p "Enter the target version (e.g., 5.1): " targetVersion
 read -p "Enter a descriptive name for your working branch: " branchName
 
 if [[ -z "$githubUsername" ]]; then
-    githubUsername = "$githubUsername"
+    githubUsername = "$GIT_HUB_USER_NAME"
 fi
 
 # Extract module name from the repository URL
@@ -91,28 +90,17 @@ cd "$dir" || {
     exit 1
 }
 
-# Function to check if the user has forked the repository
-check_fork() {
-    local user=$1
-    local repo=$2
+# check if the user has forked the repository
 
-    # Use GitHub CLI to list user's repositories and check for the fork
-    if gh repo list "$user" --limit 1000 --json fork --jq '.[] | select(.fork == true) | .name' | grep -q "$repo"; then
-        echo "Fork found."
-        return 0
-    else
-        echo "Fork not found."
-        return 1
-    fi
-}
-
-# Check if the user has forked the module
-if check_fork "$githubUsername" "$moduleName"; then
-    echo "Proceeding with the script..."
+# Use GitHub CLI to list user's repositories and check for the fork
+if gh repo list "$githubUsername" --limit 1000 --json fork --jq '.[] | select(.fork == true) | .name' | grep -q "$moduleName"; then
+    echonice "Fork found - Proceeding with the script..."
 else
     echobad "Please fork the repository on GitHub before continuing."
     exit 1
 fi
+
+# Check if the user has forked the module
 
 # Add your fork as a remote
 git remote add pr git@github.com:$githubUsername/$moduleName.git

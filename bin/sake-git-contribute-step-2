@@ -41,7 +41,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-tag ."
+    echonice "sake-git-contribute-step-2"
 
     echofunctions
     exit
@@ -60,9 +60,17 @@ else
     echobad "Could not change directory to $WORKING_DIR"
     help_and_exit
 fi
+if [ -d "$dir" ]; then
+    cd $dir
+else
+    echobad "Could not change directory to $dir"
+    help_and_exit
+fi
 
 # Get necessary information from the user
 read -p "Enter the target version (e.g., 5.1): " targetVersion
+
+sake-git-squash-commits "$dir" -b "yes" -i "$targetVersion"
 
 # Rebase your branch onto the target branch
 git fetch origin

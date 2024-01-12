@@ -14,8 +14,9 @@ numberOfCommits=0
 message=""
 doToday="no"
 help='no'
-allCommits='no'
 allCommitsInBranch='no'
+intoBranch='HEAD'
+allCommits='no'
 while (($#)); do
     case $1 in
     -n | --number-of-commits)
@@ -34,6 +35,10 @@ while (($#)); do
         if [ "$2" = "yes" ]; then
             allCommitsInBranch="yes"
         fi
+        shift
+        ;;
+    -i | --into-branch)
+        intoBranch=$2
         shift
         ;;
     -z | --ze-entire-project)
@@ -66,7 +71,8 @@ help_and_exit() {
     echonice "Number of commits to merge:          $numberOfCommits"
     echonice "Message (-m):                        $message"
     echonice "Do today (-t):                       $doToday"
-    echonice "Do all commits (-z):                 $allCommitsInBranch"
+    echonice "Do all commits of branch (-a):       $allCommitsInBranch"
+    echonice "Into Branch (-i) (merging branch):   $intoBranch"
     echonice "Do all commits (-z):                 $allCommits"
 
     ECHOHEAD "Available settings:"
@@ -74,13 +80,14 @@ help_and_exit() {
     echonice "-m, --message                        message for new commit, default: WIP"
     echonice "-t, --today                          squash commits today, default: no"
     echonice "-b, --branch--merge-all-commits      merge all commits for current branch, MUST BE SET TO yes, default: no"
+    echonice "-i, --into-branch                    target branch, default: origin/HEAD"
     echonice "-z, --ze-entire-project              merge all commits, MUST BE SET TO yes, default: no"
     echonice "-h, --help                           show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-squash-commits ./ -t 'yes' -m 'MAJOR: overhaul of everything'"
+    echonice "sake-git-squash-commits ./ -t 'yes' -m 'ENH: my new features of the day'"
     echonice "sake-git-squash-commits ./ -z 'yes' -m 'MERGE ALL COMMITS'"
-    echonice "sake-git-squash-commits ./ -b 'yes' -m 'MINOR: my new feature description'"
+    echonice "sake-git-squash-commits ./ -b 'yes' -i 5.0 -m 'MINOR: my new feature description'"
 
     echofunctions
     exit
@@ -176,22 +183,22 @@ if [[ "$allCommitsInBranch" == "yes" ]]; then
     # Fetch the latest changes from the remote
     git fetch origin
 
-    # Merge origin/HEAD into the current branch
-    if ! git merge origin/HEAD; then
+    # Merge origin/$intoBranch into the current branch
+    if ! git merge origin/$intoBranch; then
         echo "Merge failed!"
         exit 1
     fi
 
-    # List commits that are ahead of origin/HEAD
-    echo "Commits ahead of 'origin/HEAD':"
-    git log --oneline origin/HEAD..$currentBranch
+    # List commits that are ahead of origin/$intoBranch
+    echo "Commits ahead of 'origin/$intoBranch':"
+    git log --oneline origin/$intoBranch..$currentBranch
 
     # Confirm with the user to squash commits
     read -p "Would you like to squash these commits into a single commit? (yes/no): " confirmation
 
     if [ "$confirmation" = "yes" ]; then
         echonice "Squashing commits..."
-        git reset --soft $(git merge-base origin/HEAD $currentBranch)
+        git reset --soft $(git merge-base origin/$intoBranch $currentBranch)
         git commit -m "$message"
 
         # Confirm to push
