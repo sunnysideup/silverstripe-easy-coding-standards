@@ -143,6 +143,7 @@ check_for_env_var() {
 # USE LIKE THIS: matchingDirs=$(get_my_repos "$WORKING_DIR")
 
 get_my_repos() {
+    check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
     WORKING_DIR=$1
     # Paths to vendor directory and composer.lock
     vendorDir="$WORKING_DIR/vendor"
@@ -164,6 +165,41 @@ get_my_repos() {
         fi
     done <<<"$packages"
     echo "${packageDirs[@]}"
+}
+
+check_commit_message() {
+    message=$1
+
+    if [[ -z "$message" ]]; then
+        read -p "Commit message: " message
+    fi
+
+    if [[ -z "$message" ]]; then
+        message=$(git log -1 --pretty=%B)
+    fi
+
+    if [[ -z "$message" ]]; then
+        echobad "Please provide a commit message."
+        echonice "Allowed prefixes are: ${PREFIXES[*]}"
+        exit 1
+    fi
+
+    # List of allowed prefixes
+    PREFIXES=("API" "NEW" "ENH" "FIX" "DOC" "DEP" "TLN" "MNT" "Merge")
+
+    # Read the first line of the commit message
+    read -r firstLine <"$message"
+
+    # Check if the commit message starts with an allowed prefix
+    for prefix in "${PREFIXES[@]}"; do
+        if [[ "$firstLine" == "$prefix"* ]]; then
+            exit $message
+        fi
+    done
+
+    echobad "Commit message does not start with an allowed prefix."
+    echonice "Allowed prefixes are: ${PREFIXES[*]}"
+    exit 1
 }
 
 # get .env variables

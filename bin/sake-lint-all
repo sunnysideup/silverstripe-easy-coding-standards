@@ -14,7 +14,7 @@ also='app/_config.php'
 alsoDoThemes='no'
 commitAndPush='yes'
 newVersion='no'
-message='PATCH: linter'
+message='MNT: linter'
 javascriptAlso='no'
 phpVersion='8.0'
 help='no'
@@ -70,7 +70,7 @@ if [[ "$justDoIt" == "yes" ]]; then
     alsoDoThemes='yes'
     commitAndPush='yes'
     newVersion='patch'
-    message='PATCH: linter all'
+    message='MNT: linter all'
 fi
 
 help_and_exit() {
@@ -111,6 +111,8 @@ help_and_exit() {
 if [[ "$help" == "yes" ]]; then
     help_and_exit
 fi
+
+message = check_commit_message $message
 
 ############################################ CODE
 

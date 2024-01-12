@@ -55,12 +55,7 @@ while (($#)); do
     shift
 done
 
-if [[ "$message" == "" ]]; then
-    read -p "Commit message: " message
-fi
-if [[ "$message" == "" ]]; then
-    message="WIP"
-fi
+message = check_commit_message $message
 
 help_and_exit() {
     ECHOHEAD "Git commit and push"

@@ -49,12 +49,7 @@ while (($#)); do
 done
 
 # prompt user for message
-if [[ -z "$message" ]]; then
-    read -p "Commit message: " message
-fi
-
-# default message if still empty
-message=${message:-"WIP"}
+message = check_commit_message $message
 
 help_and_exit() {
     ECHOHEAD "Checking Vendor Packages for Changes"
@@ -89,7 +84,6 @@ help_and_exit() {
 ############################################ CODE
 [[ ! -d "$WORKING_DIR" ]] && echobad "Could not change directory to $WORKING_DIR" && help_and_exit
 
-check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
 installpackage "jq"
 
 ECHOHEAD "Removing vendor folders that do not need to be there ..."

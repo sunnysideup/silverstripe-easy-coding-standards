@@ -55,12 +55,7 @@ while (($#)); do
     shift
 done
 
-if [[ "$message" == "" ]]; then
-    read -p "Commit message: " message
-fi
-if [[ "$message" == "" ]]; then
-    message={git log -1 --pretty=%B}
-fi
+message = check_commit_message $message
 
 help_and_exit() {
     ECHOHEAD "Merge previous commits"
@@ -132,7 +127,7 @@ if [[ "$allCommits" == "yes" ]]; then
         git commit -m "$message"
         read -p "Do you want to force push the changes to the remote? (yes/no): " pushConfirmation
         if [ "$pushConfirmation" = "yes" ]; then
-            git push origin $currentBranch --force
+            git push origin $currentBranch --force-with-lease
 
             echonice "All commits in $currentBranch have been squashed into one. Temporary branch deleted."
 
@@ -178,24 +173,34 @@ fi
 ############################################ ALL
 if [[ "$allCommitsInBranch" == "yes" ]]; then
 
-    # Find the branch it was branched from (common ancestor)
-    baseBranch=$(git merge-base --fork-point origin/main "$currentBranch" 2>/dev/null || echo "origin/main")
+    # Fetch the latest changes from the remote
+    git fetch origin
 
-    # Confirm with the user
-    read -p "Do you want to squash all unique commits on '$currentBranch' ahead of $baseBranch into a single commit? (yes/no): " confirmation
+    # Merge origin/HEAD into the current branch
+    if ! git merge origin/HEAD; then
+        echo "Merge failed!"
+        exit 1
+    fi
+
+    # List commits that are ahead of origin/HEAD
+    echo "Commits ahead of 'origin/HEAD':"
+    git log --oneline origin/HEAD..$currentBranch
+
+    # Confirm with the user to squash commits
+    read -p "Would you like to squash these commits into a single commit? (yes/no): " confirmation
 
     if [ "$confirmation" = "yes" ]; then
         echonice "Squashing commits..."
-        git reset --soft "$baseBranch"
+        git reset --soft $(git merge-base origin/HEAD $currentBranch)
         git commit -m "$message"
 
         # Confirm to push
         read -p "Do you want to force push the changes to the remote? (yes/no): " pushConfirmation
         if [ "$pushConfirmation" = "yes" ]; then
-            git push origin "$currentBranch" --force
-            ECHOHEAD "Changes have been force pushed. Kia kaha!"
+            git push origin "$currentBranch" --force-with-lease
+            echonice "Changes have been force pushed."
         else
-            ECHOHEAD "Force push cancelled."
+            ECHOHEAD "Operation cancelled."
             echoend
             exit 0
         fi
@@ -206,7 +211,7 @@ if [[ "$allCommitsInBranch" == "yes" ]]; then
     fi
 
     echoend
-    exit
+    exit 0
 fi
 
 ############################################ CODE

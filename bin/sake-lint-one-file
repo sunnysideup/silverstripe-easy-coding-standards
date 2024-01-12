@@ -10,7 +10,7 @@ dir='app/src'
 
 ############################################ SETTINGS
 commitAndPush='no'
-message='PATCH: linter'
+message='MNT: linter'
 phpVersion='8.0'
 help='no'
 while (($#)); do
@@ -64,6 +64,8 @@ help_and_exit() {
     echofunctions
     exit
 }
+
+message = check_commit_message $message
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then

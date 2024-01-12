@@ -1,0 +1,84 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+if [ "$1" != "" ]; then
+    dir=$1
+else
+    dir='.'
+fi
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Checking Vendor Packages for Changes"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-tag ."
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
+fi
+
+# Get necessary information from the user
+read -p "Enter the target version (e.g., 5.1): " targetVersion
+
+# Rebase your branch onto the target branch
+git fetch origin
+git rebase origin/$targetVersion
+
+# Handle potential rebase conflicts
+echo "If there are any conflicts during rebase, resolve them and continue the rebase process."
+echo "Once the rebase is complete, you can push your branch."
+
+currentBranch=$(git branch --show-current)
+# Push the branch to your fork
+git push pr "$currentBranch" --force-with-lease
+
+# Create the pull request on GitHub (user needs to do this manually)
+ECHOHEAD "Create a pull request on GitHub, linking it to the relevant issue and following the guidelines."
+
+# Guide the user on receiving and responding to feedback
+echonice "Monitor automated feedback from GitHub Actions and respond to peer reviews in a timely manner."
+echonice "Resolve merge conflicts using rebase and --force-with-lease if necessary."
