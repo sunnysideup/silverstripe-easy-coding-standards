@@ -61,6 +61,12 @@ while (($#)); do
 done
 
 message=$(check_commit_message "$message")
+retVal=$?
+
+if [[ $retVal -ne 0 ]]; then
+    echobad "Invalid commit message. Exiting script."
+    exit 1
+fi
 
 help_and_exit() {
     ECHOHEAD "Merge previous commits"

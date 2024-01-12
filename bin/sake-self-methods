@@ -3,21 +3,21 @@
 envFileLocation="$HOME/.config/composer/.env"
 
 echoplain() {
-    echo -e " $1"
+    echo -e " $1" >&2
 }
 
 echonice() {
-    echo -e " \033[0;33m$1 \033[0m"
+    echo -e " \033[0;33m$1 \033[0m" >&2
 }
 
 echogood() {
-    echo -e " \033[0;32m$1 \033[0m"
+    echo -e " \033[0;32m$1 \033[0m" >&2
 }
 
 echobad() {
-    echo -e "\033[1;32;44m ---------------------------------------- \033[0m"
-    echo -e " \033[1;32;44m ERROR: $1 \033[0m"
-    echo -e "\033[1;32;44m ---------------------------------------- \033[0m"
+    echo -e "\033[1;32;44m ---------------------------------------- \033[0m" >&2
+    echo -e " \033[1;32;44m ERROR: $1 \033[0m" >&2
+    echo -e "\033[1;32;44m ---------------------------------------- \033[0m" >&2
 }
 
 echoline() {
@@ -30,16 +30,16 @@ ECHOHEAD() {
     if [[ $string != \#* ]]; then
         string="# $string"
     fi
-    echo ""
-    echo ""
-    echo ""
+    echo "" >&2
+    echo "" >&2
+    echo "" >&2
     echoline
-    echo -e "\033[95m $string\033[0m"
+    echo -e "\033[95m $string\033[0m" >&2
     echoline
 }
 
 echoend() {
-    echo ""
+    echo "" >&2
     echoline
     echogood "COMPLETED"
     echoline
@@ -61,7 +61,7 @@ echolistoffunctions() {
         echonice " -  $entry"
     done
     echonice "To show the options for a specific command, run:"
-    echo "[command] -h"
+    echo "[command] -h" >&2
     echonice "e.g. sake-lint-all -h"
 }
 
@@ -164,11 +164,11 @@ get_my_repos() {
             fi
         fi
     done <<<"$packages"
-    echo "${packageDirs[@]}"
+    echonice "${packageDirs[@]}"
 }
 
 check_commit_message() {
-    message=$1
+    local message=$1
 
     if [[ -z "$message" ]]; then
         read -p "Commit message: " message
@@ -181,7 +181,7 @@ check_commit_message() {
     if [[ -z "$message" ]]; then
         echobad "Please provide a commit message."
         echonice "Allowed prefixes are: ${PREFIXES[*]}"
-        exit 1
+        return 1
     fi
 
     # List of allowed prefixes
@@ -193,15 +193,14 @@ check_commit_message() {
     # Check if the commit message starts with an allowed prefix
     for prefix in "${PREFIXES[@]}"; do
         if [[ "$firstLine" == "$prefix"* ]]; then
-            ECHOHEAD "Commit Message:"
-            echonice "$message"
+            echo "$message"
             return 0
         fi
     done
 
     echobad "Commit message does not start with an allowed prefix."
     echonice "Allowed prefixes are: ${PREFIXES[*]}"
-    exit 1
+    return 1
 }
 
 # get .env variables

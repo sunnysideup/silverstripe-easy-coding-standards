@@ -66,6 +66,12 @@ help_and_exit() {
 }
 
 message=$(check_commit_message "$message")
+retVal=$?
+
+if [[ $retVal -ne 0 ]]; then
+    echobad "Invalid commit message. Exiting script."
+    exit 1
+fi
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then

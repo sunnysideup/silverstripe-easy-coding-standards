@@ -57,6 +57,13 @@ done
 
 message=$(check_commit_message "$message")
 
+retVal=$?
+
+if [[ $retVal -ne 0 ]]; then
+    echobad "Invalid commit message. Exiting script."
+    exit 1
+fi
+
 help_and_exit() {
     ECHOHEAD "Git commit and push"
     echonice "directory of script:           $SCRIPT_DIR"
