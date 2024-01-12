@@ -93,7 +93,7 @@ help_and_exit() {
     ECHOHEAD "Example usage:"
     echonice "sake-git-squash-commits ./ -t 'yes' -m 'ENH: my new features of the day'"
     echonice "sake-git-squash-commits ./ -z 'yes' -m 'MERGE ALL COMMITS'"
-    echonice "sake-git-squash-commits ./ -b 'yes' -i 5.0 -m 'MINOR: my new feature description'"
+    echonice "sake-git-squash-commits ./ -b 'yes' -i 5.0 -m 'ENH: my new feature description'"
 
     echofunctions
     exit

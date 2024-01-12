@@ -101,11 +101,11 @@ while read -r COMMIT; do
 
     echonice "CHECKING COMMIT: $COMMIT"
 
-    if [[ $COMMIT == MAJOR* ]]; then
+    if [[ $COMMIT == API* ]] || [[ $COMMIT == MAJOR* ]]; then
         MAJOR=1
-    elif [[ $COMMIT == MINOR* ]]; then
+    elif [[ $COMMIT == ENH* ]] || [[ $COMMIT == NEW* ]]; then
         MINOR=1
-    elif [[ $COMMIT == PATCH* ]]; then
+    elif [[ $COMMIT == FIX* ]] || [[ $COMMIT == PATCH* ]]; then
         PATCH=1
     fi
 done <<<"$COMMIT_MESSAGES"
