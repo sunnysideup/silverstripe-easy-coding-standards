@@ -96,8 +96,13 @@ cd "$dir" || {
 if gh repo list "$githubUsername" --limit 1000 --json fork --jq '.[] | select(.fork == true) | .name' | grep -q "$moduleName"; then
     echonice "Fork found - Proceeding with the script..."
 else
-    echobad "Please fork the repository on GitHub before continuing."
-    exit 1
+    # Use GitHub CLI to fork the repository
+    if gh repo fork "$repoUrl" --clone=false; then
+        echonice "Successfully forked '$repoUrl'."
+    else
+        echobad "Failed to fork '$repoUrl'."
+        exit 1
+    fi
 fi
 
 # Check if the user has forked the module
