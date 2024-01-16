@@ -32,7 +32,7 @@ while (($#)); do
 done
 
 if [[ -z "$message" ]]; then
-    message="merge dev and production"
+    message="Merge: merge the development branch and the production branch"
 fi
 
 message=$(check_commit_message "$message")
