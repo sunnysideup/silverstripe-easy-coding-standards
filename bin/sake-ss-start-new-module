@@ -172,7 +172,7 @@ jq --argjson arr "$json_array" '.keywords = $arr' composer.json >temp.json && mv
 
 # Add changes to git and push them
 git add .
-git commit -m "FIRST COMMIT: build from template - github.com/sunnysideup/silverstripe-module"
+git commit -m "MNT: first commit ... build from template - github.com/sunnysideup/silverstripe-module"
 git push origin main
 
 # Fetch the URL of the remote Git repository
