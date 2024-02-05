@@ -30,6 +30,9 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-tag
 
 
+# php
+ - sake-php-set-timezone
+
 # lint
  - sake-lint-all
  - sake-lint-compat

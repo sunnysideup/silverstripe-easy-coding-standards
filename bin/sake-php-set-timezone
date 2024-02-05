@@ -1,0 +1,85 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    -f | --find)
+        find=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Set PHP timezone"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+    echonice "Find string (-t|--timezone):       $find"
+
+    ECHOHEAD "Available settings:"
+    echonice "-t, --timezone               PHP timezone (e.g. Pacific/Auckland)"
+    echonice "-h, --help                   show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-find-in-files app/src -f 'piece of code'"
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+timeZone='Pacific/Auckland'
+help='no'
+while (($#)); do
+    case $1 in
+    -t | --timezone)
+        timeZone=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+# dev-build
+sudo find /etc/php/ -name php.ini -exec sh -c 'grep -q "date.timezone = '\"'$timeZone'\"'" "$1" || echo "date.timezone = '\''$timeZone'\''" >> "$1"' sh {} \;
+
+echoend
