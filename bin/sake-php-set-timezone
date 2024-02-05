@@ -81,6 +81,6 @@ fi
 
 # dev-build
 sudo find /etc/php/ -name php.ini -exec sh -c 'grep -q "date.timezone = '\"'$timeZone'\"'" "$1" || echo "date.timezone = '\''$timeZone'\''" >> "$1"' sh {} \;
-sudo find /etc/php/ -name php.ini -exec grep "date.timezone" {} \;
+sudo find /etc/php/ -name php.ini -exec sh -c 'ECHOHEAD "File: $1"; grep "date.timezone" $1' sh {} \;
 
 echoend
