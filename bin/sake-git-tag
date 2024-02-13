@@ -68,8 +68,8 @@ ECHOHEAD "Creating Tag (if required)"
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Check if we're in the correct branch
-if [[ "$CURRENT_BRANCH" != "production" && "$CURRENT_BRANCH" != "master" && "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "develop" ]]; then
-    echonice "Not on production, master, develop, or main branch."
+if [[ "$CURRENT_BRANCH" != "master" && "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "develop" ]]; then
+    echonice "Not on production, master, develop, production or main branch."
     echonice "You are on $CURRENT_BRANCH branch."
     echonice "No tag created."
     exit 1
@@ -103,9 +103,9 @@ while read -r COMMIT; do
 
     if [[ $COMMIT == API* ]] || [[ $COMMIT == MAJOR* ]]; then
         MAJOR=1
-    elif [[ $COMMIT == ENH* ]] || [[ $COMMIT == NEW* ]]; then
+    elif [[ $COMMIT == ENH* ]] || [[ $COMMIT == NEW* ]] || [[ $COMMIT == DEP* ]]; then
         MINOR=1
-    elif [[ $COMMIT == FIX* ]] || [[ $COMMIT == PATCH* ]]; then
+    elif [[ $COMMIT == FIX* ]] || [[ $COMMIT == PATCH* ]] || [[ $COMMIT == MNT* ]]; then
         PATCH=1
     fi
 done <<<"$COMMIT_MESSAGES"
