@@ -25,6 +25,13 @@ return ECSConfig::configure()
             DeclareStrictTypesFixer::class,
         ]
     )
+    ->withPreparedSets(
+        arrays: true,
+        namespaces: true,
+        spaces: true,
+        docblocks: true,
+        comments: true,
+    )
 ;
 // return static function (ECSConfig $containerConfigurator): void {
 //     $services = $containerConfigurator->services();
