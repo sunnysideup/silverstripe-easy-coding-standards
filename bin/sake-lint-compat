@@ -11,7 +11,7 @@ source $SCRIPT_DIR/sake-self-methods
 dir='app/src'
 
 ############################################ SETTINGS
-phpVersion="8.0"
+phpVersion="8.2"
 help='no'
 severity="1,2"
 while (($#)); do

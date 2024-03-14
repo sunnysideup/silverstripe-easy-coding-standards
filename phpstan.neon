@@ -1,4 +1,7 @@
 parameters:
+
+    phpVersion: 80200  # for PHP 8.2
+
     excludePaths:
         - /tests/*
         - '*/tests/*'
