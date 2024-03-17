@@ -140,12 +140,18 @@ if [ -z "$(git status --porcelain)" ]; then
     $SCRIPT_DIR/sake-lint-compat -p $phpVersion $dir
     cd $WORKING_DIR
 
+    echonice "# run linter ide annotator #1"
+    $SCRIPT_DIR/sake-lint-ide-annotator -a $also $dir
+
     echonice "# run linter ecs #1"
     $SCRIPT_DIR/sake-lint-ecs -a $also $dir
 
     echonice "# run rector #1"
     $SCRIPT_DIR/sake-lint-rector -a $also $dir
     cd $WORKING_DIR
+
+    echonice "# run linter ide annotator #2"
+    $SCRIPT_DIR/sake-lint-ide-annotator -a $also $dir
 
     echonice "# run ecs #2"
     $SCRIPT_DIR/sake-lint-ecs -a $also $dir

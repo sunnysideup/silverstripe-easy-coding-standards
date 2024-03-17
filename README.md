@@ -37,6 +37,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-lint-all
  - sake-lint-compat
  - sake-lint-ecs
+ - sake-lint-ide-annotator
  - sake-lint-js
  - sake-lint-one-file
  - sake-lint-rector

@@ -1,0 +1,81 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+# : ${ide-annotatorConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-ide-annotatordards/phpide-annotator.neon}
+if [ "$1" != "" ]; then
+    dir=$1
+else
+    dir='app'
+fi
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "PHP IDE-ANNOTATOR"
+    echonice "Directory of script:          $SCRIPT_DIR"
+    echonice "Directory to analyse:         $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                    show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-lint-ide-annotator  app "
+    echonice "sake-lint-ide-annotator  sunnysideup/module "
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
+fi
+
+composer install --dev silverleague/ideannotator:3.x-dev
+cat >app/_config/ide-annotator-$dir.yml <<EOL
+---
+Only:
+    environment: 'dev'
+---
+SilverLeague\IDEAnnotator\DataObjectAnnotator:
+    enabled_modules:
+      - $dir
+EOL
+
+echogood "IDE Annotator file created in app/_config/ide-annotator-$dir.yml"
+echogood "You can now run sake dev/build to annotate your code"
+vendor/bin/sake dev/tasks/SilverLeague-IDEAnnotator-Tasks-DataObjectAnnotatorTask module=$dir
+
+echoend
