@@ -43,7 +43,6 @@ help_and_exit() {
 
     ECHOHEAD "Example usage:"
     echonice "sake-lint-ide-annotator  app "
-    echonice "sake-lint-ide-annotator  sunnysideup/module "
 
     echofunctions
     exit
@@ -63,8 +62,15 @@ else
     help_and_exit
 fi
 
-composer install --dev silverleague/ideannotator:3.x-dev
-cat >app/_config/ide-annotator-$dir.yml <<EOL
+if [ -d "./$dir" ]; then
+    echonice "Directory exists: $dir"
+else
+    echobad "Folder $app does not exist."
+    help_and_exit
+fi
+
+composer require --dev silverleague/ideannotator:3.x-dev
+cat >$dir/_config/ide-annotator.yml <<EOL
 ---
 Only:
     environment: 'dev'
@@ -74,7 +80,7 @@ SilverLeague\IDEAnnotator\DataObjectAnnotator:
       - $dir
 EOL
 
-echogood "IDE Annotator file created in app/_config/ide-annotator-$dir.yml"
+echogood "IDE Annotator file created in $dir/_config/ide-annotator.yml"
 echogood "You can now run sake dev/build to annotate your code"
 vendor/bin/sake dev/tasks/SilverLeague-IDEAnnotator-Tasks-DataObjectAnnotatorTask module=$dir
 
