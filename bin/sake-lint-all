@@ -136,6 +136,8 @@ if [ -z "$(git status --porcelain)" ]; then
     $SCRIPT_DIR/sake-lint-remove-origs -a $also $dir
     cd $WORKING_DIR
 
+    sake-git-commit-and-push . -m "$message"
+
     echonice "# run php check"
     $SCRIPT_DIR/sake-lint-compat -p $phpVersion $dir
     cd $WORKING_DIR
@@ -149,6 +151,8 @@ if [ -z "$(git status --porcelain)" ]; then
     echonice "# run rector #1"
     $SCRIPT_DIR/sake-lint-rector -a $also $dir
     cd $WORKING_DIR
+
+    sake-git-commit-and-push . -m "$message"
 
     echonice "# run linter ide annotator #2"
     $SCRIPT_DIR/sake-lint-ide-annotator -a $also $dir
