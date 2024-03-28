@@ -105,7 +105,7 @@ while read -r COMMIT; do
         MAJOR=1
     elif [[ $COMMIT == ENH* ]] || [[ $COMMIT == NEW* ]] || [[ $COMMIT == DEP* ]]; then
         MINOR=1
-    elif [[ $COMMIT == FIX* ]] || [[ $COMMIT == PATCH* ]] || [[ $COMMIT == MNT* ]]; then
+    elif [[ $COMMIT == FIX* ]] || [[ $COMMIT == PATCH* ]]; then
         PATCH=1
     fi
 done <<<"$COMMIT_MESSAGES"
