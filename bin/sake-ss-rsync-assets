@@ -78,6 +78,8 @@ else
     help_and_exit
 fi
 
+mkdir -p ./public/assets
+
 if [ ! -z "$server" ]; then
     if [ -d "$WORKING_DIR/public/assets/" ]; then
         sudo chown $USER public/assets -R
