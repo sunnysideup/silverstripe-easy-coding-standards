@@ -114,6 +114,7 @@ check_gh_auth
 check_for_env_var "SCRUTINIZER_API_TOKEN"
 check_for_env_var "PACKAGIST_USERNAME"
 check_for_env_var "PACKAGIST_API_TOKEN"
+echonice "package name:                    $package"
 echonice "package short name:              $packageShortName"
 echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
 echonice "package with silverstripe:       $packageWithSilverstripe"
