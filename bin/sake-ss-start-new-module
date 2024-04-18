@@ -51,7 +51,7 @@ while (($#)); do
 done
 
 [ -z "$package" ] && read -p "Enter package (e.g. sunnysideup/abc): " package || package=$package
-[ -z "$namespace" ] && read -p -r "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
+[ -z "$namespace" ] && read -r -p "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
 [ -z "$fullName" ] && read -p "Enter full name (e.g. My Abc Module): " fullName || fullName=$fullName
 [ -z "$description" ] && read -p "Enter description (e.g. Does the ABC): " description || description=$description
 [ -z "$keywords" ] && read -p "Enter keywords, separated by a commna (e.g. foo, bar): " keywords || keywords=$keywords
