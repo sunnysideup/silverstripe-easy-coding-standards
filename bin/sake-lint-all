@@ -94,7 +94,7 @@ help_and_exit() {
     echonice "-a, --also                     also lint, e.g. app/_config.php or app/, default: app/_config.php"
     echonice "-c, --commit-and-push          also commit and push, default: yes"
     echonice "-v, --new-version              create tag (no|patch|minor|major), default: no"
-    echonice "-m, --message                  commit message, default: PATCH: linter"
+    echonice "-m, --message                  commit message, default: MNT: linter"
     echonice "-t, --themes-also              include folders in themes, default: no"
     echonice "-j, --javascript-also          include javascript linting, default: no"
     echonice "-p, --php-version              php version, default: 8.0"

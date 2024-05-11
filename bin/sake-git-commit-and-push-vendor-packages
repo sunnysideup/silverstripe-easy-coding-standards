@@ -78,7 +78,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-commit-and-push-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch -f no   vendor/my-vendor-name"
+    echonice "sake-git-commit-and-push-vendor-packages  -m 'MNT: lint'   -c yes  -v patch -f no   vendor/my-vendor-name"
 
     echofunctions
     exit

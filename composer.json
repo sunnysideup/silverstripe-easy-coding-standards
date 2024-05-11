@@ -43,6 +43,7 @@
     "bin/sake-git-info",
     "bin/sake-git-merge-develop-and-production",
     "bin/sake-git-remove-stale-branches",
+    "bin/sake-git-squash-and-pr",
     "bin/sake-git-squash-commits",
     "bin/sake-git-tag",
     "bin/sake-help",

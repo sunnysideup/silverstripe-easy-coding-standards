@@ -54,7 +54,7 @@ help_and_exit() {
 
     ECHOHEAD "Available settings:"
     echonice "-c, --commit-and-push          also commit and push, default: no"
-    echonice "-m, --message                  commit message, defualt: PATCH: linter"
+    echonice "-m, --message                  commit message, defualt: MNT: linter"
     echonice "-p, --php-version              php version, default 8.0"
     echonice "-h, --help                     show help information"
 

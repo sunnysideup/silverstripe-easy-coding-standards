@@ -175,10 +175,6 @@ check_commit_message() {
     fi
 
     if [[ -z "$message" ]]; then
-        message=$(git log -1 --pretty=%B)
-    fi
-
-    if [[ -z "$message" ]]; then
         echobad "Please provide a commit message."
         echonice "Allowed prefixes are: ${PREFIXES[*]}"
         return 1

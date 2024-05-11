@@ -1,0 +1,128 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+message=""
+help='no'
+into='develop'
+while (($#)); do
+    case $1 in
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -i | --into)
+        into=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+message=$(check_commit_message "$message")
+
+retVal=$?
+
+if [[ $retVal -ne 0 ]]; then
+    echobad "Invalid commit message. Exiting script."
+    exit 1
+fi
+
+help_and_exit() {
+    ECHOHEAD "Squash commits of current branch and make a pull request to develop"
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to commit:           $dir (relative to $WORKING_DIR)"
+
+    ECHOHEAD "Current settings:"
+    echonice "Message (-m):                  $message"
+    echonice "Merge into (-i):               $into"
+
+    ECHOHEAD "Available settings:"
+    echonice "-m, --message                  commit message, defaults to last message used"
+    echonice "-i, --into                     branch to merge into (default: develop)"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-git-squash-and-pr -m 'FIX: something' -i develop "
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+GIT_DIR=$(git rev-parse --show-toplevel)
+
+if test -f "$GIT_DIR/.git/config"; then
+
+    if [[ "$newVersion" == "yes" ]]; then
+        $SCRIPT_DIR/sake-git-tag $WORKING_DIR
+    fi
+
+    protected_branch="production"
+
+    # Get the current branch name
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    # Ensure we are not on develop or production
+    if [ "$current_branch" == "$into" ] || [ "$current_branch" == "$protected_branch" ]; then
+        echo "You are on $current_branch, which is not allowed for this operation."
+        exit 1
+    fi
+
+    # Fetch the latest changes from the repository
+    git fetch origin
+
+    # Reset the current branch's history to the latest on develop
+    echo "Squashing commits..."
+    git reset --soft $(git merge-base origin/$into $current_branch)
+    git commit -m "$message ($current_branch branch squashed)"
+
+    # Check if commit was successful
+    if [ $? -ne 0 ]; then
+        echo "Commit failed. Please check your changes and try again."
+        exit 1
+    fi
+
+    # Push changes to remote repository
+    git push origin $current_branch --force
+
+    # Create a merge request
+    # Replace this with the command or API call for your specific Git platform if necessary
+    echo "Creating a merge request..."
+    git request-pull $current_branch origin $into
+
+    echo "Merge request created successfully."
+else
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO so I can not commit the changes."
+fi
+
+echoend
