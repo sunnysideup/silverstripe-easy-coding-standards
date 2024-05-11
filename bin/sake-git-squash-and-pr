@@ -117,8 +117,10 @@ if test -f "$GIT_DIR/.git/config"; then
 
     # Create a merge request
     # Replace this with the command or API call for your specific Git platform if necessary
-    echo "Creating a merge request..."
-    git request-pull $current_branch origin $into
+    # Create a pull request using GitHub CLI
+    echo "Creating a pull request..."
+    installpackage "gh"
+    gh pr create --base $into --head $current_branch --title "MERGE: $message" --body "$message"
 
     echo "Merge request created successfully."
 else
