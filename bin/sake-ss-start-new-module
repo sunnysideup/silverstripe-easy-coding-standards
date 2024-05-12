@@ -141,21 +141,21 @@ rsync -av --exclude='.git' "${tmpDir}/" ./
 rm -rf "$tmpDir" # Remove the temporary directory
 
 # Replace instances of the template strings with the provided variables
-find . -type f -exec sed -i "s|sunnysideup/silverstripe-skeleton|$packageWithSilverstripe|g" {} +
-find . -type f -exec sed -i "s|sunnysideup/skeleton|$package|g" {} +
-find . -type f -exec sed -i "s|Sunnysideup\\\\\\\\Skeleton|$double_escaped_namespace|g" {} +
-find . -type f -exec sed -i "s|Sunnysideup\\\\Skeleton|$escaped_namespace|g" {} +
-find . -type f -exec sed -i "s|skeleton-fullname|$fullName|g" {} +
-find . -type f -exec sed -i "s|skeleton-description|$description|g" {} +
-find . -type f -exec sed -i "s|silverstripe-skeleton|$packageShortNameWithSilverstripe|g" {} +
-find . -type f -exec sed -i "s|skeleton|$packageShortName|g" {} +
+find . -type f -exec sed -i "s|sunnysideup/silverstripe-foobar|$packageWithSilverstripe|g" {} +
+find . -type f -exec sed -i "s|sunnysideup/foobar|$package|g" {} +
+find . -type f -exec sed -i "s|Sunnysideup\\\\\\\\FooBar|$double_escaped_namespace|g" {} +
+find . -type f -exec sed -i "s|Sunnysideup\\\\FooBar|$escaped_namespace|g" {} +
+find . -type f -exec sed -i "s|foobar-fullname|$fullName|g" {} +
+find . -type f -exec sed -i "s|foobar-description|$description|g" {} +
+find . -type f -exec sed -i "s|silverstripe-foobar|$packageShortNameWithSilverstripe|g" {} +
+find . -type f -exec sed -i "s|foobar|$packageShortName|g" {} +
 
 # Move the configuration file
-mv _config/skeleton.yml.example _config/$packageShortName.yml.example
+mv _config/foobar.yml.example _config/$packageShortName.yml.example
 
 # Move the sake scripts
-mv bin/sake-npm-watch-skeleton.sh bin/sake-npm-watch-$packageShortName.sh
-mv bin/sake-npm-build-skeleton.sh bin/sake-npm-build-$packageShortName.sh
+mv bin/sake-npm-watch-foobar.sh bin/sake-npm-watch-$packageShortName.sh
+mv bin/sake-npm-build-foobar.sh bin/sake-npm-build-$packageShortName.sh
 
 # Sample keywords string
 
