@@ -50,26 +50,26 @@ while (($#)); do
     shift
 done
 
-[ -z "$package" ] && read -p "Enter package (e.g. sunnysideup/abc): " package || package=$package
+[ -z "$packageName" ] && read -p "Enter package name (e.g. sunnysideup/abc): " package || packageName=$packageName
 [ -z "$namespace" ] && read -r -p "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
 [ -z "$fullName" ] && read -p "Enter full name (e.g. My Abc Module): " fullName || fullName=$fullName
 [ -z "$description" ] && read -p "Enter description (e.g. Does the ABC): " description || description=$description
 [ -z "$keywords" ] && read -p "Enter keywords, separated by a commna (e.g. foo, bar): " keywords || keywords=$keywords
 
-package=$(echo $package | tr -d '|')
+packageName=$(echo $packageName | tr -d '|')
 namespace=$(echo $namespace | tr -d '|')
 fullName=$(echo $fullName | tr -d '|')
 description=$(echo $description | tr -d '|')
 keywords=$(echo $keywords | tr -d '|')
 
 # Remove the vendor part and store it as packageShortName
-packageShortName=$(echo $package | sed 's/.*\///')
+packageShortName=$(echo $packageName | sed 's/.*\///')
 
 # add silverstripe- to the packageShortName
 packageShortNameWithSilverstripe="silverstripe-$packageShortName"
 
 # Add "silverstripe-" after the "/" and store it as packageWithSilverstripe
-packageWithSilverstripe=$(echo $package | sed 's/\//\/silverstripe-/')
+packageWithSilverstripe=$(echo $packageName | sed 's/\//\/silverstripe-/')
 escaped_namespace=$(echo "$namespace" | sed 's/\\/\\\\/g')
 double_escaped_namespace=$(echo "$escaped_namespace" | sed 's/\\/\\\\/g')
 
@@ -79,7 +79,7 @@ help_and_exit() {
     echonice "Directory to analyse:            $WORKING_DIR/$dir"
 
     echoline "Current settings:"
-    echonice "--package (-p):                  $package"
+    echonice "--package (-p):                  $packageName"
     echonice "--namespace (-n):                $namespace"
     echonice "--fullName (-f):                 $fullName"
     echonice "--description (-d):              $description"
@@ -114,7 +114,7 @@ check_gh_auth
 check_for_env_var "SCRUTINIZER_API_TOKEN"
 check_for_env_var "PACKAGIST_USERNAME"
 check_for_env_var "PACKAGIST_API_TOKEN"
-echonice "package name:                    $package"
+echonice "package name:                    $packageName"
 echonice "package short name:              $packageShortName"
 echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
 echonice "package with silverstripe:       $packageWithSilverstripe"
@@ -142,7 +142,7 @@ rm -rf "$tmpDir" # Remove the temporary directory
 
 # Replace instances of the template strings with the provided variables
 find . -type f -exec sed -i "s|sunnysideup/silverstripe-foobar|$packageWithSilverstripe|g" {} +
-find . -type f -exec sed -i "s|sunnysideup/foobar|$package|g" {} +
+find . -type f -exec sed -i "s|sunnysideup/foobar|$packageName|g" {} +
 find . -type f -exec sed -i "s|Sunnysideup\\\\\\\\FooBar|$double_escaped_namespace|g" {} +
 find . -type f -exec sed -i "s|Sunnysideup\\\\FooBar|$escaped_namespace|g" {} +
 find . -type f -exec sed -i "s|foobar-fullname|$fullName|g" {} +
