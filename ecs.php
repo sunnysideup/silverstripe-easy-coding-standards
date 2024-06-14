@@ -6,6 +6,7 @@ use PhpCsFixer\Fixer\Strict\DeclareStrictTypesFixer;
 use PhpCsFixer\Fixer\StringNotation\SingleQuoteFixer;
 use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayListItemNewlineFixer;
 use Symplify\CodingStandard\Fixer\ArrayNotation\ArrayOpenerAndCloserNewlineFixer;
+use Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer;
 use Symplify\EasyCodingStandard\Config\ECSConfig;
 
 return ECSConfig::configure()
@@ -17,6 +18,7 @@ return ECSConfig::configure()
             ArrayListItemNewlineFixer::class,
             OrderedClassElementsFixer::class,
             DeclareStrictTypesFixer::class,
+            RemoveUselessDefaultCommentFixer::class,
         ]
     )
     ->withPreparedSets(
