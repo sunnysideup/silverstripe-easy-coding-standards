@@ -143,10 +143,10 @@ if [ -z "$(git status --porcelain)" ]; then
     cd $WORKING_DIR
 
     echonice "# run linter ide annotator #1"
-    $SCRIPT_DIR/sake-lint-ide-annotator -a -m $message $also $dir
+    $SCRIPT_DIR/sake-lint-ide-annotator -a $also $dir
 
     echonice "# run linter ecs #1"
-    $SCRIPT_DIR/sake-lint-ecs -a $also -m $message $dir
+    $SCRIPT_DIR/sake-lint-ecs -a $also $dir
 
     echonice "# run rector #1"
     $SCRIPT_DIR/sake-lint-rector -a $also $dir
