@@ -175,13 +175,13 @@ if [ -z "$(git status --porcelain)" ]; then
 
     if test -f "$also"; then
         ECHOHEAD "# run the above on $also"
-        $SCRIPT_DIR/sake-lint-all -m "" -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
+        $SCRIPT_DIR/sake-lint-all -m $message -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
         cd $WORKING_DIR
     fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
         ECHOHEAD "# run the above on themes"
-        $SCRIPT_DIR/sake-lint-all -m "" -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso themes
+        $SCRIPT_DIR/sake-lint-all -m $message -a 'nothing-here-hopefully' -c no -t no -j $javascriptAlso themes
         cd $WORKING_DIR
     fi
 
