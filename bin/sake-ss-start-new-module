@@ -9,7 +9,7 @@ source $SCRIPT_DIR/sake-self-methods
 dir='./'
 
 ############################################ SETTINGS
-package=''
+packageName=''
 namespace=''
 fullName=''
 description=''
@@ -18,7 +18,7 @@ help='no'
 while (($#)); do
     case $1 in
     -p | --package)
-        package=$2
+        packageName=$2
         shift
         ;;
     -n | --namespace)
@@ -50,7 +50,7 @@ while (($#)); do
     shift
 done
 
-[ -z "$packageName" ] && read -p "Enter package name (e.g. sunnysideup/abc): " package || packageName=$packageName
+[ -z "$packageName" ] && read -p "Enter package name (e.g. sunnysideup/abc): " packageName || packageName=$packageName
 [ -z "$namespace" ] && read -r -p "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
 [ -z "$fullName" ] && read -p "Enter full name (e.g. My Abc Module): " fullName || fullName=$fullName
 [ -z "$description" ] && read -p "Enter description (e.g. Does the ABC): " description || description=$description
@@ -118,7 +118,7 @@ echonice "package name:                    $packageName"
 echonice "package short name:              $packageShortName"
 echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
 echonice "package with silverstripe:       $packageWithSilverstripe"
-
+help_and_exit
 # Create a new repository on GitHub
 gh repo create $packageShortNameWithSilverstripe --public
 
