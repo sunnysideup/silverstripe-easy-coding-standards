@@ -95,7 +95,7 @@ show_vars() {
     echonice "package with silverstripe:       $packageWithSilverstripe"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module'"
+    echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module' -k 'foo, bar'"
 
 }
 
