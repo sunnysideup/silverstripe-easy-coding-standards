@@ -74,6 +74,12 @@ escaped_namespace=$(echo "$namespace" | sed 's/\\/\\\\/g')
 double_escaped_namespace=$(echo "$escaped_namespace" | sed 's/\\/\\\\/g')
 
 help_and_exit() {
+    show_vars
+    echofunctions
+    exit
+}
+
+show_vars() {
     ECHOHEAD "Make a new module"
     echonice "Directory of script:             $SCRIPT_DIR"
     echonice "Directory to analyse:            $WORKING_DIR/$dir"
@@ -83,6 +89,7 @@ help_and_exit() {
     echonice "--namespace (-n):                $namespace"
     echonice "--fullName (-f):                 $fullName"
     echonice "--description (-d):              $description"
+    echonice "--keywords (-k):                 $keywords"
     echonice "package short name:              $packageShortName"
     echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
     echonice "package with silverstripe:       $packageWithSilverstripe"
@@ -90,8 +97,6 @@ help_and_exit() {
     ECHOHEAD "Example usage:"
     echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module'"
 
-    echofunctions
-    exit
 }
 
 ############################################ HELP ONLY
@@ -114,11 +119,15 @@ check_gh_auth
 check_for_env_var "SCRUTINIZER_API_TOKEN"
 check_for_env_var "PACKAGIST_USERNAME"
 check_for_env_var "PACKAGIST_API_TOKEN"
-echonice "package name:                    $packageName"
+echonice "--package (-p):                  $packageName"
+echonice "--namespace (-n):                $namespace"
+echonice "--fullName (-f):                 $fullName"
+echonice "--description (-d):              $description"
+echonice "--keywords (-k):                 $keywords"
 echonice "package short name:              $packageShortName"
 echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
 echonice "package with silverstripe:       $packageWithSilverstripe"
-help_and_exit
+show_vars
 # Create a new repository on GitHub
 gh repo create $packageShortNameWithSilverstripe --public
 
