@@ -68,8 +68,8 @@ ECHOHEAD "Creating Tag (if required)"
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Check if we're in the correct branch
-if [[ "$CURRENT_BRANCH" != "master" && "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "develop" ]]; then
-    echonice "Not on production, master, develop, production or main branch."
+if [[ "$CURRENT_BRANCH" != "master" && "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "production" ]]; then
+    echonice "Not on production, master, production or main branch."
     echonice "You are on $CURRENT_BRANCH branch."
     echonice "No tag created."
     exit 1
