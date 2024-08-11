@@ -6,7 +6,7 @@ Lints your silverstripe php code, checks for potential bugs, and also has a raft
 
 Install as global composer package and then try to access the commands, starting with `sake-` from the command line.
 
-# commands available:
+# commands available
 
 ```shell
 
@@ -54,6 +54,7 @@ Install as global composer package and then try to access the commands, starting
 # silverstripe
  - sake-ss-add-site
  - sake-ss-dev-build
+ - sake-ss-flush
  - sake-ss-rsync-asset
  - sake-ss-dump-database
  - sake-ss-start-new-module
@@ -108,7 +109,7 @@ sake-lint-ecs [dir]
 
 (this command, and all the other commands listed above).
 
-# How to use:
+# How to use
 
 Commands should be run from the root directory of your project.
 
