@@ -108,6 +108,7 @@ process_directory() {
     else
         if has_git_changes; then
             if [[ "$statusOnly" == "yes" ]]; then
+                echonice "Changes in $directory"
                 git status -s
             else
                 $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
@@ -148,7 +149,8 @@ done
 
 # ECHOHEAD "back to the start: $WORKING_DIR"
 # cd "$WORKING_DIR"
-
-[[ "$fullUpdate" == "yes" ]] && sake-composer-update && sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
+if [[ "$statusOnly" != "yes" ]]; then
+    [[ "$fullUpdate" == "yes" ]] && sake-composer-update && sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
+fi
 
 echoend

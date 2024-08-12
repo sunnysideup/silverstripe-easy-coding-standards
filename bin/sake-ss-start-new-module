@@ -160,11 +160,11 @@ find . -type f -exec sed -i "s|silverstripe-foobar|$packageShortNameWithSilverst
 find . -type f -exec sed -i "s|foobar|$packageShortName|g" {} +
 
 # Move the configuration file
-mv _config/skeleton.yml.example _config/$packageShortName.yml.example
+mv _config/foobar.yml.example _config/$packageShortName.yml.example
 
 # Move the sake scripts
-mv bin/sake-npm-watch-skeleton.sh bin/sake-npm-watch-$packageShortName.sh
-mv bin/sake-npm-build-skeleton.sh bin/sake-npm-build-$packageShortName.sh
+mv bin/sake-npm-watch-foobar.sh bin/sake-npm-watch-$packageShortName.sh
+mv bin/sake-npm-build-foobar.sh bin/sake-npm-build-$packageShortName.sh
 
 # Sample keywords string
 
