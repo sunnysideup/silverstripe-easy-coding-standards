@@ -144,27 +144,13 @@ if [[ "$allCommits" == "yes" ]]; then
 
             echonice "All commits in $currentBranch have been squashed into one. Temporary branch deleted."
 
+            # delete local tags
+            git tag -d $(git tag -l)
             # Fetch all the tags from the remote repository
             git fetch --tags
 
-            # Store a list of all tags
-            tags=$(git tag -l)
-
-            # Check if there are local tags and delete them
-            if [ -n "$tags" ]; then
-                echonice "$tags" | xargs git tag -d
-                echonice "Local tags deleted."
-            else
-                echonice "No local tags to delete."
-            fi
-
-            # Check if there are remote tags and delete them
-            if [ -n "$tags" ]; then
-                echonice "$tags" | xargs -n 1 git push --delete origin
-                echonice "Remote tags deleted."
-            else
-                echonice "No remote tags to delete."
-            fi
+            # delete all of them from the remote repository
+            git tag -l | xargs -I {} git push origin :refs/tags/{}
         else
             ECHOHEAD "Force push cancelled."
             echoend
