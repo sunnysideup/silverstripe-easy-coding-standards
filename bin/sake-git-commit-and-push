@@ -80,7 +80,7 @@ help_and_exit() {
     ECHOHEAD "Available settings:"
     echonice "-c, --commit-and-push          commit and push also? default: yes !!!"
     echonice "-m, --message                  commit message, defaults to last message used"
-    echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no"
+    echonice "-v, --new-version              create new tag (no|patch|minor|major), default: yes"
     echonice "-a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup"
     echonice "-s, --status-only              status only, default: no !!!"
     echonice "-t, --themes-also              include folders in themes, default: no"
@@ -126,8 +126,12 @@ if test -f "$GIT_DIR/.git/config"; then
     fi
 
     # pull all branches
-    git fetch --all
-    git pull --all
+    if [[ "$statusOnly" == "yes" ]]; then
+        git fetch --all
+    else
+        git pull --all
+        # git pull origin $(git rev-parse --abbrev-ref HEAD) --ipv4
+    fi
 
     echoline
 
@@ -150,9 +154,9 @@ if test -f "$GIT_DIR/.git/config"; then
         #git commit $WORKING_DIR/$logFile -m "$message"
     fi
 
-    ECHOHEAD "# pulling commits for the current branch from git repo"
-    git pull origin $(git rev-parse --abbrev-ref HEAD) --ipv4
-    git fetch --all --ipv4
+    # ECHOHEAD "# pulling commits for the current branch from git repo"
+    # git pull origin $(git rev-parse --abbrev-ref HEAD) --ipv4
+    # git fetch --all --ipv4
 
     if [[ "$commitAndPush" == "yes" ]]; then
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
