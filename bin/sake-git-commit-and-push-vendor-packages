@@ -30,10 +30,7 @@ while (($#)); do
         newVersion=$2
         shift
         ;;
-    -s | --status-only)
-        statusOnly=$2
-        shift
-        ;;
+    -s | --status-only) statusOnly='yes' ;;
     -f | --full-update)
         fullUpdate=$2
         shift
@@ -47,15 +44,6 @@ while (($#)); do
     esac
     shift
 done
-
-# prompt user for message
-message=$(check_commit_message "$message")
-retVal=$?
-
-if [[ $retVal -ne 0 ]]; then
-    echobad "Invalid commit message. Exiting script."
-    exit 1
-fi
 
 help_and_exit() {
     ECHOHEAD "Checking Vendor Packages for Changes"
@@ -87,20 +75,30 @@ help_and_exit() {
 ############################################ HELP ONLY
 [[ "$help" == "yes" ]] && help_and_exit
 
+if [[ "$statusOnly" != "yes" ]]; then
+    # prompt user for message
+    message=$(check_commit_message "$message")
+    retVal=$?
+
+    if [[ $retVal -ne 0 ]]; then
+        echobad "Invalid commit message. Exiting script."
+        exit 1
+    fi
+fi
 ############################################ CODE
 [[ ! -d "$WORKING_DIR" ]] && echobad "Could not change directory to $WORKING_DIR" && help_and_exit
 
 installpackage "jq"
 
-ECHOHEAD "Removing vendor folders that do not need to be there ..."
-find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
-
-ECHOHEAD "Removing orig files"
-sake-lint-remove-origs "$dir"
+if [[ "$statusOnly" != "yes" ]]; then
+    ECHOHEAD "Removing vendor folders that do not need to be there ..."
+    find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
+    ECHOHEAD "Removing orig files"
+    sake-lint-remove-origs "$dir"
+fi
 
 process_directory() {
     local directory=$1
-    ECHOHEAD "### DOING: $directory"
     cd "$directory" || return
 
     if [[ ! -f "$directory/.git/config" ]]; then
@@ -108,24 +106,30 @@ process_directory() {
     else
         if has_git_changes; then
             if [[ "$statusOnly" == "yes" ]]; then
-                echonice "Changes in $directory"
-                git status -s
+                echobad "Changes in $directory"
             else
                 $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
             fi
-        else
-            echonice "No changes in $directory"
         fi
     fi
     cd - >/dev/null
 }
 
 has_git_changes() {
-    if [[ -n $(git status -s) ]]; then
-        return 0 # There are changes
-    else
-        return 1 # No changes
+    # NOTE THAT 0 = true!!!!
+    # Check for uncommitted changes
+    if [[ -n $(git status --porcelain) ]]; then
+        # ZERO DENOTES A CHANGE
+        return 0
     fi
+
+    # Check for unpushed changes
+    if [[ -n $(git cherry -v) ]]; then
+        # ZERO DENOTES A CHANGE
+        return 0
+    fi
+    # ONE DENOTES NO CHANGE
+    return 1
 }
 
 matchingDirs=$(get_my_repos "$WORKING_DIR")

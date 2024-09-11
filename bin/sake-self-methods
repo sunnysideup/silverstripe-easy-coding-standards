@@ -190,12 +190,14 @@ check_commit_message() {
     for prefix in "${PREFIXES[@]}"; do
         if [[ "$firstLine" == "$prefix"* ]]; then
             echo "$message"
+            # ZERO DENOTES NO ERROR
             return 0
         fi
     done
 
     echobad "Commit message ($message) does not start with an allowed prefix."
     echonice "Allowed prefixes are: ${PREFIXES[*]}"
+    # ONE DENOTES AN ERROR
     return 1
 }
 
