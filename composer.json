@@ -70,6 +70,7 @@
     "bin/sake-ss-dump-database",
     "bin/sake-ss-rsync-assets",
     "bin/sake-ss-start-new-module",
+    "bin/sake-test-site",
     "bin/sake-update-vs-code"
   ],
   "config": {

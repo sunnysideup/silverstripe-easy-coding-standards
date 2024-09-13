@@ -1,0 +1,72 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) url=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "test site"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "URL to analyse:                $url"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-test-site "https://www.example.com"  "
+    echonice "... run in the destination folder"
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+# Check if a URL is provided as an argument
+if [ -z "$url" ]; then
+    echo "Usage: $0 <url>"
+    exit 1
+fi
+
+# Use the first argument as the URL
+url="$1"
+
+# Make the request and output the timings using the URL variable
+curl -w '
+   time_namelookup:  %{time_namelookup}s\n
+      time_connect:  %{time_connect}s\n
+   time_appconnect:  %{time_appconnect}s\n
+  time_pretransfer:  %{time_pretransfer}s\n
+     time_redirect:  %{time_redirect}s\n
+time_starttransfer:  %{time_starttransfer}s\n
+                ----------\n
+     time_total:  %{time_total}s\n' -o /dev/null -s "$url"
+
+echoend

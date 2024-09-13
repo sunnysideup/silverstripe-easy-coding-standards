@@ -59,11 +59,16 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-dump-database
  - sake-ss-start-new-module
 
+# test
+- sake-test-site
+
 # scrutinizer
  - sake-scrutinizer-add
 
 # machine maintenance
  - sake-update-vs-code
+
+
 ```
 
 # How to install for one project (not recommended - as it may not work)
