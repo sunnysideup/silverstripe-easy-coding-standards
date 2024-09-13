@@ -50,10 +50,10 @@ fi
 
 # Check if a URL is provided as an argument
 if [ -z "$url" ]; then
-    echo "Usage: $0 <url>"
-    exit 1
+    help_and_exit
 fi
 
+ECHOHEAD "$url - V1"
 # Use the first argument as the URL
 curl -w @- -o /dev/null -s "$url" <<'EOF'
     time_namelookup: %{time_namelookup}\n
@@ -61,14 +61,15 @@ curl -w @- -o /dev/null -s "$url" <<'EOF'
     time_appconnect: %{time_appconnect}\n
    time_pretransfer: %{time_pretransfer}\n
       time_redirect: %{time_redirect}\n
- time_starttransfer: %{time_starttransfer} - how quick the server responds \n
+ time_starttransfer: %{time_starttransfer} \n
                      ----------\n
          time_total: %{time_total}\n
                      ----------\n
 EOF
 
-result=$(curl -w '%{time_namelookup} %{time_connect} %{time_appconnect} %{time_pretransfer} %{time_starttransfer} %{time_total}' -o /dev/null -s "$url")
+result=$(curl --no-keepalive -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' -w '%{time_namelookup} %{time_connect} %{time_appconnect} %{time_pretransfer} %{time_starttransfer} %{time_total}' -o /dev/null -s "$url")
 
+ECHOHEAD "$url - V2"
 # Read the values into separate variables
 read -r timeNamelookup timeConnect timeAppconnect timePretransfer timeStarttransfer timeTotal <<<"$result"
 
@@ -85,7 +86,7 @@ echo "       time_connect:  + $timeAppconnectCalc = $timeConnect"
 echo "    time_appconnect:  + $timeAppconnectCalc = $timeAppconnect"
 echo "   time_pretransfer:  + $timePretransferCalc = $timePretransfer"
 echo " time_starttransfer:  + $timeStarttransferCalc = $timeStarttransfer (how quick the server responds)"
-echo "               rest:  + $rest = $timeTotal"
+echo "       dowload time:  + $rest = $timeTotal"
 echo "                      ----------"
 
 echoend
