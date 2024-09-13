@@ -55,17 +55,15 @@ if [ -z "$url" ]; then
 fi
 
 # Use the first argument as the URL
-url="$1"
-
-# Make the request and output the timings using the URL variable
-curl -w '
-   time_namelookup:  %{time_namelookup}s\n
-      time_connect:  %{time_connect}s\n
-   time_appconnect:  %{time_appconnect}s\n
-  time_pretransfer:  %{time_pretransfer}s\n
-     time_redirect:  %{time_redirect}s\n
-time_starttransfer:  %{time_starttransfer}s\n
-                ----------\n
-     time_total:  %{time_total}s\n' -o /dev/null -s "$url"
+curl -w @- -o /dev/null -s "$url" <<'EOF'
+    time_namelookup:  %{time_namelookup}\n
+       time_connect:  %{time_connect}\n
+    time_appconnect:  %{time_appconnect}\n
+   time_pretransfer:  %{time_pretransfer}\n
+      time_redirect:  %{time_redirect}\n
+ time_starttransfer:  %{time_starttransfer} - how quick the server responds \n
+                    ----------\n
+         time_total:  %{time_total}\n
+EOF
 
 echoend
