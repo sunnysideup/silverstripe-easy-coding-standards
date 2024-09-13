@@ -56,14 +56,36 @@ fi
 
 # Use the first argument as the URL
 curl -w @- -o /dev/null -s "$url" <<'EOF'
-    time_namelookup:  %{time_namelookup}\n
-       time_connect:  %{time_connect}\n
-    time_appconnect:  %{time_appconnect}\n
-   time_pretransfer:  %{time_pretransfer}\n
-      time_redirect:  %{time_redirect}\n
- time_starttransfer:  %{time_starttransfer} - how quick the server responds \n
-                    ----------\n
-         time_total:  %{time_total}\n
+    time_namelookup: %{time_namelookup}\n
+       time_connect: %{time_connect}\n
+    time_appconnect: %{time_appconnect}\n
+   time_pretransfer: %{time_pretransfer}\n
+      time_redirect: %{time_redirect}\n
+ time_starttransfer: %{time_starttransfer} - how quick the server responds \n
+                     ----------\n
+         time_total: %{time_total}\n
+                     ----------\n
 EOF
+
+result=$(curl -w '%{time_namelookup} %{time_connect} %{time_appconnect} %{time_pretransfer} %{time_starttransfer} %{time_total}' -o /dev/null -s "$url")
+
+# Read the values into separate variables
+read -r timeNamelookup timeConnect timeAppconnect timePretransfer timeStarttransfer timeTotal <<<"$result"
+
+# Perform the calculations (e.g., deduct time_namelookup from time_starttransfer)
+timeConnectCalc=$(echo "$timeConnect - $timeNamelookup" | bc)
+timeAppconnectCalc=$(echo "$timeAppconnect - $timeConnect" | bc)
+timePretransferCalc=$(echo "$timePretransfer - $timeAppconnect" | bc)
+timeStarttransferCalc=$(echo "$timeStarttransfer - $timePretransfer" | bc)
+rest=$(echo "$timeTotal - $timeStarttransfer" | bc)
+
+# Output the timing details and calculation
+echo "    time_namelookup:   $timeNamelookup"
+echo "       time_connect:  + $timeAppconnectCalc = $timeConnect"
+echo "    time_appconnect:  + $timeAppconnectCalc = $timeAppconnect"
+echo "   time_pretransfer:  + $timePretransferCalc = $timePretransfer"
+echo " time_starttransfer:  + $timeStarttransferCalc = $timeStarttransfer (how quick the server responds)"
+echo "               rest:  + $rest = $timeTotal"
+echo "                      ----------"
 
 echoend
