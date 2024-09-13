@@ -36,7 +36,6 @@ help_and_exit() {
 
     ECHOHEAD "Example usage:"
     echonice "e.g. sake-test-site "https://www.example.com"  "
-    echonice "... run in the destination folder"
 
     echofunctions
     exit
