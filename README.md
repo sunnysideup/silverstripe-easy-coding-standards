@@ -53,10 +53,11 @@ Install as global composer package and then try to access the commands, starting
 
 # silverstripe
  - sake-ss-add-site
+ - sake-ss-db-dump
+ - sake-ss-db-open
  - sake-ss-dev-build
  - sake-ss-flush
  - sake-ss-rsync-asset
- - sake-ss-dump-database
  - sake-ss-start-new-module
 
 # test
