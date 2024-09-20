@@ -28,7 +28,7 @@ done
 
 help_and_exit() {
 
-    ECHOHEAD "Connect to Silverstripe MySQL database"
+    ECHOHEAD "Open Silverstripe MySQL database"
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to use:              $WORKING_DIR/$dir"
 
@@ -36,7 +36,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-ss-db-connect."
+    echonice "sake-ss-db-open."
 
     echofunctions
     exit
