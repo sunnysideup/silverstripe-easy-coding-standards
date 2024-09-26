@@ -157,6 +157,11 @@ if [[ "$allCommits" == "yes" ]]; then
         fi
         # If you've pushed to a remote before and want to force push, uncomment the line below:
 
+        ECHOHEAD "One more time"
+        git reset --soft HEAD~1
+        git commit --amend -m "$message"
+        git push --force
+
         ECHOHEAD "All local and remote tags have been deleted."
         echoend
         exit
