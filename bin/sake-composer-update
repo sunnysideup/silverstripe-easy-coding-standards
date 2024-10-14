@@ -10,6 +10,7 @@ dir='./'
 ############################################ SETTINGS
 force='no'
 commit='yes'
+sortPackages='yes'
 help='no'
 
 while (($#)); do
@@ -20,6 +21,10 @@ while (($#)); do
         ;;
     -c | --commit)
         commit=$2
+        shift
+        ;;
+    -s | --sort)
+        sortPackages=$2
         shift
         ;;
     -h | --help)
@@ -47,6 +52,7 @@ help_and_exit() {
     ECHOHEAD "Available settings:"
     echonice "-f, --force                    delete vendor folder, default: 'no'"
     echonice "-c, --commit                   also commit, default: 'yes'"
+    echonice "-s, --sort                     sort packages, default: 'yes'"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
@@ -75,8 +81,52 @@ if [[ "$force" == "yes" ]]; then
     rm vendor -rf
 fi
 
-composer config sort-packages true
-composer update --prefer-source
+if [[ "$sortPackages" == "yes" ]]; then
+    composer config sort-packages true
+fi
+
+# Step 1: Run a real Composer update and log the output
+echo "Running Composer update..."
+composer update --no-interaction --no-progress --prefer-source | tee composer.log
+
+# Step 2: Initialize the commit message variable
+commitMessage=""
+
+# Step 3: Extract updated packages from the composer log
+echonice "Extracting updated packages and capturing commit messages..."
+
+grep -E 'Updating|Downgrading' composer.log | while read -r line; do
+    # Extract package name, old version, and new version
+    package=$(echo "$line" | awk '{print $2}')
+    old_version=$(echo "$line" | awk '{print $3}' | tr -d '()')
+    new_version=$(echo "$line" | awk '{print $5}' | tr -d '()')
+
+    # Navigate to the package directory
+    package_path="vendor/$package"
+
+    if [ -d "$package_path" ]; then
+        cd "$package_path" || exit
+
+        # Get the Git commit hashes for the old and new versions
+        old_commit=$(git rev-list -n 1 "$old_version" 2>/dev/null)
+        new_commit=$(git rev-list -n 1 "$new_version" 2>/dev/null)
+
+        if [ -n "$old_commit" ] && [ -n "$new_commit" ]; then
+            # Capture all commit messages between the two versions
+            packageCommits=$(git log --pretty=format:'%h - %s' "$old_commit".."$new_commit")
+            commitMessage+="$package (from $old_version to $new_version):\n$packageCommits\n\n"
+        else
+            commitMessage+="$package: Unable to find commits between $old_version and $new_version.\n\n"
+        fi
+
+        cd - >/dev/null # Return to the original directory
+    else
+        commitMessage+="$package: Not found in vendor directory.\n\n"
+    fi
+done
+
+# Step 4: Display the final commit message for debugging (optional)
+echonice -e "$commitMessage"
 
 echoline
 
@@ -90,7 +140,7 @@ done
 echoline
 
 if [[ "$commit" == "yes" ]]; then
-    sake-git-commit-and-push . -m "DEP: composer update"
+    sake-git-commit-and-push . -m "DEP: composer update: \n\n $commitMessage"
 fi
 
 echoend
