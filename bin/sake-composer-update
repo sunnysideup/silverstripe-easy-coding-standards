@@ -88,8 +88,8 @@ if [[ "$sortPackages" == "yes" ]]; then
 fi
 
 # Step 1: Run a real Composer update and log the output
-echo "Running Composer update..."
-composer update --no-interaction --no-progress --prefer-source | tee composer.log
+echonice "Running Composer update..."
+composer update --no-interaction --no-progress --prefer-source >composer.log
 
 # Step 2: Initialize the commit message variable
 commitMessage=""
