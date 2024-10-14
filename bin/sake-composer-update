@@ -78,10 +78,12 @@ else
 fi
 
 if [[ "$force" == "yes" ]]; then
+    echonice "Clearning vendor folder"
     rm vendor -rf
 fi
 
 if [[ "$sortPackages" == "yes" ]]; then
+    echonice "Sorting packages"
     composer config sort-packages true
 fi
 
@@ -140,7 +142,7 @@ done
 echoline
 
 if [[ "$commit" == "yes" ]]; then
-    sake-git-commit-and-push . -m "DEP: composer update: \n\n $commitMessage"
+    sake-git-commit-and-push . -m "$(echo -e "DEP: composer update:\n\n$commitMessage")"
 fi
 
 echoend
