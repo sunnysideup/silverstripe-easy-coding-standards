@@ -127,49 +127,63 @@ else
     echo "DEBUG: Raw git diff output:"
     git diff composer.lock
 
-    # Extract package names and their references from the composer.lock diff
-    changes=$(git diff composer.lock | awk '
-        BEGIN { pkg_name = ""; old_ref = ""; new_ref = "" }
-        /"name":/ { gsub(/"|,/, "", $2); pkg_name = $2 }
-        /"reference":/ {
-            gsub(/"|,/, "", $2);
-            if (NR % 2 == 1) old_ref = $2;
-            else {
-                new_ref = $2;
-                print pkg_name, old_ref, new_ref;
-            }
-        }
-    ')
+    # Extract the changed references from the diff
+    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/",//')
 
-    # DEBUG: Show extracted changes
-    echo "DEBUG: Extracted package names and references:"
+    # DEBUG: Show extracted references
+    echo "DEBUG: Extracted references:"
     echo "$changes"
 
+    # Function to find the package name for a given reference in composer.lock
+    find_package_name() {
+        local reference=$1
+        grep -B 10 "\"reference\": \"$reference\"" composer.lock | grep '"name":' | awk -F'"' '{print $4}'
+    }
+
     # Loop through the changes and gather commit messages
-    while IFS=' ' read -r package oldRef newRef; do
-        echo "DEBUG: Processing package: $package, Old Ref: $oldRef, New Ref: $newRef"
+    previousReference=""
+    while IFS= read -r line; do
+        echo "DEBUG: Processing reference: $line"
 
-        # Verify that both references are valid
-        if [ -n "$oldRef" ] && [ -n "$newRef" ]; then
-            packagePath="vendor/$package"
+        # Track old and new references
+        if [ -z "$previousReference" ]; then
+            previousReference="$line"
+            echo "DEBUG: Set previous reference: $previousReference"
+        else
+            newReference="$line"
+            echo "DEBUG: Set new reference: $newReference"
 
-            if [ -d "$packagePath" ]; then
-                cd "$packagePath" || continue
+            # Find the package name using the previous reference
+            package=$(find_package_name "$previousReference")
 
-                # Fetch commits between the two references
-                git fetch --tags &>/dev/null
-                commits=$(git log --pretty=format:'%h - %s' "$oldRef".."$newRef")
+            # Ensure we have a valid package name
+            if [ -n "$package" ]; then
+                packagePath="vendor/$package"
 
-                if [ -n "$commits" ]; then
-                    commitMessage+="$package (from $oldRef to $newRef):\n$commits\n\n"
+                if [ -d "$packagePath" ]; then
+                    cd "$packagePath" || continue
+
+                    # Fetch commits between the two references
+                    git fetch --tags &>/dev/null
+                    commits=$(git log --pretty=format:'%h - %s' "$previousReference".."$newReference")
+
+                    if [ -n "$commits" ]; then
+                        commitMessage+="$package (from $previousReference to $newReference):\n$commits\n\n"
+                    else
+                        commitMessage+="$package: No new commits between $previousReference and $newReference.\n\n"
+                    fi
+
+                    cd - >/dev/null
                 else
-                    commitMessage+="$package: No new commits between $oldRef and $newRef.\n\n"
+                    commitMessage+="$package: Vendor directory not found.\n\n"
                 fi
-
-                cd - >/dev/null
             else
-                commitMessage+="$package: Vendor directory not found.\n\n"
+                commitMessage+="Unknown package for reference $previousReference\n\n"
             fi
+
+            # Reset references for the next pair
+            previousReference=""
+            newReference=""
         fi
     done <<<"$changes"
 
