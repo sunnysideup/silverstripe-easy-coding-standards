@@ -133,70 +133,58 @@ else
     echo "DEBUG: Raw git diff output:"
     git diff composer.lock
 
-    # Extract changed references and clean them
-    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed -E 's/^[-+]\s*"reference": "(.*)",?/\1/' | tr -d '"')
+    # Extract references (old and new) and ensure uniqueness
+    references=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' |
+        sed -E 's/^[-+]\s*"reference": "(.*)",?/\1/' |
+        sort -u)
 
     # DEBUG: Show extracted references
     echo "DEBUG: Extracted references:"
-    echo "$changes"
+    echo "$references"
 
-    # Function to find the package name using jq
-    find_package_name() {
-        local reference=$1
-        jq -r --arg ref "$reference" '
+    # Convert references into an array
+    refArray=($references)
+
+    # Loop through reference pairs (old, new)
+    for ((i = 0; i < ${#refArray[@]}; i += 2)); do
+        oldRef="${refArray[i]}"
+        newRef="${refArray[i + 1]}"
+
+        # DEBUG: Print each reference pair being processed
+        echo "DEBUG: Processing pair: old=$oldRef, new=$newRef"
+
+        # Use the new reference to find the package name
+        package=$(jq -r --arg ref "$newRef" '
             (.packages + .["packages-dev"])[]? |
             select(.source.reference == $ref) |
             .name // "Unknown package"
-        ' composer.lock
-    }
+        ' composer.lock)
 
-    # Loop through the changes and gather commit messages
-    previousReference=""
-    while IFS= read -r line; do
-        # DEBUG: Print each reference being processed
-        echo "DEBUG: Processing reference: $line"
+        # Ensure we have a valid package name
+        if [ -n "$package" ] && [ "$package" != "Unknown package" ]; then
+            packagePath="vendor/$package"
 
-        # Track old and new references
-        if [ -z "$previousReference" ]; then
-            previousReference="$line"
-            echo "DEBUG: Set previous reference: $previousReference"
-        else
-            newReference="$line"
-            echo "DEBUG: Set new reference: $newReference"
+            if [ -d "$packagePath" ]; then
+                cd "$packagePath" || continue
 
-            # Find the package name using the previous reference
-            package=$(find_package_name "$previousReference")
+                # Fetch commits between the two references
+                git fetch --tags &>/dev/null
+                commits=$(git log --pretty=format:'%h - %s' "$oldRef".."$newRef")
 
-            # Ensure we have a valid package name
-            if [ -n "$package" ] && [ "$package" != "Unknown package" ]; then
-                packagePath="vendor/$package"
-
-                if [ -d "$packagePath" ]; then
-                    cd "$packagePath" || continue
-
-                    # Fetch commits between the two references
-                    git fetch --tags &>/dev/null
-                    commits=$(git log --pretty=format:'%h - %s' "$previousReference".."$newReference")
-
-                    if [ -n "$commits" ]; then
-                        commitMessage+="$package (from $previousReference to $newReference):\n$commits\n\n"
-                    else
-                        commitMessage+="$package: No new commits between $previousReference and $newReference.\n\n"
-                    fi
-
-                    cd - >/dev/null
+                if [ -n "$commits" ]; then
+                    commitMessage+="$package (from $oldRef to $newRef):\n$commits\n\n"
                 else
-                    commitMessage+="$package: Vendor directory not found.\n\n"
+                    commitMessage+="$package: No new commits between $oldRef and $newRef.\n\n"
                 fi
-            else
-                commitMessage+="Unknown package for reference $previousReference\n\n"
-            fi
 
-            # Reset references for the next pair
-            previousReference=""
-            newReference=""
+                cd - >/dev/null
+            else
+                commitMessage+="$package: Vendor directory not found.\n\n"
+            fi
+        else
+            commitMessage+="Unknown package for reference $newRef\n\n"
         fi
-    done <<<"$changes"
+    done
 
     # Print the final commit message or fallback message
     if [[ -z "$commitMessage" ]]; then
