@@ -172,7 +172,7 @@ else
                 commits=$(git log --pretty=format:'%h - %s' "$oldRef".."$newRef")
 
                 if [ -n "$commits" ]; then
-                    commitMessage+="$package (from $oldRef to $newRef):\n$commits\n\n"
+                    commitMessage+="$package: \n$commits\n\n"
                 else
                     commitMessage+="$package: No new commits between $oldRef and $newRef.\n\n"
                 fi
@@ -193,12 +193,19 @@ else
         echonice "Committing changes to composer.json and composer.lock..."
         echo -e "$commitMessage"
 
+        # Save the commit message to a temporary file
+        tempFile=$(mktemp)
+        printf "%s" "$commitMessage" >"$tempFile"
+
         # Stage composer.json and composer.lock
         git add composer.json composer.lock
 
-        # Commit the changes with the generated message
-        git commit -m "DEP: composer update:\n\n$commitMessage"
+        # Commit the changes using the temporary file
+        git commit -F "$tempFile"
         git push
+
+        # Clean up the temporary file
+        rm "$tempFile"
     fi
 fi
 echoend
