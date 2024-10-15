@@ -51,30 +51,42 @@ help_and_exit() {
     exit
 }
 
-# Function to find directories larger than a specified size
-findLargeDirs() {
-    local sizeThreshold=$1
-    find . -type d -exec du -sh {} + | awk -v size="${sizeThreshold}" '$1 > size'
+# Function to convert human-readable sizes to bytes for comparison
+sizeToBytes() {
+    echo "$1" | awk '
+    /G/ { printf "%.0f\n", $1 * 1024 * 1024 * 1024 }
+    /M/ { printf "%.0f\n", $1 * 1024 * 1024 }
+    /K/ { printf "%.0f\n", $1 * 1024 }
+    /^[0-9]+$/ { print $1 }
+    '
 }
 
-# Usage: ./script.sh 100M
-# This will find directories larger than 100MB
+# Function to find directories larger than a specified size
+findLargeDirs() {
+    local sizeThresholdBytes=$(sizeToBytes "$1")
+    find . -type d -exec du -sb {} + | awk -v size="$sizeThresholdBytes" '$1 > size' | sort -rh
+}
 
-############################################ HELP ONLY
+# Check if help is requested
 if [[ "$help" == "yes" ]]; then
     help_and_exit
 fi
 
-############################################ CODE
-
+# Verify directory existence
 if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
+    cd "$WORKING_DIR/$dir" || {
+        echonice "Failed to enter directory"
+        exit 1
+    }
 else
     echonice "Could not change directory to $WORKING_DIR/$dir"
     help_and_exit
 fi
 
-find $WORKING_DIR/$dir -xdev -type f -size +$minSize -exec du -sh {} ';' | sort -rh | head -n50
-findLargeDirs $minSize
+echonice "Finding files larger than $minSize in $WORKING_DIR/$dir"
+
+# Finding large files and directories
+find "$WORKING_DIR/$dir" -xdev -type f -size +"$minSize" -exec du -sh {} + | sort -rh | head -n50
+findLargeDirs "$minSize"
 
 echoend
