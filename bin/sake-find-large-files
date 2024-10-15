@@ -50,7 +50,11 @@ help_and_exit() {
     echofunctions
     exit
 }
-#!/bin/bash
+
+# Check if help is requested
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
 
 # Function to convert human-readable sizes to bytes for comparison
 sizeToBytes() {
@@ -73,11 +77,6 @@ findLargeDirs() {
         printf "%-10s\t%s\n" "$humanSize" "$relativeDir"
     done
 }
-
-# Check if help is requested
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
 
 # Verify directory existence
 if [ -d "$dir" ]; then
