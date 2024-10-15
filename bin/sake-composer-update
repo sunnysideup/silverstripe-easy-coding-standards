@@ -68,6 +68,12 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 ############################################ CODE
+# Ensure jq is installed
+if ! command -v jq &>/dev/null; then
+    echo "Error: jq is not installed. Please install jq to proceed."
+    exit 1
+fi
+
 check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
 
 if [ -d "$WORKING_DIR/$dir" ]; then
@@ -114,12 +120,6 @@ check_vendor_changes() {
 echonice "Running composer update..."
 composer update --prefer-source
 
-# Ensure jq is installed
-if ! command -v jq &>/dev/null; then
-    echo "Error: jq is not installed. Please install jq to proceed."
-    exit 1
-fi
-
 # Initialize an empty commit message
 commitMessage=""
 
@@ -133,8 +133,8 @@ else
     echo "DEBUG: Raw git diff output:"
     git diff composer.lock
 
-    # Extract the changed references from the diff
-    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/"$//')
+    # Extract the changed references and clean trailing characters
+    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/[",]$//')
 
     # DEBUG: Show extracted references
     echo "DEBUG: Extracted references:"
@@ -144,9 +144,9 @@ else
     find_package_name() {
         local reference=$1
         jq -r --arg ref "$reference" '
-            .packages + .packages-dev |
-            map(select(.source.reference == $ref)) |
-            .[0].name // "Unknown package"
+            (.packages + .["packages-dev"])[]? |
+            select(.source.reference == $ref) |
+            .name // "Unknown package"
         ' composer.lock
     }
 
@@ -212,4 +212,5 @@ else
         git push
     fi
 fi
+
 echoend
