@@ -127,8 +127,8 @@ else
     echo "DEBUG: Raw git diff output:"
     git diff composer.lock
 
-    # Extract the changed references from the diff
-    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/",//')
+    # Extract the changed references (remove extra quotes)
+    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/"$//')
 
     # DEBUG: Show extracted references
     echo "DEBUG: Extracted references:"
