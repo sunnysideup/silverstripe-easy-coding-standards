@@ -133,8 +133,8 @@ else
     echo "DEBUG: Raw git diff output:"
     git diff composer.lock
 
-    # Extract the changed references and clean trailing characters
-    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/[",]$//')
+    # Extract the changed references, clean trailing characters and quotes
+    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/[",]\s*$//')
 
     # DEBUG: Show extracted references
     echo "DEBUG: Extracted references:"
@@ -153,6 +153,7 @@ else
     # Loop through the changes and gather commit messages
     previousReference=""
     while IFS= read -r line; do
+        # DEBUG: Print each reference being processed
         echo "DEBUG: Processing reference: $line"
 
         # Track old and new references
