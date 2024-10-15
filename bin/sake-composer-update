@@ -110,11 +110,8 @@ check_vendor_changes() {
     echonice "No uncommitted changes found in vendor packages."
 }
 
-# Run the function before updating
-check_vendor_changes
-
-# Proceed with the Composer update
-echonice "Running Composer update..."
+# Run composer update
+echonice "Running composer update..."
 composer update --prefer-source
 
 # Initialize an empty commit message
@@ -126,51 +123,57 @@ if git diff --quiet composer.lock; then
 else
     echonice "Parsing composer.lock changes..."
 
+    # DEBUG: Show the raw diff output
+    echo "DEBUG: Raw git diff output:"
+    git diff composer.lock
+
     # Extract package changes from the composer.lock diff
-    changes=$(git diff --unified=0 composer.lock | grep '^[-+][^+-]' | sed 's/^+ //g')
+    changes=$(git diff --unified=0 composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/",//')
 
-    # Loop through each package change to gather commit messages
+    # DEBUG: Show extracted references
+    echo "DEBUG: Extracted references:"
+    echo "$changes"
+
+    previousReference=""
+    newReference=""
+
+    # Loop through the changes and pair old/new references
     while IFS= read -r line; do
-        # Extract package name and version changes
-        if [[ "$line" =~ \"name\":\ \"([^\"]+)\" ]]; then
-            package="${BASH_REMATCH[1]}"
-        elif [[ "$line" =~ \"version\":\ \"([a-f0-9]+)\" ]]; then
-            version="${BASH_REMATCH[1]}"
-        fi
+        echo "DEBUG: Processing line: $line" # Debug output for each line
 
-        # If both package and version are available, gather commit messages
-        if [ -n "$package" ] && [ -n "$version" ]; then
-            echonice "Processing $package version $version..."
+        if [[ "$line" =~ ^[a-f0-9]{40}$ ]]; then # Match commit SHA
+            if [ -z "$previousReference" ]; then
+                previousReference="$line"
+                echo "DEBUG: Set previous reference: $previousReference" # Debug
+            else
+                newReference="$line"
+                echo "DEBUG: Set new reference: $newReference" # Debug
 
-            # Go to the vendor package directory if it exists
-            packagePath="vendor/$package"
-            if [ -d "$packagePath" ]; then
-                cd "$packagePath" || continue
+                # Now we have both old and new references; extract commits
+                package="vendor/package" # Update logic to detect real package if needed
 
-                # Fetch tags and commits to ensure we have the latest history
-                git fetch --tags &>/dev/null
+                if [ -d "$package" ]; then
+                    cd "$package" || continue
 
-                # Extract commit hashes for the current and previous versions
-                previousCommit=$(git rev-list -n 1 HEAD^1 2>/dev/null)
-                currentCommit=$(git rev-list -n 1 HEAD 2>/dev/null)
+                    # Fetch commits between the two references
+                    git fetch --tags &>/dev/null
+                    commits=$(git log --pretty=format:'%h - %s' "$previousReference".."$newReference")
 
-                # Gather commit messages between the two commits
-                if [ -n "$previousCommit" ] && [ -n "$currentCommit" ]; then
-                    commits=$(git log --pretty=format:'%h - %s' "$previousCommit".."$currentCommit")
-                    commitMessage+="$package (from $previousCommit to $currentCommit):\n$commits\n\n"
+                    if [ -n "$commits" ]; then
+                        commitMessage+="$package (from $previousReference to $newReference):\n$commits\n\n"
+                    else
+                        commitMessage+="$package: No new commits between $previousReference and $newReference.\n\n"
+                    fi
+
+                    cd - >/dev/null
                 else
-                    commitMessage+="$package: Unable to find commits for the current or previous version.\n\n"
+                    commitMessage+="$package: Vendor directory not found.\n\n"
                 fi
 
-                # Go back to the working directory
-                cd - >/dev/null
-            else
-                commitMessage+="$package: Vendor directory not found.\n\n"
+                # Reset references for the next pair
+                previousReference=""
+                newReference=""
             fi
-
-            # Reset package and version variables for the next loop
-            package=""
-            version=""
         fi
     done <<<"$changes"
 
