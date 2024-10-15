@@ -112,7 +112,6 @@ check_vendor_changes() {
 
 # Run the function before updating
 check_vendor_changes
-
 # Proceed with the Composer update
 echonice "Running Composer update..."
 composer update --no-interaction --no-progress --prefer-source >composer.log
@@ -120,8 +119,8 @@ composer update --no-interaction --no-progress --prefer-source >composer.log
 # Step 2: Initialize the commit message variable
 commitMessage=""
 
-# Step 3: Extract updated packages and store in a temporary file
-grep -E 'Updating|Downgrading' composer.log >composer_changes.log
+# Step 3: Extract relevant package changes
+grep -E 'Upgrading|Updating|Downgrading|Syncing' composer.log >composer_changes.log
 
 # Process the log file outside the subshell
 while read -r line; do
