@@ -127,55 +127,61 @@ else
     echo "DEBUG: Raw git diff output:"
     git diff composer.lock
 
-    # Extract package changes from the composer.lock diff
+    # Extract package names and references from the composer.lock diff
     changes=$(git diff --unified=0 composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/",//')
 
-    # DEBUG: Show extracted references
+    # Extract package names separately
+    package_names=$(git diff --unified=0 composer.lock | grep '^\(-\|+\)[[:space:]]*"name":' | sed 's/^[-+]\s*"name": "//' | sed 's/",//')
+
+    # DEBUG: Show extracted references and package names
     echo "DEBUG: Extracted references:"
     echo "$changes"
+    echo "DEBUG: Extracted package names:"
+    echo "$package_names"
 
+    # Initialize variables for tracking changes
     previousReference=""
     newReference=""
+    package=""
 
-    # Loop through the changes and pair old/new references
-    while IFS= read -r line; do
-        echo "DEBUG: Processing line: $line" # Debug output for each line
+    # Combine extracted package names and references line by line
+    paste <(echo "$package_names") <(echo "$changes") | while read -r package reference; do
+        echo "DEBUG: Processing package: $package, Reference: $reference" # Debug
 
-        if [[ "$line" =~ ^[a-f0-9]{40}$ ]]; then # Match commit SHA
-            if [ -z "$previousReference" ]; then
-                previousReference="$line"
-                echo "DEBUG: Set previous reference: $previousReference" # Debug
-            else
-                newReference="$line"
-                echo "DEBUG: Set new reference: $newReference" # Debug
+        # Track old and new references
+        if [ -z "$previousReference" ]; then
+            previousReference="$reference"
+            echo "DEBUG: Set previous reference: $previousReference" # Debug
+        else
+            newReference="$reference"
+            echo "DEBUG: Set new reference: $newReference" # Debug
 
-                # Now we have both old and new references; extract commits
-                package="vendor/package" # Update logic to detect real package if needed
+            # Now we have both old and new references; extract commits
+            packagePath="vendor/$package"
 
-                if [ -d "$package" ]; then
-                    cd "$package" || continue
+            if [ -d "$packagePath" ]; then
+                cd "$packagePath" || continue
 
-                    # Fetch commits between the two references
-                    git fetch --tags &>/dev/null
-                    commits=$(git log --pretty=format:'%h - %s' "$previousReference".."$newReference")
+                # Fetch commits between the two references
+                git fetch --tags &>/dev/null
+                commits=$(git log --pretty=format:'%h - %s' "$previousReference".."$newReference")
 
-                    if [ -n "$commits" ]; then
-                        commitMessage+="$package (from $previousReference to $newReference):\n$commits\n\n"
-                    else
-                        commitMessage+="$package: No new commits between $previousReference and $newReference.\n\n"
-                    fi
-
-                    cd - >/dev/null
+                if [ -n "$commits" ]; then
+                    commitMessage+="$package (from $previousReference to $newReference):\n$commits\n\n"
                 else
-                    commitMessage+="$package: Vendor directory not found.\n\n"
+                    commitMessage+="$package: No new commits between $previousReference and $newReference.\n\n"
                 fi
 
-                # Reset references for the next pair
-                previousReference=""
-                newReference=""
+                cd - >/dev/null
+            else
+                commitMessage+="$package: Vendor directory not found.\n\n"
             fi
+
+            # Reset references for the next pair
+            previousReference=""
+            newReference=""
         fi
-    done <<<"$changes"
+    done
 
     # Print the final commit message or fallback message
     if [[ -z "$commitMessage" ]]; then
