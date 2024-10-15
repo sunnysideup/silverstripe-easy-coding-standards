@@ -87,21 +87,51 @@ if [[ "$sortPackages" == "yes" ]]; then
     composer config sort-packages true
 fi
 
-# Step 1: Run a real Composer update and log the output
+# Step: Check each vendor package for uncommitted changes
+check_vendor_changes() {
+    echonice "Checking for local changes in vendor packages..."
+
+    for package_dir in vendor/*/*; do
+        if [ -d "$package_dir/.git" ]; then
+            cd "$package_dir" || continue
+
+            # Check if there are uncommitted changes
+            if [[ -n $(git status --porcelain) ]]; then
+                echobad "Uncommitted changes detected in $package_dir!"
+                echonice "Please commit or stash your changes before updating."
+                cd - >/dev/null
+                exit 1
+            fi
+
+            cd - >/dev/null
+        fi
+    done
+
+    echonice "No uncommitted changes found in vendor packages."
+}
+
+# Run the function before updating
+check_vendor_changes
+
+# Proceed with the Composer update
 echonice "Running Composer update..."
 composer update --no-interaction --no-progress --prefer-source >composer.log
 
 # Step 2: Initialize the commit message variable
 commitMessage=""
 
-# Step 3: Extract updated packages from the composer log
-echonice "Extracting updated packages and capturing commit messages..."
+# Step 3: Extract updated packages and store in a temporary file
+grep -E 'Updating|Downgrading' composer.log >composer_changes.log
 
-grep -E 'Updating|Downgrading' composer.log | while read -r line; do
-    # Extract package name, old version, and new version
+# Process the log file outside the subshell
+while read -r line; do
+    # Extract package name, old version, and new version reliably
     package=$(echo "$line" | awk '{print $2}')
     old_version=$(echo "$line" | awk '{print $3}' | tr -d '()')
     new_version=$(echo "$line" | awk '{print $5}' | tr -d '()')
+
+    # Debug message to verify parsing
+    echonice "Processing $package: $old_version -> $new_version"
 
     # Navigate to the package directory
     package_path="vendor/$package"
@@ -125,22 +155,12 @@ grep -E 'Updating|Downgrading' composer.log | while read -r line; do
     else
         commitMessage+="$package: Not found in vendor directory.\n\n"
     fi
-done
+done <composer_changes.log
 
-# Step 4: Display the final commit message for debugging (optional)
-echonice -e "$commitMessage"
+# Display the final commit message for debugging (optional)
+echonice "$commitMessage"
 
-echoline
-
-matchingDirs=$(get_my_repos "$WORKING_DIR")
-for dir in $matchingDirs; do
-    if [ ! -d "$dir/.git" ]; then
-        echobad "CHECKED OUT AS DIST: $dir ... consider --prefer-source if you want to change them."
-    fi
-done
-
-echoline
-
+# Proceed with the commit if requested
 if [[ "$commit" == "yes" ]]; then
     sake-git-commit-and-push . -m "$(echo -e "DEP: composer update:\n\n$commitMessage")"
 fi
