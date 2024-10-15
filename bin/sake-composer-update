@@ -114,6 +114,12 @@ check_vendor_changes() {
 echonice "Running composer update..."
 composer update --prefer-source
 
+# Ensure jq is installed
+if ! command -v jq &>/dev/null; then
+    echo "Error: jq is not installed. Please install jq to proceed."
+    exit 1
+fi
+
 # Initialize an empty commit message
 commitMessage=""
 
@@ -127,17 +133,21 @@ else
     echo "DEBUG: Raw git diff output:"
     git diff composer.lock
 
-    # Extract the changed references (remove extra quotes)
+    # Extract the changed references from the diff
     changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/"$//')
 
     # DEBUG: Show extracted references
     echo "DEBUG: Extracted references:"
     echo "$changes"
 
-    # Function to find the package name for a given reference in composer.lock
+    # Function to find the package name for a given reference using jq
     find_package_name() {
         local reference=$1
-        grep -B 10 "\"reference\": \"$reference\"" composer.lock | grep '"name":' | awk -F'"' '{print $4}'
+        jq -r --arg ref "$reference" '
+            .packages + .packages-dev |
+            map(select(.source.reference == $ref)) |
+            .[0].name // "Unknown package"
+        ' composer.lock
     }
 
     # Loop through the changes and gather commit messages
@@ -157,7 +167,7 @@ else
             package=$(find_package_name "$previousReference")
 
             # Ensure we have a valid package name
-            if [ -n "$package" ]; then
+            if [ -n "$package" ] && [ "$package" != "Unknown package" ]; then
                 packagePath="vendor/$package"
 
                 if [ -d "$packagePath" ]; then
