@@ -133,14 +133,14 @@ else
     echo "DEBUG: Raw git diff output:"
     git diff composer.lock
 
-    # Extract the changed references, clean trailing characters and quotes
-    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed 's/^[-+]\s*"reference": "//' | sed 's/[",]\s*$//')
+    # Extract changed references and clean them
+    changes=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' | sed -E 's/^[-+]\s*"reference": "(.*)",?/\1/' | tr -d '"')
 
     # DEBUG: Show extracted references
     echo "DEBUG: Extracted references:"
     echo "$changes"
 
-    # Function to find the package name for a given reference using jq
+    # Function to find the package name using jq
     find_package_name() {
         local reference=$1
         jq -r --arg ref "$reference" '
@@ -213,5 +213,4 @@ else
         git push
     fi
 fi
-
 echoend
