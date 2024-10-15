@@ -114,63 +114,61 @@ check_vendor_changes() {
 check_vendor_changes
 # Proceed with the Composer update
 echonice "Running Composer update..."
+rm composer.log -f
 composer update --no-interaction --no-progress --prefer-source 2>&1 | tee composer.log
 
 # Function to parse the composer.log file and extract package changes
-parse_composer_log() {
-    echonice "Parsing composer.log for package changes..."
 
-    # Initialize an empty commit message
-    commitMessage=""
+echonice "Parsing composer.log for package changes..."
 
-    # Use grep to extract only lines containing upgrades or changes
-    grep -E 'Upgrading|Updating|Downgrading|Syncing|Installing|Removing' ./composer.log | while read -r line; do
+# Initialize an empty commit message
+commitMessage=""
 
-        # Adjust regex to match dev-* branches with commit hashes
-        if [[ "$line" =~ ^[[:space:]]*-\ (Upgrading|Syncing)[[:space:]]+([^[:space:]]+)[[:space:]]+\(\([^[:space:]]+\)[[:space:]]+([a-f0-9]+)[[:space:]]+\=\>[[:space:]]+\([^[:space:]]+\)[[:space:]]+([a-f0-9]+)\)$ ]]; then
-            operation="${BASH_REMATCH[1]}"
-            package="${BASH_REMATCH[2]}"
-            old_branch="${BASH_REMATCH[3]}"
-            old_commit="${BASH_REMATCH[4]}"
-            new_branch="${BASH_REMATCH[5]}"
-            new_commit="${BASH_REMATCH[6]}"
+# Use grep to extract only lines containing upgrades or changes
+grep -E 'Upgrading|Updating|Downgrading|Syncing|Installing|Removing' ./composer.log | while read -r line; do
 
-            echonice "Processing $package: $old_branch $old_commit -> $new_branch $new_commit"
+    # Adjust regex to match dev-* branches with commit hashes
+    if [[ "$line" =~ ^[[:space:]]*-\ (Upgrading|Syncing)[[:space:]]+([^[:space:]]+)[[:space:]]+\(\([^[:space:]]+\)[[:space:]]+([a-f0-9]+)[[:space:]]+\=\>[[:space:]]+\([^[:space:]]+\)[[:space:]]+([a-f0-9]+)\)$ ]]; then
+        operation="${BASH_REMATCH[1]}"
+        package="${BASH_REMATCH[2]}"
+        old_branch="${BASH_REMATCH[3]}"
+        old_commit="${BASH_REMATCH[4]}"
+        new_branch="${BASH_REMATCH[5]}"
+        new_commit="${BASH_REMATCH[6]}"
 
-            package_path="vendor/$package"
+        echonice "Processing $package: $old_branch $old_commit -> $new_branch $new_commit"
 
-            if [ -d "$package_path" ]; then
-                cd "$package_path" || exit
+        package_path="vendor/$package"
 
-                # Capture all commit messages between the two commit hashes
-                packageCommits=$(git log --pretty=format:'%h - %s' "$old_commit".."$new_commit")
+        if [ -d "$package_path" ]; then
+            cd "$package_path" || exit
 
-                if [ -n "$packageCommits" ]; then
-                    commitMessage+="$package ($operation from $old_branch $old_commit to $new_branch $new_commit):\n$packageCommits\n\n"
-                else
-                    commitMessage+="$package: No new commits between $old_commit and $new_commit.\n\n"
-                fi
+            # Capture all commit messages between the two commit hashes
+            packageCommits=$(git log --pretty=format:'%h - %s' "$old_commit".."$new_commit")
 
-                cd - >/dev/null
+            if [ -n "$packageCommits" ]; then
+                commitMessage+="$package ($operation from $old_branch $old_commit to $new_branch $new_commit):\n$packageCommits\n\n"
             else
-                commitMessage+="$package: Not found in vendor directory.\n\n"
+                commitMessage+="$package: No new commits between $old_commit and $new_commit.\n\n"
             fi
+
+            cd - >/dev/null
         else
-            commitMessage+="$line\n"
+            commitMessage+="$package: Not found in vendor directory.\n\n"
         fi
-    done
-
-    # Output the final commit message
-    echo -e "$commitMessage"
-    echonice "$commitMessage"
-
-    # Commit changes if required
-    if [[ "$commit" == "yes" ]]; then
-        sake-git-commit-and-push . -m "$(echo -e "DEP: composer update:\n\n$commitMessage")"
+    else
+        commitMessage+="$line\n"
     fi
-}
+done
 
-# Run the parser function
-parse_composer_log
+# Output the final commit message
+
+ECHOHEAD "Composer Update Summary"
+echo -e "$commitMessage"
+
+# Commit changes if required
+if [[ "$commit" == "yes" ]]; then
+    sake-git-commit-and-push . -m "$(echo -e "DEP: composer update:\n\n$commitMessage")"
+fi
 
 echoend
