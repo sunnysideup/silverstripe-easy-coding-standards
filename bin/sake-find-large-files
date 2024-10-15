@@ -50,6 +50,7 @@ help_and_exit() {
     echofunctions
     exit
 }
+#!/bin/bash
 
 # Function to convert human-readable sizes to bytes for comparison
 sizeToBytes() {
@@ -61,10 +62,16 @@ sizeToBytes() {
     '
 }
 
-# Function to find directories larger than a specified size
+# Function to find directories larger than a specified size and format output
 findLargeDirs() {
     local sizeThresholdBytes=$(sizeToBytes "$1")
-    find . -type d -exec du -sb {} + | awk -v size="$sizeThresholdBytes" '$1 > size' | sort -rh
+    echo -e "Size\t\tDirectory"
+    find . -type d -exec du -sb {} + | awk -v size="$sizeThresholdBytes" '$1 > size' |
+        sort -rh | while read -r bytes dir; do
+        humanSize=$(numfmt --to=iec --format="%.1f" "$bytes")
+        relativeDir=${dir#./} # Remove './' prefix
+        printf "%-10s\t%s\n" "$humanSize" "$relativeDir"
+    done
 }
 
 # Check if help is requested
@@ -73,20 +80,28 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 # Verify directory existence
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd "$WORKING_DIR/$dir" || {
+if [ -d "$dir" ]; then
+    cd "$dir" || {
         echonice "Failed to enter directory"
         exit 1
     }
 else
-    echonice "Could not change directory to $WORKING_DIR/$dir"
+    echonice "Could not change directory to $dir"
     help_and_exit
 fi
 
-echonice "Finding files larger than $minSize in $WORKING_DIR/$dir"
+echonice "Finding files larger than $minSize in $dir"
 
-# Finding large files and directories
-find "$WORKING_DIR/$dir" -xdev -type f -size +"$minSize" -exec du -sh {} + | sort -rh | head -n50
+# Finding large files and formatting output
+echo -e "Size\t\tFile"
+find . -xdev -type f -size +"$minSize" -exec du -sb {} + |
+    sort -rh | head -n50 | while read -r bytes file; do
+    humanSize=$(numfmt --to=iec --format="%.1f" "$bytes")
+    relativeFile=${file#./} # Remove './' prefix
+    printf "%-10s\t%s\n" "$humanSize" "$relativeFile"
+done
+
+# Finding large directories
 findLargeDirs "$minSize"
 
 echoend
