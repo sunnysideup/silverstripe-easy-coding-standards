@@ -112,63 +112,82 @@ check_vendor_changes() {
 
 # Run the function before updating
 check_vendor_changes
+
 # Proceed with the Composer update
 echonice "Running Composer update..."
-rm composer.log -f
-composer update --no-interaction --no-progress --prefer-source 2>&1 | tee composer.log
-
-# Function to parse the composer.log file and extract package changes
-
-echonice "Parsing composer.log for package changes..."
+composer update --prefer-source
 
 # Initialize an empty commit message
 commitMessage=""
 
-# Use grep to extract only lines containing upgrades or changes
-grep -E 'Upgrading|Updating|Downgrading|Syncing|Installing|Removing' ./composer.log | while read -r line; do
+# Check if composer.lock has changed
+if git diff --quiet composer.lock; then
+    echonice "No vendor package changes detected."
+else
+    echonice "Parsing composer.lock changes..."
 
-    # Adjust regex to match dev-* branches with commit hashes
-    if [[ "$line" =~ ^[[:space:]]*-\ (Upgrading|Syncing)[[:space:]]+([^[:space:]]+)[[:space:]]+\(\([^[:space:]]+\)[[:space:]]+([a-f0-9]+)[[:space:]]+\=\>[[:space:]]+\([^[:space:]]+\)[[:space:]]+([a-f0-9]+)\)$ ]]; then
-        operation="${BASH_REMATCH[1]}"
-        package="${BASH_REMATCH[2]}"
-        old_branch="${BASH_REMATCH[3]}"
-        old_commit="${BASH_REMATCH[4]}"
-        new_branch="${BASH_REMATCH[5]}"
-        new_commit="${BASH_REMATCH[6]}"
+    # Extract package changes from the composer.lock diff
+    changes=$(git diff --unified=0 composer.lock | grep '^[-+][^+-]' | sed 's/^+ //g')
 
-        echonice "Processing $package: $old_branch $old_commit -> $new_branch $new_commit"
+    # Loop through each package change to gather commit messages
+    while IFS= read -r line; do
+        # Extract package name and version changes
+        if [[ "$line" =~ \"name\":\ \"([^\"]+)\" ]]; then
+            package="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ \"version\":\ \"([a-f0-9]+)\" ]]; then
+            version="${BASH_REMATCH[1]}"
+        fi
 
-        package_path="vendor/$package"
+        # If both package and version are available, gather commit messages
+        if [ -n "$package" ] && [ -n "$version" ]; then
+            echonice "Processing $package version $version..."
 
-        if [ -d "$package_path" ]; then
-            cd "$package_path" || exit
+            # Go to the vendor package directory if it exists
+            packagePath="vendor/$package"
+            if [ -d "$packagePath" ]; then
+                cd "$packagePath" || continue
 
-            # Capture all commit messages between the two commit hashes
-            packageCommits=$(git log --pretty=format:'%h - %s' "$old_commit".."$new_commit")
+                # Fetch tags and commits to ensure we have the latest history
+                git fetch --tags &>/dev/null
 
-            if [ -n "$packageCommits" ]; then
-                commitMessage+="$package ($operation from $old_branch $old_commit to $new_branch $new_commit):\n$packageCommits\n\n"
+                # Extract commit hashes for the current and previous versions
+                previousCommit=$(git rev-list -n 1 HEAD^1 2>/dev/null)
+                currentCommit=$(git rev-list -n 1 HEAD 2>/dev/null)
+
+                # Gather commit messages between the two commits
+                if [ -n "$previousCommit" ] && [ -n "$currentCommit" ]; then
+                    commits=$(git log --pretty=format:'%h - %s' "$previousCommit".."$currentCommit")
+                    commitMessage+="$package (from $previousCommit to $currentCommit):\n$commits\n\n"
+                else
+                    commitMessage+="$package: Unable to find commits for the current or previous version.\n\n"
+                fi
+
+                # Go back to the working directory
+                cd - >/dev/null
             else
-                commitMessage+="$package: No new commits between $old_commit and $new_commit.\n\n"
+                commitMessage+="$package: Vendor directory not found.\n\n"
             fi
 
-            cd - >/dev/null
-        else
-            commitMessage+="$package: Not found in vendor directory.\n\n"
+            # Reset package and version variables for the next loop
+            package=""
+            version=""
         fi
+    done <<<"$changes"
+
+    # Print the final commit message or fallback message
+    if [[ -z "$commitMessage" ]]; then
+        echonice "No meaningful vendor package changes detected."
     else
-        commitMessage+="$line\n"
+        echonice "Committing changes to composer.json and composer.lock..."
+        echo -e "$commitMessage"
+
+        # Stage composer.json and composer.lock
+        git add composer.json composer.lock
+
+        # Commit the changes with the generated message
+        git commit -m "DEP: composer update:\n\n$commitMessage"
+        git push
     fi
-done
-
-# Output the final commit message
-
-ECHOHEAD "Composer Update Summary"
-echo -e "$commitMessage"
-
-# Commit changes if required
-if [[ "$commit" == "yes" ]]; then
-    sake-git-commit-and-push . -m "$(echo -e "DEP: composer update:\n\n$commitMessage")"
 fi
 
 echoend
