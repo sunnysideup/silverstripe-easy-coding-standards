@@ -40,6 +40,7 @@
     "bin/sake-find-large-files",
     "bin/sake-git-commit-and-push",
     "bin/sake-git-commit-and-push-vendor-packages",
+    "bin/sake-git-diff-analyser",
     "bin/sake-git-info",
     "bin/sake-git-merge-develop-and-production",
     "bin/sake-git-remove-stale-branches",

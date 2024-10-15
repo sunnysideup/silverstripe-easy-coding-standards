@@ -1,0 +1,95 @@
+#!/usr/bin/env php
+<?php
+
+foreach ([__DIR__ . '/../../../autoload.php', __DIR__ . '/../vendor/autoload.php'] as $file) {
+    if (file_exists($file)) {
+        require $file;
+        break;
+    }
+}
+
+use Sunnysideup\DiffAnalyser\GitDiffAnalyser;
+
+// Usage information
+if (in_array('--help', $argv) || in_array('-h', $argv)) {
+    echo <<<EOL
+Usage: sake-git-diff-analyser [--days=1] [--branch=develop] [--filter=sunnysideup] [--date=YYYY-MM-DD] [--minutes-for-first-line=1] [--mysetting=blue] [directory]
+
+Options:
+  --days=N                     Number of days to go back in time for the analysis (default: 1).
+  --branch=NAME                Specify the branch to analyze (default: develop).
+  --filter=STRING              Filter git repos by their remote URL (default: 'sunnysideup').
+  --date=YYYY-MM-DD            Analyze for a specific date instead of days back.
+  --minutes-for-first-line=N   Set the number of minutes for the first line of code change (default: 20).
+  --show-full-diff=B           set show full diff (default: false).
+  --debug=B                    set debug mode (default: false).
+  -v, -vv, -vvv                Set verbosity level:
+  -v                           - Show total time and total changes only.
+  -vv                          - Show commit messages, file changes, and total time (default).
+  -vvv                         - Show detailed changes for each file.
+  -h, --help                   Show this help message.
+
+  directory                    Directory to run the analysis in (default: current directory).
+
+Examples:
+  vendor/bin/sake-git-diff-analyser --days=7 --branch=main --filter=myorganization ./myrepo
+  vendor/bin/sake-git-diff-analyser  -vvv ./
+
+EOL;
+    exit;
+}
+
+// CLI argument handling
+$options = getopt(
+    '',
+    [
+        'days:',
+        'branch:',
+        'filter:',
+        'minutes-for-first-line:',
+        'date:',
+        'mysetting:', 'v::',
+        'show-full-diff:',
+        'debug:'
+    ]
+);
+
+$days = isset($options['days']) ? (int)$options['days'] : 1;
+$date = $options['date'] ?? null;
+
+$branch = $options['branch'] ?? 'develop';
+$filter = $options['filter'] ?? 'sunnysideup';
+$minutesForFirstLineChange = isset($options['minutes-for-first-line']) ? (float)$options['minutes-for-first-line'] : 0;
+$verbosity = isset($options['v']) ? strlen($options['v']) : 2;
+$showFullDiff = isset($options['show-full-diff']) ? true : false;
+$debug = isset($options['debug']) ? true : false;
+
+
+// Check if a directory is passed as the last argument
+$directory = $argv[count($argv) - 1] ?? getcwd();
+if (is_dir($directory)) {
+    $directory = $argv[count($argv) - 1];
+} else {
+    $directory = getcwd();
+}
+
+// Set the directory to run the analysis
+chdir($directory);
+
+if ($date) {
+    $daysOrDate = $date;
+} else {
+    $daysOrDate = $days;
+}
+
+// Create an instance of the GitDiffAnalyzer and run the analysis
+(new GitDiffAnalyser())
+    ->setDirectory($directory)
+    ->setDaysOrDate($daysOrDate)
+    ->setBranch($branch)
+    ->setFilter($filter)
+    // ->setMinutesForFirstLineChange($minutesForFirstLineChange)
+    ->setVerbosity($verbosity)
+    ->setShowFullDiff($showFullDiff)
+    ->setDebug($debug)
+    ->run();
