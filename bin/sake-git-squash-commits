@@ -173,11 +173,15 @@ if [[ "$allCommits" == "yes" ]]; then
 
 fi
 
+# IMPORTANT - DO THIS FIRST
+
+git fetch origin
+git fetch origin
+
 ############################################ ALL
 if [[ "$allCommitsInBranch" == "yes" ]]; then
 
     # Fetch the latest changes from the remote
-    git fetch origin
 
     # Merge origin/$intoBranch into the current branch
     if ! git merge origin/$intoBranch; then
@@ -240,8 +244,8 @@ fi
 
 if [ $numberOfCommits \> 0 ]; then
     git reset --soft HEAD~$numberOfCommits
-    git commit . -m "$message"
     git add . -A
+    git commit . -m "$message"
     git push --force-with-lease
 else
     ECHOHEAD "Nothing to squash, please use -t or -n option"
