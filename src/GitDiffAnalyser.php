@@ -1,6 +1,6 @@
 <?php
 
-namespace Sunnysideup\DiffAnalyser;
+namespace Sunnysideup\EasyCodingStandards;
 
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
