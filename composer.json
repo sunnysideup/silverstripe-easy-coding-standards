@@ -82,5 +82,5 @@
         "psr-4": {
             "Sunnysideup\\EasyCodingStandards\\": "src/"
         }
-    },  
+    }
 }
