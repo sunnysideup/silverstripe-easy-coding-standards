@@ -169,7 +169,7 @@ else
 
                 # Fetch commits between the two references
                 git fetch --tags &>/dev/null
-                commits=$(git log --pretty=format:'%h - %s' "$oldRef".."$newRef")
+                commits=$(git log --pretty=format:'%s - %h' "$oldRef".."$newRef")
 
                 if [ -n "$commits" ]; then
                     commitMessage+="$package: \n$commits\n\n"
@@ -195,7 +195,7 @@ else
 
         # Save the commit message to a temporary file
         tempFile=$(mktemp)
-        printf "%s" "$commitMessage" >"$tempFile"
+        printf "%b" "$commitMessage" >"$tempFile"
 
         # Stage composer.json and composer.lock
         git add composer.json composer.lock
