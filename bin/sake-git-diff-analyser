@@ -8,7 +8,7 @@ foreach ([__DIR__ . '/../../../autoload.php', __DIR__ . '/../vendor/autoload.php
     }
 }
 
-use Sunnysideup\DiffAnalyser\GitDiffAnalyser;
+use Sunnysideup\EasyCodingStandards\GitDiffAnalyser;
 
 // Usage information
 if (in_array('--help', $argv) || in_array('-h', $argv)) {
