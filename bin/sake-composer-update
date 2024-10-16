@@ -129,60 +129,72 @@ if git diff --quiet composer.lock; then
 else
     echonice "Parsing composer.lock changes..."
 
-    # DEBUG: Show the raw diff output
-    echo "DEBUG: Raw git diff output:"
-    git diff composer.lock
+    # Extract changes by package and reference using jq
+    package_refs=$(jq -r '
+        (.packages + .["packages-dev"])[] |
+        {name: .name, reference: .source.reference} |
+        "\(.name) \(.reference)"
+    ' composer.lock)
 
-    # Extract references (old and new) and ensure uniqueness
-    references=$(git diff composer.lock | grep '^\(-\|+\)[[:space:]]*"reference":' |
-        sed -E 's/^[-+]\s*"reference": "(.*)",?/\1/' |
-        sort -u)
+    # DEBUG: Show extracted package references
+    echo "DEBUG: Extracted package references:"
+    echo "$package_refs"
 
-    # DEBUG: Show extracted references
-    echo "DEBUG: Extracted references:"
-    echo "$references"
+    # Convert package references into an associative array (package => reference)
+    declare -A refMap
+    while IFS=' ' read -r package reference; do
+        refMap["$package"]="$reference"
+    done <<<"$package_refs"
 
-    # Convert references into an array
-    refArray=($references)
+    # Loop through the git diff and extract reference pairs per package
+    currentPackage=""
+    oldRef=""
+    newRef=""
 
-    # Loop through reference pairs (old, new)
-    for ((i = 0; i < ${#refArray[@]}; i += 2)); do
-        oldRef="${refArray[i]}"
-        newRef="${refArray[i + 1]}"
+    git diff composer.lock | grep -E '^\(-\|+\)\s*"reference":' | while read -r line; do
+        reference=$(echo "$line" | sed -E 's/^[-+]\s*"reference": "(.*)",?/\1/')
 
-        # DEBUG: Print each reference pair being processed
-        echo "DEBUG: Processing pair: old=$oldRef, new=$newRef"
+        if [[ "$line" == -* ]]; then
+            oldRef="$reference"
+        elif [[ "$line" == +* ]]; then
+            newRef="$reference"
+        fi
 
-        # Use the new reference to find the package name
-        package=$(jq -r --arg ref "$newRef" '
-            (.packages + .["packages-dev"])[]? |
-            select(.source.reference == $ref) |
-            .name // "Unknown package"
-        ' composer.lock)
+        # If both old and new references are available, process them
+        if [[ -n "$oldRef" && -n "$newRef" ]]; then
+            # Find the matching package for this reference change
+            for package in "${!refMap[@]}"; do
+                if [[ "${refMap[$package]}" == "$newRef" ]]; then
+                    currentPackage="$package"
+                    break
+                fi
+            done
 
-        # Ensure we have a valid package name
-        if [ -n "$package" ] && [ "$package" != "Unknown package" ]; then
-            packagePath="vendor/$package"
+            echo "DEBUG: Processing package: $currentPackage (old=$oldRef, new=$newRef)"
 
+            # Check if the package directory exists
+            packagePath="vendor/$currentPackage"
             if [ -d "$packagePath" ]; then
                 cd "$packagePath" || continue
 
                 # Fetch commits between the two references
                 git fetch --tags &>/dev/null
-                commits=$(git log --pretty=format:'%s - %h' "$oldRef".."$newRef")
+                commits=$(git log --pretty=format:'%s' "$oldRef".."$newRef")
 
                 if [ -n "$commits" ]; then
-                    commitMessage+="$package: \n$commits\n\n"
+                    commitMessage+="$currentPackage: \n$commits\n\n"
                 else
-                    commitMessage+="$package: No new commits between $oldRef and $newRef.\n\n"
+                    commitMessage+="$currentPackage: No new commits between $oldRef and $newRef.\n\n"
                 fi
 
                 cd - >/dev/null
             else
-                commitMessage+="$package: Vendor directory not found.\n\n"
+                commitMessage+="$currentPackage: Vendor directory not found.\n\n"
             fi
-        else
-            commitMessage+="Unknown package for reference $newRef\n\n"
+
+            # Reset old and new references for the next iteration
+            oldRef=""
+            newRef=""
         fi
     done
 
@@ -193,19 +205,17 @@ else
         echonice "Committing changes to composer.json and composer.lock..."
         echo -e "$commitMessage"
 
-        # Save the commit message to a temporary file
-        tempFile=$(mktemp)
-        printf "%b" "$commitMessage" >"$tempFile"
-
         # Stage composer.json and composer.lock
         git add composer.json composer.lock
 
-        # Commit the changes using the temporary file
-        git commit -F "$tempFile"
-        git push
+        # Use a here-document to handle multi-line commit messages correctly
+        git commit -F - <<EOF
+DEP: composer update:
 
-        # Clean up the temporary file
-        rm "$tempFile"
+$commitMessage
+EOF
+
+        git push
     fi
 fi
 echoend
