@@ -93,129 +93,101 @@ if [[ "$sortPackages" == "yes" ]]; then
     composer config sort-packages true
 fi
 
-# Step: Check each vendor package for uncommitted changes
-check_vendor_changes() {
-    echonice "Checking for local changes in vendor packages..."
-
-    for package_dir in vendor/*/*; do
-        if [ -d "$package_dir/.git" ]; then
-            cd "$package_dir" || continue
-
-            # Check if there are uncommitted changes
-            if [[ -n $(git status --porcelain) ]]; then
-                echobad "Uncommitted changes detected in $package_dir!"
-                echonice "Please commit or stash your changes before updating."
-                cd - >/dev/null
-                exit 1
-            fi
-
-            cd - >/dev/null
-        fi
-    done
-
-    echonice "No uncommitted changes found in vendor packages."
-}
+# Step: Capture the current package info before the update
+oldPackageInfo=$(composer info --format=json)
 
 # Run composer update
 echonice "Running composer update..."
 composer update --prefer-source
 
+# Capture the new package info after the update
+newPackageInfo=$(composer info --format=json)
+
+# Parse both old and new package info
+oldPackages=$(echo "$oldPackageInfo" | jq -r '.installed[] | "\(.name) \(.version) \(.source.reference)"')
+newPackages=$(echo "$newPackageInfo" | jq -r '.installed[] | "\(.name) \(.version) \(.source.reference)"')
+
 # Initialize an empty commit message
 commitMessage=""
 
-# Check if composer.lock has changed
-if git diff --quiet composer.lock; then
-    echonice "No vendor package changes detected."
-else
-    echonice "Parsing composer.lock changes..."
-
-    # Extract changes by package and reference using jq
-    package_refs=$(jq -r '
-        (.packages + .["packages-dev"])[] |
-        {name: .name, reference: .source.reference} |
-        "\(.name) \(.reference)"
-    ' composer.lock)
-
-    # DEBUG: Show extracted package references
-    echo "DEBUG: Extracted package references:"
-    echo "$package_refs"
-
-    # Convert package references into an associative array (package => reference)
-    declare -A refMap
-    while IFS=' ' read -r package reference; do
-        refMap["$package"]="$reference"
-    done <<<"$package_refs"
-
-    # Loop through the git diff and extract reference pairs per package
-    currentPackage=""
-    oldRef=""
-    newRef=""
-
-    git diff composer.lock | grep -E '^\(-\|+\)\s*"reference":' | while read -r line; do
-        reference=$(echo "$line" | sed -E 's/^[-+]\s*"reference": "(.*)",?/\1/')
-
-        if [[ "$line" == -* ]]; then
-            oldRef="$reference"
-        elif [[ "$line" == +* ]]; then
-            newRef="$reference"
+# Function to detect added packages
+detect_added_packages() {
+    echo "Detecting added packages..."
+    while read -r newPackage; do
+        packageName=$(echo "$newPackage" | awk '{print $1}')
+        if ! echo "$oldPackages" | grep -q "^$packageName "; then
+            echonice "Package added: $newPackage"
+            commitMessage+="Package added: $newPackage\n"
         fi
+    done <<<"$newPackages"
+}
 
-        # If both old and new references are available, process them
-        if [[ -n "$oldRef" && -n "$newRef" ]]; then
-            # Find the matching package for this reference change
-            for package in "${!refMap[@]}"; do
-                if [[ "${refMap[$package]}" == "$newRef" ]]; then
-                    currentPackage="$package"
-                    break
-                fi
-            done
+# Function to detect deleted packages
+detect_deleted_packages() {
+    echo "Detecting deleted packages..."
+    while read -r oldPackage; do
+        packageName=$(echo "$oldPackage" | awk '{print $1}')
+        if ! echo "$newPackages" | grep -q "^$packageName "; then
+            echonice "Package deleted: $oldPackage"
+            commitMessage+="Package deleted: $oldPackage\n"
+        fi
+    done <<<"$oldPackages"
+}
 
-            echo "DEBUG: Processing package: $currentPackage (old=$oldRef, new=$newRef)"
+# Detect added and deleted packages
+detect_added_packages
+detect_deleted_packages
 
-            # Check if the package directory exists
-            packagePath="vendor/$currentPackage"
-            if [ -d "$packagePath" ]; then
-                cd "$packagePath" || continue
+# Compare the packages and identify version/reference changes
+while read -r oldPackage; do
+    packageName=$(echo "$oldPackage" | awk '{print $1}')
+    oldVersion=$(echo "$oldPackage" | awk '{print $2}')
+    oldRef=$(echo "$oldPackage" | awk '{print $3}')
 
-                # Fetch commits between the two references
-                git fetch --tags &>/dev/null
-                commits=$(git log --pretty=format:'%s' "$oldRef".."$newRef")
+    newPackage=$(echo "$newPackages" | grep "^$packageName ")
+    newVersion=$(echo "$newPackage" | awk '{print $2}')
+    newRef=$(echo "$newPackage" | awk '{print $3}')
 
-                if [ -n "$commits" ]; then
-                    commitMessage+="$currentPackage: \n$commits\n\n"
-                else
-                    commitMessage+="$currentPackage: No new commits between $oldRef and $newRef.\n\n"
-                fi
+    if [[ "$oldVersion" != "$newVersion" || "$oldRef" != "$newRef" ]]; then
+        echonice "Package $packageName updated from $oldVersion ($oldRef) to $newVersion ($newRef)"
 
-                cd - >/dev/null
+        # Fetch the commits between the two references
+        packagePath="vendor/$packageName"
+        if [ -d "$packagePath" ]; then
+            cd "$packagePath" || continue
+            git fetch --tags &>/dev/null
+            commits=$(git log --pretty=format:'%s' "$oldRef".."$newRef")
+
+            if [ -n "$commits" ]; then
+                commitMessage+="$packageName: \n$commits\n\n"
             else
-                commitMessage+="$currentPackage: Vendor directory not found.\n\n"
+                commitMessage+="$packageName: No new commits between $oldRef and $newRef.\n\n"
             fi
-
-            # Reset old and new references for the next iteration
-            oldRef=""
-            newRef=""
+            cd - >/dev/null
+        else
+            commitMessage+="$packageName: Vendor directory not found.\n\n"
         fi
-    done
+    fi
+done <<<"$oldPackages"
 
-    # Print the final commit message or fallback message
-    if [[ -z "$commitMessage" ]]; then
-        echonice "No meaningful vendor package changes detected."
-    else
-        echonice "Committing changes to composer.json and composer.lock..."
-        echo -e "$commitMessage"
+# Print the final commit message or fallback message
+if [[ -z "$commitMessage" ]]; then
+    echonice "No meaningful vendor package changes detected."
+else
+    echonice "Committing changes to composer.json and composer.lock..."
+    echo -e "$commitMessage"
 
-        # Stage composer.json and composer.lock
-        git add composer.json composer.lock
+    # Stage composer.json and composer.lock
+    git add composer.json composer.lock
 
-        # Use a here-document to handle multi-line commit messages correctly
-        git commit -F - <<EOF
+    # Use a here-document to handle multi-line commit messages correctly
+    git commit -F - <<EOF
 DEP: composer update:
 
 $commitMessage
 EOF
 
-        git push
-    fi
+    git push
 fi
+
 echoend
