@@ -89,28 +89,33 @@ if [[ -z "$LATEST_TAG" ]]; then
 fi
 
 # Get the list of commit messages since the last tag
-COMMIT_MESSAGES=$(git log "$LATEST_TAG"..HEAD --pretty=format:%s)
+COMMIT_MESSAGES=$(git log "$LATEST_TAG"..HEAD --pretty=format:%B)
 
 # Initialize version bump types
 MAJOR=0
 MINOR=0
 PATCH=0
 
-# Check each commit message
-while read -r COMMIT; do
+# Check each commit message (multi-line messages supported)
+while IFS= read -r COMMIT; do
+    # If a blank line, continue (it means end of a commit message)
+    if [[ -z "$COMMIT" ]]; then
+        continue
+    fi
 
     echonice "CHECKING COMMIT: $COMMIT"
 
-    if [[ $COMMIT == API* ]] || [[ $COMMIT == MAJOR* ]]; then
+    # Check for specific phrases at the start of any line in the commit message
+    if [[ "$COMMIT" =~ ^API: ]] || [[ "$COMMIT" =~ ^MAJOR: ]]; then
         MAJOR=1
-    elif [[ $COMMIT == ENH* ]] || [[ $COMMIT == NEW* ]] || [[ $COMMIT == DEP* ]]; then
+    elif [[ "$COMMIT" =~ ^ENH: ]] || [[ "$COMMIT" =~ ^NEW: ]] || [[ "$COMMIT" =~ ^DEP: ]]; then
         MINOR=1
-    elif [[ $COMMIT == FIX* ]] || [[ $COMMIT == PATCH* ]]; then
+    elif [[ "$COMMIT" =~ ^FIX: ]] || [[ "$COMMIT" =~ ^PATCH: ]]; then
         PATCH=1
     fi
 done <<<"$COMMIT_MESSAGES"
 
-# Extract current version numbers
+# Extract current version numbers from the latest tag
 IFS='.' read -ra ADDR <<<"$LATEST_TAG"
 CUR_MAJOR="${ADDR[0]}"
 CUR_MINOR="${ADDR[1]}"
@@ -128,7 +133,9 @@ else
     exit 0
 fi
 
+# Tagging the repository with the new tag
 git tag "$NEW_TAG"
+echonice "New version tagged: $NEW_TAG"
 
 echonice "NEW TAG: $NEW_TAG"
 

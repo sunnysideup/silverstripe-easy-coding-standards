@@ -98,7 +98,7 @@ detect_added_packages() {
     while read -r newPackage; do
         packageName=$(echo "$newPackage" | awk '{print $1}')
         if ! echo "$oldPackages" | grep -q "^$packageName "; then
-            echonice "Package added: $newPackage"
+            echonice "ENH: Package added: $newPackage"
             commitMessage+="Package added: $newPackage\n"
         fi
     done <<<"$newPackages"
@@ -110,7 +110,7 @@ detect_deleted_packages() {
     while read -r oldPackage; do
         packageName=$(echo "$oldPackage" | awk '{print $1}')
         if ! echo "$newPackages" | grep -q "^$packageName "; then
-            echonice "Package deleted: $oldPackage"
+            echonice "API: Package deleted: $oldPackage"
             commitMessage+="Package deleted: $oldPackage\n"
         fi
     done <<<"$oldPackages"
