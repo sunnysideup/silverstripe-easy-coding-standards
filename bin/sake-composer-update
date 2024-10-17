@@ -1,96 +1,10 @@
 #!/bin/bash
 
-############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
-WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
-
-############################################ DIR
-dir='./'
-############################################ SETTINGS
-force='no'
-commit='yes'
-sortPackages='yes'
-help='no'
-
-while (($#)); do
-    case $1 in
-    -f | --force)
-        force=$2
-        shift
-        ;;
-    -c | --commit)
-        commit=$2
-        shift
-        ;;
-    -s | --sort)
-        sortPackages=$2
-        shift
-        ;;
-    -h | --help)
-        help='yes'
-        shift
-        ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1"
-        help='yes'
-        ;;
-    *) dir=$1 ;;
-    esac
-    shift
-done
-
-help_and_exit() {
-    ECHOHEAD "Composer Update"
-    echonice "Directory of script:           $SCRIPT_DIR"
-    echonice "Directory to analyse:          $WORKING_DIR/$dir"
-
-    ECHOHEAD "Current settings:"
-    echonice "Force (-f|--force):            $force"
-    echonice "Commit result:                 $commit"
-
-    ECHOHEAD "Available settings:"
-    echonice "-f, --force                    delete vendor folder, default: 'no'"
-    echonice "-c, --commit                   also commit, default: 'yes'"
-    echonice "-s, --sort                     sort packages, default: 'yes'"
-    echonice "-h, --help                     show help information"
-
-    ECHOHEAD "Example usage:"
-    echonice "sake-composer-update . -f 'yes' -c 'no'"
-
-    echofunctions
-    exit
-}
-
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
-
 ############################################ CODE
 # Ensure jq is installed
 if ! command -v jq &>/dev/null; then
     echo "Error: jq is not installed. Please install jq to proceed."
     exit 1
-fi
-
-check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
-
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
-else
-    echonice "Could not change directory to $WORKING_DIR/$dir"
-    help_and_exit
-fi
-
-if [[ "$force" == "yes" ]]; then
-    echonice "Clearning vendor folder"
-    rm vendor -rf
-fi
-
-if [[ "$sortPackages" == "yes" ]]; then
-    echonice "Sorting packages"
-    composer config sort-packages true
 fi
 
 # Step: Capture the current package info before the update
@@ -104,8 +18,9 @@ composer update --prefer-source
 newPackageInfo=$(composer info --format=json)
 
 # Parse both old and new package info
-oldPackages=$(echo "$oldPackageInfo" | jq -r '.installed[] | "\(.name) \(.version) \(.source.reference)"')
-newPackages=$(echo "$newPackageInfo" | jq -r '.installed[] | "\(.name) \(.version) \(.source.reference)"')
+# Extract version and commit hash from the version field
+oldPackages=$(echo "$oldPackageInfo" | jq -r '.installed[] | "\(.name) \(.version)"')
+newPackages=$(echo "$newPackageInfo" | jq -r '.installed[] | "\(.name) \(.version)"')
 
 # Initialize an empty commit message
 commitMessage=""
@@ -138,35 +53,18 @@ detect_deleted_packages() {
 detect_added_packages
 detect_deleted_packages
 
-# Compare the packages and identify version/reference changes
+# Compare the packages and identify version changes
 while read -r oldPackage; do
     packageName=$(echo "$oldPackage" | awk '{print $1}')
-    oldVersion=$(echo "$oldPackage" | awk '{print $2}')
-    oldRef=$(echo "$oldPackage" | awk '{print $3}')
-
+    oldVersion=$(echo "$oldPackage" | awk '{print $2, $3}') # Handle the version and commit hash
     newPackage=$(echo "$newPackages" | grep "^$packageName ")
-    newVersion=$(echo "$newPackage" | awk '{print $2}')
-    newRef=$(echo "$newPackage" | awk '{print $3}')
+    newVersion=$(echo "$newPackage" | awk '{print $2, $3}') # Handle the version and commit hash
 
-    if [[ "$oldVersion" != "$newVersion" || "$oldRef" != "$newRef" ]]; then
-        echonice "Package $packageName updated from $oldVersion ($oldRef) to $newVersion ($newRef)"
+    if [[ "$oldVersion" != "$newVersion" ]]; then
+        echonice "Package $packageName updated from $oldVersion to $newVersion"
 
-        # Fetch the commits between the two references
-        packagePath="vendor/$packageName"
-        if [ -d "$packagePath" ]; then
-            cd "$packagePath" || continue
-            git fetch --tags &>/dev/null
-            commits=$(git log --pretty=format:'%s' "$oldRef".."$newRef")
-
-            if [ -n "$commits" ]; then
-                commitMessage+="$packageName: \n$commits\n\n"
-            else
-                commitMessage+="$packageName: No new commits between $oldRef and $newRef.\n\n"
-            fi
-            cd - >/dev/null
-        else
-            commitMessage+="$packageName: Vendor directory not found.\n\n"
-        fi
+        # No commit references available, just log the version changes
+        commitMessage+="$packageName: Updated from $oldVersion to $newVersion\n"
     fi
 done <<<"$oldPackages"
 
