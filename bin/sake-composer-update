@@ -1,5 +1,72 @@
 #!/bin/bash
 
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+############################################ SETTINGS
+force='no'
+commit='yes'
+sortPackages='yes'
+help='no'
+
+while (($#)); do
+    case $1 in
+    -f | --force)
+        force=$2
+        shift
+        ;;
+    -c | --commit)
+        commit=$2
+        shift
+        ;;
+    -s | --sort)
+        sortPackages=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Composer Update"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+    echonice "Force (-f|--force):            $force"
+    echonice "Commit result:                 $commit"
+
+    ECHOHEAD "Available settings:"
+    echonice "-f, --force                    delete vendor folder, default: 'no'"
+    echonice "-c, --commit                   also commit, default: 'yes'"
+    echonice "-s, --sort                     sort packages, default: 'yes'"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-composer-update . -f 'yes' -c 'no'"
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
 ############################################ CODE
 # Ensure jq is installed
 if ! command -v jq &>/dev/null; then
