@@ -32,7 +32,7 @@ while (($#)); do
         shift
         ;;
     -*)
-        printf 'Unknown option: %q\n\n' "$1"
+        printf 'Unknown option: %q\n' "$1"
         help='yes'
         ;;
     *) dir=$1 ;;
@@ -120,18 +120,35 @@ detect_deleted_packages() {
 detect_added_packages
 detect_deleted_packages
 
-# Compare the packages and identify version changes
+# Compare the packages and identify version/reference changes
 while read -r oldPackage; do
     packageName=$(echo "$oldPackage" | awk '{print $1}')
-    oldVersion=$(echo "$oldPackage" | awk '{print $2, $3}') # Handle the version and commit hash
+    oldVersion=$(echo "$oldPackage" | awk '{print $2}')
+    oldRef=$(echo "$oldPackage" | awk '{print $3}')
+
     newPackage=$(echo "$newPackages" | grep "^$packageName ")
-    newVersion=$(echo "$newPackage" | awk '{print $2, $3}') # Handle the version and commit hash
+    newVersion=$(echo "$newPackage" | awk '{print $2}')
+    newRef=$(echo "$newPackage" | awk '{print $3}')
 
-    if [[ "$oldVersion" != "$newVersion" ]]; then
-        echonice "Package $packageName updated from $oldVersion to $newVersion"
+    if [[ "$oldVersion" != "$newVersion" || "$oldRef" != "$newRef" ]]; then
+        echonice "Package $packageName updated from $oldVersion ($oldRef) to $newVersion ($newRef)"
 
-        # No commit references available, just log the version changes
-        commitMessage+="$packageName: Updated from $oldVersion to $newVersion\n"
+        # Fetch the commits between the two references
+        packagePath="vendor/$packageName"
+        if [ -d "$packagePath" ]; then
+            cd "$packagePath" || continue
+            git fetch --tags &>/dev/null
+            commits=$(git log --pretty=format:'%s' "$oldRef".."$newRef")
+
+            if [ -n "$commits" ]; then
+                commitMessage+="$packageName: \n$commits\n"
+            else
+                commitMessage+="$packageName: No new commits between $oldRef and $newRef.\n"
+            fi
+            cd - >/dev/null
+        else
+            commitMessage+="$packageName: Vendor directory not found.\n"
+        fi
     fi
 done <<<"$oldPackages"
 
