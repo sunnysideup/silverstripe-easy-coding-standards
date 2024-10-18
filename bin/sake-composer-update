@@ -99,7 +99,7 @@ detect_added_packages() {
         packageName=$(echo "$newPackage" | awk '{print $1}')
         if ! echo "$oldPackages" | grep -q "^$packageName "; then
             echonice "ENH: Package added: $newPackage"
-            commitMessage+="Package added: $newPackage\n"
+            commitMessage+=$(echo -e "Package added: $newPackage\n")
         fi
     done <<<"$newPackages"
 }
@@ -111,7 +111,7 @@ detect_deleted_packages() {
         packageName=$(echo "$oldPackage" | awk '{print $1}')
         if ! echo "$newPackages" | grep -q "^$packageName "; then
             echonice "API: Package deleted: $oldPackage"
-            commitMessage+="Package deleted: $oldPackage\n"
+            commitMessage+=$(echo -e "Package deleted: $oldPackage\n")
         fi
     done <<<"$oldPackages"
 }
@@ -141,13 +141,13 @@ while read -r oldPackage; do
             commits=$(git log --pretty=format:'%s' "$oldRef".."$newRef")
 
             if [ -n "$commits" ]; then
-                commitMessage+="$packageName: \n$commits\n"
+                commitMessage+=$(echo -e "$packageName: \n$commits\n")
             else
-                commitMessage+="$packageName: No new commits between $oldRef and $newRef.\n"
+                commitMessage+=$(echo -e "$packageName: No new commits between $oldRef and $newRef.\n")
             fi
             cd - >/dev/null
         else
-            commitMessage+="$packageName: Vendor directory not found.\n"
+            commitMessage+=$(echo -e "$packageName: Vendor directory not found.\n")
         fi
     fi
 done <<<"$oldPackages"
