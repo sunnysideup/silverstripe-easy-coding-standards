@@ -99,7 +99,7 @@ detect_added_packages() {
         packageName=$(echo "$newPackage" | awk '{print $1}')
         if ! echo "$oldPackages" | grep -q "^$packageName "; then
             echonice "ENH: Package added: $newPackage"
-            commitMessage+=$(echo -e "Package added: $newPackage\n")
+            commitMessage+=$(echo -e "Package added: $newPackage\n\n")
         fi
     done <<<"$newPackages"
 }
@@ -111,7 +111,7 @@ detect_deleted_packages() {
         packageName=$(echo "$oldPackage" | awk '{print $1}')
         if ! echo "$newPackages" | grep -q "^$packageName "; then
             echonice "API: Package deleted: $oldPackage"
-            commitMessage+=$(echo -e "Package deleted: $oldPackage\n")
+            commitMessage+=$(echo -e "Package deleted: $oldPackage\n\n")
         fi
     done <<<"$oldPackages"
 }
@@ -139,11 +139,11 @@ while read -r oldPackage; do
             cd "$packagePath" || continue
             git fetch --tags &>/dev/null
             commits=$(git log --pretty=format:'%s' "$oldRef".."$newRef")
-
+            commitMessage+=$(echo -e "\n\n$packageName: \n\n")
             if [ -n "$commits" ]; then
-                commitMessage+=$(echo -e "$packageName: \n$commits\n")
+                commitMessage+=$(echo -e "\n\n$commits\n\n")
             else
-                commitMessage+=$(echo -e "$packageName: No new commits between $oldRef and $newRef.\n")
+                commitMessage+=$(echo -e "No new commits between $oldRef and $newRef.\n\n")
             fi
             cd - >/dev/null
         else
