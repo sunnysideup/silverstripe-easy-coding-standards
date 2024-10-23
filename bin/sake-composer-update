@@ -138,7 +138,7 @@ while read -r oldPackage; do
         if [ -d "$packagePath" ]; then
             cd "$packagePath" || continue
             git fetch --tags &>/dev/null
-            commits=$(git log --pretty=format:'%s' "$oldRef".."$newRef")
+            commits=$(git log --pretty=format:'%s%n' "$oldRef".."$newRef")
             commitMessage+=$(echo -e "\n\n$packageName: \n\n")
             if [ -n "$commits" ]; then
                 commitMessage+=$(echo -e "\n\n$commits\n\n")
