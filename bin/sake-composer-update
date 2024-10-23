@@ -131,6 +131,8 @@ while read -r oldPackage; do
     newRef=$(echo "$newPackage" | awk '{print $3}')
 
     if [[ "$oldVersion" != "$newVersion" || "$oldRef" != "$newRef" ]]; then
+        oldRef=${oldRef:-$oldVersion}
+        newRef=${newRef:-$newVersion}
         echonice "Package $packageName updated from $oldVersion ($oldRef) to $newVersion ($newRef)"
 
         # Fetch the commits between the two references
