@@ -143,6 +143,12 @@ if test -f "$GIT_DIR/.git/config"; then
 
         ECHOHEAD "# adding files to git repo"
         git add . -A
+        if command -v meld &> /dev/null
+        then
+            meld .
+        else
+            echonice "Meld is not installed."
+        fi
         #git add $WORKING_DIR/$also
         #git add $WORKING_DIR/$logFile
 
