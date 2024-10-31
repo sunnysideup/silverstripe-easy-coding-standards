@@ -99,7 +99,7 @@ detect_added_packages() {
         packageName=$(echo "$newPackage" | awk '{print $1}')
         if ! echo "$oldPackages" | grep -q "^$packageName "; then
             echonice "ENH: Package added: $newPackage"
-            commitMessage+=$(echo -e "Package added: $newPackage\n\n")
+            commitMessage+=$(echo -e "+++ Package added: $newPackage\r\n")
         fi
     done <<<"$newPackages"
 }
@@ -111,7 +111,7 @@ detect_deleted_packages() {
         packageName=$(echo "$oldPackage" | awk '{print $1}')
         if ! echo "$newPackages" | grep -q "^$packageName "; then
             echonice "API: Package deleted: $oldPackage"
-            commitMessage+=$(echo -e "Package deleted: $oldPackage\n\n")
+            commitMessage+=$(echo -e "--- Package deleted: $oldPackage\r\n")
         fi
     done <<<"$oldPackages"
 }
@@ -134,18 +134,22 @@ while read -r oldPackage; do
         oldRef=${oldRef:-$oldVersion}
         newRef=${newRef:-$newVersion}
         echonice "Package $packageName updated from $oldVersion ($oldRef) to $newVersion ($newRef)"
-
+        commitMessage+=$(echo -e "\r\n==== $packageName changed from $oldRef to $newRef:\r\n")
         # Fetch the commits between the two references
         packagePath="vendor/$packageName"
         if [ -d "$packagePath" ]; then
             cd "$packagePath" || continue
-            git fetch --tags &>/dev/null
-            commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef")
-            commitMessage+=$(echo -e "\n\n$packageName: \n\n")
-            if [ -n "$commits" ]; then
-                commitMessage+=$(echo -e "\n\n$commits\n\n")
+            if [ -d .git ]; then
+                git fetch --tags &>/dev/null
+                commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef")
+                commitMessage+=$(echo -e "$packageName: \r\n")
+                if [ -n "$commits" ]; then
+                    commitMessage+=$(echo -e "$commits\r\n")
+                else
+                    commitMessage+=$(echo -e "No new commits between $oldRef and $newRef.\r\n")
+                fi
             else
-                commitMessage+=$(echo -e "No new commits between $oldRef and $newRef.\n\n")
+                commitMessage+=$(echo -e "\r\n")
             fi
             cd - >/dev/null
         else
