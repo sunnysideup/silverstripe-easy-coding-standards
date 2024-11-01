@@ -12,6 +12,7 @@ dir='./'
 commitAndPush="yes"
 message=""
 newVersion='yes'
+review='yes'
 also='nothing-here-hopefully'
 alsoDoThemes='no'
 statusOnly='no'
@@ -27,6 +28,10 @@ while (($#)); do
         shift
         ;;
     -v | --new-version)
+        newVersion=$2
+        shift
+        ;;
+    -r | --review)
         newVersion=$2
         shift
         ;;
@@ -75,6 +80,7 @@ help_and_exit() {
     echonice "New Version (-v):              $newVersion"
     echonice "Also check (-a):               $also (relative to $WORKING_DIR)"
     echonice "Status Only (-s):              $statusOnly"
+    echonice "Review First (-r):             $review"
     echonice "Also include themes (-t):      $alsoDoThemes"
 
     ECHOHEAD "Available settings:"
@@ -82,8 +88,9 @@ help_and_exit() {
     echonice "-m, --message                  commit message, defaults to last message used"
     echonice "-v, --new-version              create new tag (no|patch|minor|major), default: yes"
     echonice "-a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup"
-    echonice "-s, --status-only              status only, default: no !!!"
     echonice "-t, --themes-also              include folders in themes, default: no"
+    echonice "-s, --status-only              status only, default: no !!!"
+    echonice "-r, --review                   review first, default: yes"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
@@ -143,22 +150,24 @@ if test -f "$GIT_DIR/.git/config"; then
 
         ECHOHEAD "# adding files to git repo"
         git add . -A
-        if command -v meld &>/dev/null; then
-            # Get the count of changed lines and files
-            output=$(git diff --cached --stat)
-            lineCount=$(echo "$output" | awk '{added += $1; deleted += $3} END {print added + deleted}')
-            fileCount=$(echo "$output" | grep -c '|')
+        if [[ "$review" == "yes" ]]; then
+            if command -v meld &>/dev/null; then
+                # Get the count of changed lines and files
+                output=$(git diff --cached --stat)
+                lineCount=$(echo "$output" | awk '{added += $1; deleted += $3} END {print added + deleted}')
+                fileCount=$(echo "$output" | grep -c '|')
 
-            # Check conditions
-            if [[ "$lineCount" -gt 3 || "$fileCount" -gt 1 ]]; then
-                echonice "Plenty of changes! ($lineCount lines changed across $fileCount files)"
-                # Add your action here, e.g., exit 1 or some other command
-                meld .
+                # Check conditions
+                if [[ "$lineCount" -gt 3 || "$fileCount" -gt 1 ]]; then
+                    echonice "Plenty of changes! ($lineCount lines changed across $fileCount files)"
+                    # Add your action here, e.g., exit 1 or some other command
+                    meld .
+                else
+                    echonice "Changes are within acceptable limits."
+                fi
             else
-                echonice "Changes are within acceptable limits."
+                echobad "Meld is not installed."
             fi
-        else
-            echobad "Meld is not installed."
         fi
         #git add $WORKING_DIR/$also
         #git add $WORKING_DIR/$logFile
