@@ -32,7 +32,7 @@ while (($#)); do
         shift
         ;;
     -*)
-        printf 'Unknown option: %q\n' "$1"
+        printf 'Unknown option: %q\n\n' "$1"
         help='yes'
         ;;
     *) dir=$1 ;;
@@ -99,7 +99,7 @@ detect_added_packages() {
         packageName=$(echo "$newPackage" | awk '{print $1}')
         if ! echo "$oldPackages" | grep -q "^$packageName "; then
             echonice "ENH: Package added: $newPackage"
-            commitMessage+=$(echo -e "\n+++ Package added: $newPackage \n")
+            commitMessage+=$(echo -e "\n\n+++ Package added: $newPackage \n\n")
         fi
     done <<<"$newPackages"
 }
@@ -111,7 +111,7 @@ detect_deleted_packages() {
         packageName=$(echo "$oldPackage" | awk '{print $1}')
         if ! echo "$newPackages" | grep -q "^$packageName "; then
             echonice "API: Package deleted: $oldPackage"
-            commitMessage+=$(echo -e "\n--- Package deleted: $oldPackage \n")
+            commitMessage+=$(echo -e "\n\n--- Package deleted: $oldPackage \n\n")
         fi
     done <<<"$oldPackages"
 }
@@ -134,7 +134,7 @@ while read -r oldPackage; do
         oldRef=${oldRef:-$oldVersion}
         newRef=${newRef:-$newVersion}
         echonice "Package $packageName updated from $oldVersion ($oldRef) to $newVersion ($newRef)"
-        commitMessage+=$(echo -e "\n==== $packageName changed from $oldRef to $newRef: \n")
+        commitMessage+=$(echo -e "\n\n==== $packageName changed from $oldRef to $newRef: \n\n")
         # Fetch the commits between the two references
         packagePath="vendor/$packageName"
         if [ -d "$packagePath" ]; then
@@ -143,16 +143,16 @@ while read -r oldPackage; do
                 git fetch --tags &>/dev/null
                 commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef")
                 if [ -n "$commits" ]; then
-                    commitMessage+=$(echo -e "\n$commits \n")
+                    commitMessage+=$(echo -e "\n\n$commits \n\n")
                 else
-                    commitMessage+=$(echo -e "\nNo new commits between $oldRef and $newRef. \n")
+                    commitMessage+=$(echo -e "\n\nNo new commits between $oldRef and $newRef. \n\n")
                 fi
             else
-                commitMessage+=$(echo -e "\nNo git repository found in $packagePath. \n")
+                commitMessage+=$(echo -e "\n\nNo git repository found in $packagePath. \n\n")
             fi
             cd - >/dev/null
         else
-            commitMessage+=$(echo -e "\n$packageName: Vendor directory not found. \n")
+            commitMessage+=$(echo -e "\n\n$packageName: Vendor directory not found. \n\n")
         fi
     fi
 done <<<"$oldPackages"
