@@ -19,8 +19,8 @@ class GitDiffAnalyser
     protected int $verbosity = 2;
     protected bool $showFullDiff = false;
     protected int $maxLinesToShowAll = 15;
-    protected int $maxLinesToShowAdditionsOnly = 55;
-    protected int $maxNumberOfKeywords = 15;
+    protected int $maxLinesToShowAdditionsOnly = 300;
+    protected int $maxNumberOfKeywords = 30;
     protected string|null $currentDir = null;
     protected array $branchesToCheck = ['develop', 'main', 'master'];
 
@@ -199,11 +199,11 @@ class GitDiffAnalyser
         $this->totalChangesPerDayPerRepo[$date] = [];
         $repos = $this->findGitRepos();
         foreach ($repos as $repo) {
-            $this->outputDebug("Analyzing repository: $repo", 3);
+            $this->outputDebug("Analyzing repository: $repo", 4);
             $this->changeDir($repo);
             $this->totalChangesPerDayPerRepo[$date][$repo] = $this->gitDiffForDayForRepo($date, $repo);
             if ($this->totalChangesPerDayPerRepo[$date][$repo] > 0) {
-                $this->outputEffort($repo, $this->totalChangesPerDayPerRepo[$date][$repo], 3, 2);
+                $this->outputEffort($repo, $this->totalChangesPerDayPerRepo[$date][$repo], 3, 3);
             }
         }
         $this->outputEffort($date, array_sum($this->totalChangesPerDayPerRepo[$date]), 2, 1);
@@ -244,27 +244,29 @@ class GitDiffAnalyser
         $filesChanged = $this->getFilesChanged($startOfDayCommit, $endOfDayCommit);
         $commitMessagesArray = $this->getCommitMessages($startOfDayCommit, $endOfDayCommit);
         if (count($filesChanged) > 0 || count($commitMessagesArray) > 0) {
-            $this->output('Total files changes for : '.$repo .': '. count($filesChanged), 2, 2);
+            $this->output('Total files changed for '.$repo .': '. count($filesChanged), 2, 1);
         } else {
             return 0;
         }
 
-        $this->output("Commit Messages", 4, 2);
-        $this->output($commitMessagesArray, 0, 2);
+        $this->output("Commit Messages", 4, 1);
+        $this->output($commitMessagesArray, 0, 1);
 
 
         // Loop through the file types and process changes
         foreach ($this->fileTypes as $fileType) {
             $fileTypeChanges = 0;
+            $filesChangedForOutput = [];
             foreach ($filesChanged as $key => $fileChanged) {
                 if (preg_match('/'.$fileType['extension'].'$/', $fileChanged)) {
-                    $this->output($fileChanged, 0, 2);
                     unset($filesChanged[$key]);  // Remove the found file from the array
                     $fileTypeChanges += $this->extractChangesForFileName($diffOutput, $fileChanged);
+                    $filesChangedForOutput[] = $fileChanged;
                 }
             }
             if ($fileTypeChanges > 0) {
-                $this->output('Total changes for '.$fileType['type'] . ': ' . $fileTypeChanges, 4, 2);
+                $this->output('Total changes for '.$fileType['type'] . ': ' . $fileTypeChanges, 4, 3);
+                $this->output($filesChangedForOutput, 0, 4);
             }
             $noOfChanges += $fileTypeChanges;
         }
@@ -272,7 +274,7 @@ class GitDiffAnalyser
         // If no changes in any file types, skip output for this repository
 
         // Display total changes and estimated time
-        $this->outputEffort($repo, $noOfChanges, 3, 3);
+        $this->outputEffort($repo, $noOfChanges, 3, 2);
 
         return $noOfChanges;
     }
@@ -366,10 +368,10 @@ class GitDiffAnalyser
                     $totalChanges += $fileChanges;
 
                     // Print the result in the desired format
-                    $this->output("$fileName: $fileChanges changes", 5, 2);
+                    $this->output("$fileName: $fileChanges changes", 5, 4);
                 }
-                if ($this->showFullDiff) {
-                    $this->output($this->extractDiffInfo($fileDiff), 0, 0);
+                if (($this->verbosity > 2 && $this->showFullDiff) || $this->verbosity > 3) {
+                    $this->output($this->extractDiffInfo($fileDiff), 0, 4);
                 }
             }
         }
@@ -434,12 +436,12 @@ class GitDiffAnalyser
         $name = str_replace($this->directory, './', $name);
         $name = str_replace('//', '/', $name);
         $this->output(
-            "Changes for $name:",
+            "Summary of efforf $name:",
             $headerLevel,
             $verbosityLevel
         );
         $this->output($numberOfChanges .' (changes)', 0, $verbosityLevel);
-        $this->output($time .' (estimated time - '.$timeInDecimals.' rounded decimal hours)', 0, $verbosityLevel);
+        $this->output($time .' ('.$timeInDecimals.' rounded decimal hours)', 0, $verbosityLevel);
     }
 
     protected function outputDebug(string|array $message, $headerLevel = 0, ?int $verbosityLevel = null)
@@ -462,73 +464,67 @@ class GitDiffAnalyser
         }
         if (is_array($message)) {
             foreach ($message as $m) {
-                $this->output($m, $headerLevel);
+                $this->output($m, $headerLevel, $verbosityLevel);
             }
         } else {
-            $this->outputHeader($headerLevel);
-            echo $message;
-            $this->outputHeader($headerLevel, false);
+            $this->outputHeader($message, $headerLevel);
+        }
+    }
+    protected function outputHeader($message, int $headerLevel = 0): void
+    {
+
+        if ($headerLevel > 0) {
+            $this->outputNewLines($headerLevel, true);
+        }
+
+        $headerLine = $this->getHeaderLine($headerLevel);
+        if ($headerLine) {
+            echo $this->getColor($headerLevel) . $headerLine . $this->resetColor() . PHP_EOL;
+        }
+        echo $this->getColor($headerLevel) . $message . $this->resetColor() . PHP_EOL;
+        if ($headerLine) {
+            echo $this->getColor($headerLevel) . $headerLine . $this->resetColor() . PHP_EOL;
+        }
+        // $this->outputNewLines($headerLevel, false);
+
+    }
+
+    private function outputNewLines(int $headerLevel, bool $isStart): void
+    {
+        if ($isStart) {
+            echo str_repeat(PHP_EOL, max(0, 3 - ($headerLevel)));
+        } else {
+            echo PHP_EOL;
         }
     }
 
-    protected function outputHeader($headerLevel = 0, ?bool $isStart = true)
+    private function getHeaderLine(int $headerLevel): ?string
     {
-        if ($headerLevel === 0) {
-            if (! $isStart) {
-                echo PHP_EOL;
-            }
-            return;
-        }
-        switch ($headerLevel) {
-            case 1:
-                if ($isStart) {
-                    echo PHP_EOL;
-                    echo PHP_EOL;
-                    echo PHP_EOL;
-                } else {
-                    echo PHP_EOL;
-                }
-                echo "==============================================================".PHP_EOL;
-                break;
-            case 2:
-                if ($isStart) {
-                    echo PHP_EOL;
-                    echo PHP_EOL;
-                } else {
-                    echo PHP_EOL;
-                }
-                echo "**************************************************************".PHP_EOL;
-                break;
-            case 3:
-                if ($isStart) {
-                    echo PHP_EOL;
-                } else {
-                    echo PHP_EOL;
-                }
-                echo "--------------------------------------------------------------".PHP_EOL;
-                break;
-            case 4:
-                if ($isStart) {
-                    echo PHP_EOL;
-                }
-                echo "===";
-                if (! $isStart) {
-                    echo PHP_EOL;
-                }
-                break;
-            case 5:
-                if ($isStart) {
-                    echo PHP_EOL;
-                }
-                echo "---";
-                if (! $isStart) {
-                    echo PHP_EOL;
-                }
-                break;
-            default:
-                //nothing
-                break;
-        }
+        return match ($headerLevel) {
+            1 => '==============================================================',
+            2 => '**************************************************************',
+            3 => '--------------------------------------------------------------',
+            4 => '===',
+            5 => '---',
+            default => null
+        };
+    }
+
+    private function getColor(int $headerLevel): string
+    {
+        return match ($headerLevel) {
+            1 => "\033[1;31m", // Red, bold
+            2 => "\033[1;33m", // Yellow, bold
+            3 => "\033[1;34m", // Blue, bold
+            4 => "\033[0;32m", // Green
+            5 => "\033[0;36m", // Cyan
+            default => $this->resetColor()
+        };
+    }
+
+    private function resetColor(): string
+    {
+        return "\033[0m";
     }
 
 
@@ -537,7 +533,7 @@ class GitDiffAnalyser
         $lines = explode("\n", $diffContent); // Split the string into lines
         $lineCount = count($lines);
         $string = 'Total line changes: '.$lineCount.PHP_EOL;
-        if ($lineCount < $this->maxLinesToShowAll) {
+        if ($this->verbosity < 4 && $lineCount < $this->maxLinesToShowAll) {
             return $diffContent;
         }
         if ($lineCount < $this->maxLinesToShowAdditionsOnly) {

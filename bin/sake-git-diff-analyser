@@ -41,14 +41,14 @@ EOL;
 
 // CLI argument handling
 $options = getopt(
-    '',
+    'v::',
     [
         'days:',
         'branch:',
         'filter:',
         'minutes-for-first-line:',
         'date:',
-        'mysetting:', 'v::',
+        'mysetting:',
         'show-full-diff:',
         'debug:'
     ]
@@ -60,7 +60,7 @@ $date = $options['date'] ?? null;
 $branch = $options['branch'] ?? 'develop';
 $filter = $options['filter'] ?? 'sunnysideup';
 $minutesForFirstLineChange = isset($options['minutes-for-first-line']) ? (float)$options['minutes-for-first-line'] : 0;
-$verbosity = isset($options['v']) ? strlen($options['v']) : 2;
+$verbosity = isset($options['v']) ? strlen($options['v']) + 1 : 0;
 $showFullDiff = isset($options['show-full-diff']) ? true : false;
 $debug = isset($options['debug']) ? true : false;
 
