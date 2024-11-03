@@ -18,12 +18,12 @@ class GitDiffAnalyser
     protected float $decreaseFactor = 0.99;
     protected int $verbosity = 2;
     protected bool $showFullDiff = false;
+    protected bool $showEstimatedEffort = false;
     protected int $maxLinesToShowAll = 15;
     protected int $maxLinesToShowAdditionsOnly = 300;
     protected int $maxNumberOfKeywords = 30;
     protected string|null $currentDir = null;
     protected array $branchesToCheck = ['develop', 'main', 'master'];
-
     protected $totalChangesPerDayPerRepo = [];
 
     protected $fileTypes = [
@@ -127,6 +127,12 @@ class GitDiffAnalyser
     public function setVerbosity(int $verbosity): static
     {
         $this->verbosity = $verbosity;
+        return $this;
+    }
+
+    public function setShowEstimatedEffort(bool $showEstimatedEffort): static
+    {
+        $this->showEstimatedEffort = $showEstimatedEffort;
         return $this;
     }
 
@@ -391,10 +397,14 @@ class GitDiffAnalyser
     /**
      * Fetch the commit messages for a given day.
      */
-    protected function getCommitMessages(string $startOfDayCommit, string $endOfDayCommit): array
+    protected function getCommitMessages(string $startOfDayCommit, string $endOfDayCommit, int $verbosity = 1): array
     {
-        $commitLog = shell_exec("git log --pretty=format:'%s' $startOfDayCommit..$endOfDayCommit");
-        $commitMessages = array_filter(array_map('trim', explode("".PHP_EOL, $commitLog)));
+        $format = $this->verbosity > 2 ? '%B' : '%s'; // Full message if verbosity > 2, else just the subject line
+        $commitLog = shell_exec("git log --pretty=format:$format $startOfDayCommit..$endOfDayCommit");
+
+        $delimiter = $this->verbosity > 2 ? PHP_EOL . PHP_EOL : PHP_EOL;
+        $commitMessages = array_filter(array_map('trim', explode($delimiter, $commitLog)));
+
         return array_unique($commitMessages);
     }
     /**
@@ -417,6 +427,9 @@ class GitDiffAnalyser
 
     protected function outputEffort(string $name, int $numberOfChanges, ?int $headerLevel = 3, ?int $verbosityLevel = null)
     {
+        if ($this->showEstimatedEffort !== true) {
+            return;
+        }
         // Convert total changes to time in minutes and hours
         $timeInMinutes = $numberOfChanges > 0 ? $this->instantiationCostInMinutes : 0;
 
@@ -515,9 +528,9 @@ class GitDiffAnalyser
         return match ($headerLevel) {
             1 => "\033[1;31m", // Red, bold
             2 => "\033[1;33m", // Yellow, bold
-            3 => "\033[1;34m", // Blue, bold
-            4 => "\033[0;32m", // Green
-            5 => "\033[0;36m", // Cyan
+            3 => "\033[0;32m", // Green
+            4 => "\033[0;36m", // Cyan
+            5 => "\033[1;34m", // Blue, bold
             default => $this->resetColor()
         };
     }

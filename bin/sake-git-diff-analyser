@@ -20,8 +20,9 @@ Options:
   --branch=NAME                Specify the branch to analyze (default: develop).
   --filter=STRING              Filter git repos by their remote URL (default: 'sunnysideup').
   --date=YYYY-MM-DD            Analyze for a specific date instead of days back.
-  --minutes-for-first-line=N   Set the number of minutes for the first line of code change (default: 20).
+  --show-estimated-effort=B    Show the estimated effort for the work done.
   --show-full-diff=B           set show full diff (default: false).
+  --minutes-for-first-line=N   Set the number of minutes for the first line of code change (default: 20).
   --debug=B                    set debug mode (default: false).
   -v, -vv, -vvv                Set verbosity level:
   -v                           - Show total time and total changes only.
@@ -47,10 +48,11 @@ $options = getopt(
         'branch:',
         'filter:',
         'minutes-for-first-line:',
+        'show-estimated-effort:',
         'date:',
         'mysetting:',
         'show-full-diff:',
-        'debug:'
+        'debug:',
     ]
 );
 
@@ -60,9 +62,10 @@ $date = $options['date'] ?? null;
 $branch = $options['branch'] ?? 'develop';
 $filter = $options['filter'] ?? 'sunnysideup';
 $minutesForFirstLineChange = isset($options['minutes-for-first-line']) ? (float)$options['minutes-for-first-line'] : 0;
+$showEstimatedEffort = isset($options['show-estimated-effort']) ? true : false;
 $verbosity = isset($options['v']) ? strlen($options['v']) + 1 : 0;
-$showFullDiff = isset($options['show-full-diff']) ? true : false;
 $debug = isset($options['debug']) ? true : false;
+$showFullDiff = isset($options['show-full-diff']) ? true : false;
 
 
 // Check if a directory is passed as the last argument
@@ -92,4 +95,5 @@ if ($date) {
     ->setVerbosity($verbosity)
     ->setShowFullDiff($showFullDiff)
     ->setDebug($debug)
+    ->setShowEstimatedEffort($showEstimatedEffort)
     ->run();
