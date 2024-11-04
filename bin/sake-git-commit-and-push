@@ -163,7 +163,7 @@ if test -f "$GIT_DIR/.git/config"; then
                     # Add your action here, e.g., exit 1 or some other command
                     meld .
                 else
-                    echonice "Changes are within acceptable limits."
+                    echonice "Changes are within acceptable limits, no need for a review."
                 fi
             else
                 echobad "Meld is not installed."
