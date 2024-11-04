@@ -168,6 +168,8 @@ if test -f "$GIT_DIR/.git/config"; then
             else
                 echobad "Meld is not installed."
             fi
+        else
+            echonice "Skipping review"
         fi
         #git add $WORKING_DIR/$also
         #git add $WORKING_DIR/$logFile
