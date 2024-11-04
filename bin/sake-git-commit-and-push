@@ -32,7 +32,7 @@ while (($#)); do
         shift
         ;;
     -r | --review)
-        newVersion=$2
+        review=$2
         shift
         ;;
     -a | --also)
