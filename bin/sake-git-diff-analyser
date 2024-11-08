@@ -63,7 +63,7 @@ $branch = $options['branch'] ?? 'develop';
 $filter = $options['filter'] ?? 'sunnysideup';
 $minutesForFirstLineChange = isset($options['minutes-for-first-line']) ? (float)$options['minutes-for-first-line'] : 0;
 $showEstimatedEffort = isset($options['show-estimated-effort']) ? true : false;
-$verbosity = isset($options['v']) ? strlen($options['v']) + 1 : 0;
+$verbosity = isset($options['v']) ? strlen($options['v']) + 1 : 2;
 $debug = isset($options['debug']) ? true : false;
 $showFullDiff = isset($options['show-full-diff']) ? true : false;
 
