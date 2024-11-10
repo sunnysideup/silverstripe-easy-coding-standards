@@ -62,6 +62,17 @@ help_and_exit() {
     exit
 }
 
+echonice "Updating composer.lock ..."
+git add composer.lock
+git commit -m 'MNT: update composer.lock before composer update'
+
+echonice "Updating composer.json ..."
+git add composer.json
+git commit -m 'MNT: update composer.json before composer update'
+
+git fetch
+git checkout FETCH_HEAD -- composer.json composer.lock
+
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
     help_and_exit
