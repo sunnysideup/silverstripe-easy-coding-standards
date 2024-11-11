@@ -62,16 +62,6 @@ help_and_exit() {
     exit
 }
 
-echonice "Updating composer.lock ..."
-git add composer.lock
-git commit -m 'MNT: update composer.lock before composer update'
-
-echonice "Updating composer.json ..."
-git add composer.json
-git commit -m 'MNT: update composer.json before composer update'
-
-git fetch
-git checkout FETCH_HEAD -- composer.json composer.lock
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
@@ -81,9 +71,23 @@ fi
 ############################################ CODE
 # Ensure jq is installed
 if ! command -v jq &>/dev/null; then
-    echo "Error: jq is not installed. Please install jq to proceed."
+    echobad "Error: jq is not installed. Please install jq to proceed."
     exit 1
 fi
+
+echonice "Updating composer.lock ..."
+git add composer.lock
+git commit -m 'MNT: update composer.lock before composer update'
+
+echonice "Updating composer.json ..."
+git add composer.json
+git commit -m 'MNT: update composer.json before composer update'
+
+if ! git fetch --quiet && git status | grep -q 'Your branch is up to date'; then
+    echobad "The repository is not up-to-date. Stopping."
+    exit 1
+fi
+
 
 # Step: Capture the current package info before the update
 oldPackageInfo=$(composer info --format=json)
