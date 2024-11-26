@@ -62,7 +62,6 @@ help_and_exit() {
     exit
 }
 
-
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
     help_and_exit
@@ -88,6 +87,10 @@ if ! git fetch --quiet && git status | grep -q 'Your branch is up to date'; then
     exit 1
 fi
 
+echonice "Running composer install to get the already installed packages ..."
+git pull
+git push
+composer install --prefer-source
 
 # Step: Capture the current package info before the update
 oldPackageInfo=$(composer info --format=json)
