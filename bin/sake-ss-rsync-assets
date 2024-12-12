@@ -81,6 +81,9 @@ fi
 mkdir -p ./public/assets
 
 if [ ! -z "$server" ]; then
+    if [[ "$server" != *":/"* ]]; then
+        server="$server:/container/application"
+    fi
     if [ -d "$WORKING_DIR/public/assets/" ]; then
         sudo chown $USER public/assets -R
         if [ -w "$WORKING_DIR/public/assets" ]; then

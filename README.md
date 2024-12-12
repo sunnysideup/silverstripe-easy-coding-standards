@@ -2,11 +2,11 @@
 
 Lints your silverstripe php code, checks for potential bugs, and also has a raft of other helpful commands.
 
-# tl;dr
+## tl;dr
 
 Install as global composer package and then try to access the commands, starting with `sake-` from the command line.
 
-# commands available
+## commands available
 
 ```shell
 
@@ -55,6 +55,7 @@ Install as global composer package and then try to access the commands, starting
 # silverstripe
  - sake-ss-add-site
  - sake-ss-db-dump
+ - sake-ss-db-import
  - sake-ss-db-open
  - sake-ss-dev-build
  - sake-ss-flush
@@ -63,6 +64,10 @@ Install as global composer package and then try to access the commands, starting
 
 # test
 - sake-test-site
+
+# rsync
+- sake-ss-rsync-assets
+- sake-ss-rsync-database
 
 # scrutinizer
  - sake-scrutinizer-add
@@ -73,7 +78,7 @@ Install as global composer package and then try to access the commands, starting
 
 ```
 
-# How to install for one project (not recommended - as it may not work)
+## How to install for one project (not recommended - as it may not work)
 
 1. open your terminal
 2. browse to root folder of your project and type:
@@ -116,7 +121,7 @@ sake-lint-ecs [dir]
 
 (this command, and all the other commands listed above).
 
-# How to use
+## How to use
 
 Commands should be run from the root directory of your project.
 

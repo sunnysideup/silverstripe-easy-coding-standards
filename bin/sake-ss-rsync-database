@@ -1,0 +1,131 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+localEnvFile="$WORKING_DIR/.env"
+remoteEnvFile="/var/www/website-root/.env"
+remoteDumpFile="/tmp/db_dump.sql"
+localDumpFile="./tmp/db_dump.sql"
+
+############################################ SETTINGS
+server=''
+wwwDataUser='www-data'
+help='no'
+
+while (($#)); do
+    case $1 in
+    -w | --www-data-user)
+        wwwDataUser=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) server=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Sync Database from Server"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Remote server:                 $server"
+    echonice "Remote .env file:              $remoteEnvFile"
+    echonice "Local .env file:               $localEnvFile"
+    echonice "Local dump file:               $localDumpFile"
+
+    echonice "Apache user (-w):              $wwwDataUser"
+
+    ECHOHEAD "Available settings:"
+    echonice "-w, --www-data-user            the apache user, default: www-data"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-sync-db my-server:/var/www/website-root"
+
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+if [[ -z "$server" ]]; then
+    echobad "No server specified."
+    help_and_exit
+fi
+
+if [[ "$server" != *":/"* ]]; then
+    server="$server:/container/application"
+fi
+
+############################################ EXTRACT .env VARIABLES
+extract_env_var() {
+    local file=$1
+    local varName=$2
+    grep "^$varName=" "$file" | cut -d '=' -f 2- | tr -d '"'
+}
+
+localDbUser=$(extract_env_var "$localEnvFile" "SS_DATABASE_USERNAME")
+localDbPass=$(extract_env_var "$localEnvFile" "SS_DATABASE_PASSWORD")
+localDbName=$(extract_env_var "$localEnvFile" "SS_DATABASE_NAME")
+localDbHost=$(extract_env_var "$localEnvFile" "SS_DATABASE_SERVER")
+
+remoteDbUser=$(ssh "$server" "grep '^SS_DATABASE_USERNAME=' $remoteEnvFile | cut -d '=' -f 2- | tr -d '\"'")
+remoteDbPass=$(ssh "$server" "grep '^SS_DATABASE_PASSWORD=' $remoteEnvFile | cut -d '=' -f 2- | tr -d '\"'")
+remoteDbName=$(ssh "$server" "grep '^SS_DATABASE_NAME=' $remoteEnvFile | cut -d '=' -f 2- | tr -d '\"'")
+remoteDbHost=$(ssh "$server" "grep '^SS_DATABASE_SERVER=' $remoteEnvFile | cut -d '=' -f 2- | tr -d '\"'")
+
+if [[ -z "$remoteDbUser" || -z "$remoteDbPass" || -z "$remoteDbName" || -z "$remoteDbHost" ]]; then
+    echobad "Could not retrieve database credentials from the server."
+    exit 1
+fi
+
+if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localDbHost" ]]; then
+    echobad "Could not retrieve database credentials from the local .env file."
+    exit 1
+fi
+
+############################################ DUMP DATABASE ON SERVER
+echonice "Dumping database on the server..."
+ssh "$server" "mysqldump -u$remoteDbUser -p$remoteDbPass -h$remoteDbHost $remoteDbName > $remoteDumpFile"
+if [[ $? -ne 0 ]]; then
+    echobad "Failed to dump the database on the server."
+    exit 1
+fi
+
+############################################ RSYNC DATABASE DUMP
+echonice "Syncing database dump back locally..."
+rsync -chavzP "$server:$remoteDumpFile" "$localDumpFile"
+if [[ $? -ne 0 ]]; then
+    echobad "Failed to sync the database dump back locally."
+    exit 1
+fi
+
+############################################ RESTORE DATABASE LOCALLY
+echonice "Restoring database locally..."
+mysql -u"$localDbUser" -p"$localDbPass" -h"$localDbHost" "$localDbName" < "$localDumpFile"
+if [[ $? -ne 0 ]]; then
+    echobad "Failed to restore the database locally."
+    exit 1
+fi
+
+############################################ CLEANUP
+echonice "Cleaning up remote dump file..."
+ssh "$server" "rm -f $remoteDumpFile"
+if [[ $? -ne 0 ]]; then
+    echowarn "Failed to clean up the remote dump file."
+fi
+
+echonice "Database sync completed successfully."
+echoend

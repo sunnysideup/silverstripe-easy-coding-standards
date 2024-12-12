@@ -1,0 +1,78 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+localEnvFile="$WORKING_DIR/.env"
+
+############################################ SETTINGS
+help='no'
+dumpFile=$1
+
+############################################ HELP FUNCTION
+help_and_exit() {
+    ECHOHEAD "Import Local Database File"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Local .env file:               $localEnvFile"
+    echonice "Database dump file:            the first parameter"
+
+    ECHOHEAD "Available settings:"
+    echonice "First parameter                path to the local database dump file (required)"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-import-db ./tmp/db_dump.sql"
+
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$dumpFile" == "-h" || "$dumpFile" == "--help" ]]; then
+    help='yes'
+fi
+
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ VALIDATE INPUT
+if [[ -z "$dumpFile" ]]; then
+    echobad "No database dump file specified. Provide the file path as the first parameter."
+    help_and_exit
+fi
+
+if [[ ! -f "$dumpFile" ]]; then
+    echobad "The specified dump file does not exist: $dumpFile"
+    exit 1
+fi
+
+############################################ EXTRACT .env VARIABLES
+extract_env_var() {
+    local file=$1
+    local varName=$2
+    grep "^$varName=" "$file" | cut -d '=' -f 2- | tr -d '"'
+}
+
+localDbUser=$(extract_env_var "$localEnvFile" "SS_DATABASE_USERNAME")
+localDbPass=$(extract_env_var "$localEnvFile" "SS_DATABASE_PASSWORD")
+localDbName=$(extract_env_var "$localEnvFile" "SS_DATABASE_NAME")
+localDbHost=$(extract_env_var "$localEnvFile" "SS_DATABASE_SERVER")
+
+if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localDbHost" ]]; then
+    echobad "Could not retrieve database credentials from the local .env file."
+    exit 1
+fi
+
+############################################ IMPORT DATABASE
+echonice "Restoring database from file: $dumpFile"
+mysql -u"$localDbUser" -p"$localDbPass" -h"$localDbHost" "$localDbName" < "$dumpFile"
+if [[ $? -ne 0 ]]; then
+    echobad "Failed to restore the database from $dumpFile."
+    exit 1
+fi
+
+echonice "Database import completed successfully."
+echoend
