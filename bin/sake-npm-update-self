@@ -6,8 +6,6 @@ WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
-############################################ DIR
-dir="./"
 
 ############################################ SETTINGS
 help='no'
@@ -29,8 +27,6 @@ done
 help_and_exit() {
     ECHOHEAD "NPM Update Self (Update NVM, NPM, and Node to latest version)"
     echonice "Directory of script:          $SCRIPT_DIR"
-    echonice "Directory to install:         $WORKING_DIR/$dir"
-
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                    show help information"
@@ -49,24 +45,43 @@ fi
 
 ############################################ RUN
 
-nvm_string="nvm-sh/nvm"
 
-# Function to get the latest release version from GitHub
-git_latest_version() {
-    curl -fsSL -o /dev/null -w '%{redirect_url}' "https://github.com/$1/releases/latest" | xargs basename
-}
+# Set NVM repository
+nvm_repo="nvm-sh/nvm"
 
-# Get the latest NVM version
-latest_version_number=$(git_latest_version "${nvm_string}")
+# Fetch the latest release version using GitHub API
+latest_version=$(curl -fsSL "https://api.github.com/repos/${nvm_repo}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+
+# Check if the version was retrieved
+if [ -z "$latest_version" ]; then
+    echo "Error: Unable to fetch the latest NVM version."
+    exit 1
+fi
+
+echo "Latest NVM version: $latest_version"
 
 # Download and install the latest NVM version
-wget -qO- "https://raw.githubusercontent.com/${nvm_string}/${latest_version_number}/install.sh" | bash
+wget -qO- "https://raw.githubusercontent.com/${nvm_repo}/${latest_version}/install.sh" | bash
 
-# Reload the shell environment to include NVM
-source ~/.bashrc
+# Source NVM for the current shell session
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    source "$NVM_DIR/nvm.sh"
+else
+    echo "Error: nvm.sh not found in $NVM_DIR."
+    exit 1
+fi
 
-# List remote Node.js versions to verify NVM works
-nvm ls-remote
+# Verify installation
+if command -v nvm &> /dev/null; then
+    echo "NVM installed successfully. Version: $(nvm --version)"
+else
+    echo "Error: NVM installation failed."
+    exit 1
+fi
+
+
+
 
 # Install the latest Node.js version and set it as default
 nvm install node

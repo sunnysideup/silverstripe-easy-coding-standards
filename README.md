@@ -50,6 +50,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-npm-build
  - sake-npm-dev
  - sake-npm-install
+ - sake-npm-update-self
  - sake-npm-watch
 
 # silverstripe
