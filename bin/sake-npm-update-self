@@ -1,0 +1,82 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
+
+############################################ DIR
+dir="./"
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "NPM Update Self (Update NVM, NPM, and Node to latest version)"
+    echonice "Directory of script:          $SCRIPT_DIR"
+    echonice "Directory to install:         $WORKING_DIR/$dir"
+
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                    show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-npm-update-self"
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ RUN
+
+nvm_string="nvm-sh/nvm"
+
+# Function to get the latest release version from GitHub
+git_latest_version() {
+    curl -fsSL -o /dev/null -w '%{redirect_url}' "https://github.com/$1/releases/latest" | xargs basename
+}
+
+# Get the latest NVM version
+latest_version_number=$(git_latest_version "${nvm_string}")
+
+# Download and install the latest NVM version
+wget -qO- "https://raw.githubusercontent.com/${nvm_string}/${latest_version_number}/install.sh" | bash
+
+# Reload the shell environment to include NVM
+source ~/.bashrc
+
+# List remote Node.js versions to verify NVM works
+nvm ls-remote
+
+# Install the latest Node.js version and set it as default
+nvm install node
+nvm use node
+nvm alias default node
+
+# Update npm to the latest version
+npm install -g npm
+
+# Display installed Node.js and npm versions
+echo "Node.js version: $(node -v)"
+echo "npm version: $(npm -v)"
+

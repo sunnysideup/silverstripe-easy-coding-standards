@@ -60,6 +60,7 @@
     "bin/sake-npm-build",
     "bin/sake-npm-dev",
     "bin/sake-npm-install",
+    "bin/sake-npm-update-self",
     "bin/sake-npm-watch",
     "bin/sake-php-set-timezone",
     "bin/sake-scrutinizer-add",
