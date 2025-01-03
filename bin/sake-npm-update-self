@@ -91,6 +91,8 @@ nvm alias default node
 # Update npm to the latest version
 npm install -g npm
 
+nvm use default
+
 # Display installed Node.js and npm versions
 echo "Node.js version: $(node -v)"
 echo "npm version: $(npm -v)"
