@@ -1,0 +1,91 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+
+############################################ SETTINGS
+server=''
+wwwDataUser='www-data'
+help='no'
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) server=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Sync Database from Server"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Remote server web root dir:    $server"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-sync-sspak my-server:/var/www/website-root"
+
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+if [[ -z "$server" ]]; then
+    echobad "No server specified."
+    help_and_exit
+fi
+
+# Parse the server and optional remote directory
+SERVER_CLEAN=$(echo "$server" | cut -d':' -f1)
+REMOTE_DIR=$(echo "$server" | cut -s -d':' -f2)
+REMOTE_DIR=${REMOTE_DIR:-/container/application}
+
+BACKUP_FILE="__backups/backup.sspak"
+LOCAL_BACKUP_DIR=".."
+LOCAL_BACKUP_NAME="$(echo "$server" | sed 's/.*@//').sspak"
+
+if [[ "$server" != *":/"* ]]; then
+    server="$server:/container/application"
+fi
+
+############################################ RUN
+
+# Enable autocomplete for servers listed in ~/.ssh/config
+if [[ -f ~/.ssh/config ]]; then
+    complete -W "$(grep -E '^Host ' ~/.ssh/config | awk '{print $2}' | tr '\n' ' ')" $(basename "$0")
+fi
+
+# Log in to the server, navigate to the directory, and run the command
+ssh "$SERVER_CLEAN" <<EOF
+  cd "$REMOTE_DIR"
+  vendor/bin/sake-release -o
+EOF
+
+# Copy the backup file from the server to the local machine
+scp "$SERVER_CLEAN:$REMOTE_DIR/$BACKUP_FILE" "$LOCAL_BACKUP_DIR/$LOCAL_BACKUP_NAME"
+
+# Load the backup using ssbak
+sudo ssbak load "$LOCAL_BACKUP_DIR/$LOCAL_BACKUP_NAME" .
+
+ssh "$SERVER" <<EOF
+  rm -f "$REMOTE_DIR/$BACKUP_FILE"
+EOF
+
+echonice "SSPAK sync completed successfully."
+echoend
