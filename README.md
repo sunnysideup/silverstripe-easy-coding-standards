@@ -68,7 +68,8 @@ Install as global composer package and then try to access the commands, starting
 
 # rsync
 - sake-ss-rsync-assets
-- sake-ss-rsync-database
+- sake-ss-rsync-db
+- sake-ss-rsync-sspak
 
 # scrutinizer
  - sake-scrutinizer-add
