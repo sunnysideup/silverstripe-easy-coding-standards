@@ -8,7 +8,7 @@ source $SCRIPT_DIR/sake-self-methods
 ############################################ DIR
 localEnvFile="$WORKING_DIR/.env"
 remoteDumpFile="/tmp/db_dump.sql"
-localDumpFile="./tmp/db_dump.sql"
+localDumpFile="/tmp/db_dump.sql"
 
 ############################################ SETTINGS
 server=''
@@ -94,7 +94,7 @@ fi
 
 ############################################ DUMP DATABASE ON SERVER
 echonice "Dumping database on the server..."
-ssh "$serverClean" "mysqldump -u$remoteDbUser -p$remoteDbPass -h$remoteDbHost $remoteDbName > $remoteDumpFile"
+ssh "$serverClean" "mysqldump  --column-statistics=0 --no-tablespaces -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName > $remoteDumpFile"
 if [[ $? -ne 0 ]]; then
     echobad "Failed to dump the database on the server."
     exit 1
