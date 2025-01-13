@@ -68,7 +68,7 @@ fi
 extract_env_var() {
     local file=$1
     local varName=$2
-    grep "^$varName=" "$file" | cut -d '=' -f 2- | tr -d '"'
+    grep "^$varName=" "$file" | cut -d '=' -f 2- | tr -d '"' | xargs
 }
 
 localDbUser=$(extract_env_var "$localEnvFile" "SS_DATABASE_USERNAME")
@@ -110,7 +110,7 @@ fi
 
 ############################################ RESTORE DATABASE LOCALLY
 echonice "Restoring database locally..."
-mysql -u"$localDbUser" -p"$localDbPass" -h"$localDbHost" "$localDbName" <"$localDumpFile"
+mysql -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" <"$localDumpFile"
 if [[ $? -ne 0 ]]; then
     echobad "Failed to restore the database locally."
     exit 1
