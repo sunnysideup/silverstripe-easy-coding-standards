@@ -195,4 +195,6 @@ EOF
     git push
 fi
 
+sake-composer-available-updates
+
 echoend
