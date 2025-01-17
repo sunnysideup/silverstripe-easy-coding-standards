@@ -90,14 +90,14 @@ fi
 echonice "Running composer install to get the already installed packages ..."
 git pull
 git push
-composer install --prefer-source
+composer install
 
 # Step: Capture the current package info before the update
 oldPackageInfo=$(composer info --format=json)
 
 # Run composer update
 echonice "Running composer update..."
-composer update --prefer-source
+composer update
 
 # Capture the new package info after the update
 newPackageInfo=$(composer info --format=json)
