@@ -21,45 +21,45 @@ description=''
 keywords=''
 help='no'
 while (($#)); do
-  case $1 in
+    case $1 in
     -p | --package)
-      packageName=$2
-      shift
-    ;;
+        packageName=$2
+        shift
+        ;;
     -n | --namespace)
-      namespace=$2
-      shift
-    ;;
+        namespace=$2
+        shift
+        ;;
     -f | --fullName)
-      fullName=$2
-      shift
-    ;;
+        fullName=$2
+        shift
+        ;;
     -d | --description)
-      description=$2
-      shift
-    ;;
+        description=$2
+        shift
+        ;;
     -k | --keywords)
-      keywords=$2
-      shift
-    ;;
+        keywords=$2
+        shift
+        ;;
     -h | --help)
-      help='yes'
-      shift
-    ;;
+        help='yes'
+        shift
+        ;;
     -*)
-      printf 'Unknown option: %q\n\n' "$1"
-      help='yes'
-    ;;
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
     *) dir=$1 ;;
-  esac
-  shift
+    esac
+    shift
 done
 
 [ -z "$packageName" ] && read -p "Enter package name (e.g. sunnysideup/abc): " packageName || packageName=$packageName
 [ -z "$namespace" ] && read -r -p "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
 [ -z "$fullName" ] && read -p "Enter full name (e.g. My Abc Module): " fullName || fullName=$fullName
 [ -z "$description" ] && read -p "Enter description (e.g. Does the ABC): " description || description=$description
-[ -z "$keywords" ] && read -p "Enter keywords, separated by a commna (e.g. foo, bar): " keywords || keywords=$keywords
+[ -z "$keywords" ] && read -p "Enter keywords, separated by a commna (Silverstripe, CMS are added automatically): " keywords || keywords=$keywords
 
 packageName=$(echo $packageName | tr -d '|')
 namespace=$(echo $namespace | tr -d '|')
@@ -79,54 +79,45 @@ escaped_namespace=$(echo "$namespace" | sed 's/\\/\\\\/g')
 double_escaped_namespace=$(echo "$escaped_namespace" | sed 's/\\/\\\\/g')
 
 help_and_exit() {
-  show_vars
-  echofunctions
-  exit
+    show_vars
+    echofunctions
+    exit
 }
 
 show_vars() {
-  ECHOHEAD "Make a new module"
-  echonice "Directory of script:             $SCRIPT_DIR"
-  echonice "Directory to analyse:            $WORKING_DIR/$dir"
-  
-  echoline "Current settings:"
-  echonice "--package (-p):                  $packageName"
-  echonice "--namespace (-n):                $namespace"
-  echonice "--fullName (-f):                 $fullName"
-  echonice "--description (-d):              $description"
-  echonice "--keywords (-k):                 $keywords"
-  echonice "package short name:              $packageShortName"
-  echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
-  echonice "package with silverstripe:       $packageWithSilverstripe"
-  
-  ECHOHEAD "Example usage:"
-  echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module' -k 'foo, bar'"
-  
+    ECHOHEAD "Make a new module"
+    echonice "Directory of script:             $SCRIPT_DIR"
+    echonice "Directory to analyse:            $WORKING_DIR/$dir"
+
+    echoline "Current settings:"
+    echonice "--package (-p):                  $packageName"
+    echonice "--namespace (-n):                $namespace"
+    echonice "--fullName (-f):                 $fullName"
+    echonice "--description (-d):              $description"
+    echonice "--keywords (-k):                 $keywords"
+    echonice "package short name:              $packageShortName"
+    echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
+    echonice "package with silverstripe:       $packageWithSilverstripe"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module' -k 'foo, bar'"
+
 }
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
-  help_and_exit
+    help_and_exit
 fi
 
 ############################################ CODE
 
 if [ -d "$WORKING_DIR" ]; then
-  cd $WORKING_DIR
+    cd $WORKING_DIR
 else
-  echobad "Could not change directory to $WORKING_DIR"
-  help_and_exit
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
 fi
 
-
-echonice "--package (-p):                  $packageName"
-echonice "--namespace (-n):                $namespace"
-echonice "--fullName (-f):                 $fullName"
-echonice "--description (-d):              $description"
-echonice "--keywords (-k):                 $keywords"
-echonice "package short name:              $packageShortName"
-echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
-echonice "package with silverstripe:       $packageWithSilverstripe"
 show_vars
 # Create a new repository on GitHub
 gh repo create $packageShortNameWithSilverstripe --public
@@ -134,10 +125,10 @@ gh repo create $packageShortNameWithSilverstripe --public
 # Clone the template repository into the new repository
 git clone git@github.com:sunnysideup/$packageShortNameWithSilverstripe $packageShortNameWithSilverstripe
 if [ -d "$packageShortNameWithSilverstripe" ]; then
-  cd $packageShortNameWithSilverstripe
+    cd $packageShortNameWithSilverstripe
 else
-  echonice "Could not change directory to '$packageShortNameWithSilverstripe'"
-  help_and_exit
+    echonice "Could not change directory to '$packageShortNameWithSilverstripe'"
+    help_and_exit
 fi
 
 # Clone the template repository into a temporary directory
