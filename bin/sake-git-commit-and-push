@@ -148,6 +148,12 @@ if test -f "$GIT_DIR/.git/config"; then
 
     if [[ "$commitAndPush" == "yes" ]]; then
 
+        if [[ -x "bin/npm-build.sh" ]]; then
+            bin/npm-build.sh
+        else
+            echo "bin/npm-build.sh not found or not executable"
+        fi
+
         ECHOHEAD "# adding files to git repo"
         git add . -A
         if [[ "$review" == "yes" ]]; then
