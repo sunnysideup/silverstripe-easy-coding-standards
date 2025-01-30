@@ -16,6 +16,7 @@ review='yes'
 also='nothing-here-hopefully'
 alsoDoThemes='no'
 statusOnly='no'
+doBuild='yes'
 help='no'
 while (($#)); do
     case $1 in
@@ -37,6 +38,10 @@ while (($#)); do
         ;;
     -a | --also)
         also=$2
+        shift
+        ;;
+    -n | --no-build)
+        doBuild='no'
         shift
         ;;
     -s | --status-only)
@@ -88,6 +93,7 @@ help_and_exit() {
     echonice "-m, --message                  commit message, defaults to last message used"
     echonice "-v, --new-version              create new tag (no|patch|minor|major), default: yes"
     echonice "-a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup"
+    echonice "-n, --no-build                 do not run build script"
     echonice "-t, --themes-also              include folders in themes, default: no"
     echonice "-s, --status-only              status only, default: no !!!"
     echonice "-r, --review                   review first, default: yes"
@@ -147,11 +153,12 @@ if test -f "$GIT_DIR/.git/config"; then
     fi
 
     if [[ "$commitAndPush" == "yes" ]]; then
-
-        if [[ -x "bin/npm-build.sh" ]]; then
-            bin/npm-build.sh
-        else
-            echo "bin/npm-build.sh not found or not executable"
+        if [[ "$doBuild" == "yes" ]]; then
+            if [[ -x "bin/npm-build.sh" ]]; then
+                bin/npm-build.sh
+            else
+                echo "bin/npm-build.sh not found or not executable"
+            fi
         fi
 
         ECHOHEAD "# adding files to git repo"
