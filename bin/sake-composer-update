@@ -108,7 +108,7 @@ if ([[ "$force" == "yes" ]]); then
     if [[ $answer =~ ^[Yy]$ ]]; then
         echo 'Confirmed.'
         rm vendor -rf
-        rm composer.lock
+        rm composer.lock -f
     else
         echo 'Cancelled force option.'
     fi
