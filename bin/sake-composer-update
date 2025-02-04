@@ -9,7 +9,7 @@ source $SCRIPT_DIR/sake-self-methods
 dir='./'
 ############################################ SETTINGS
 force='no'
-minimalChangesOnly='yes'
+minimalChangesOnly='no'
 commit='yes'
 sortPackages='yes'
 help='no'
