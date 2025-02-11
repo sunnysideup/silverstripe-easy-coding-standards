@@ -34,6 +34,7 @@
   "bin": [
     "bin/sake-composer-about",
     "bin/sake-composer-available-updates",
+    "bin/sake-composer-force-update",
     "bin/sake-composer-update",
     "bin/sake-composer-require",
     "bin/sake-find-in-files",
@@ -81,9 +82,9 @@
   "config": {
     "sort-packages": true
   },
-    "autoload": {
-        "psr-4": {
-            "Sunnysideup\\EasyCodingStandards\\": "src/"
-        }
+  "autoload": {
+    "psr-4": {
+      "Sunnysideup\\EasyCodingStandards\\": "src/"
     }
+  }
 }

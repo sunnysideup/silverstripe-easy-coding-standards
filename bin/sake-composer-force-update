@@ -1,0 +1,112 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+
+############################################ DIR
+dir='./'
+package=''
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Composer Require"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-composer-force-update "
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+set -euo pipefail
+
+echonice "DEBUG: Retrieving full composer info (including dev dependencies)..."
+allInfo=$(composer info --format=json)
+echonice "DEBUG: Retrieving composer info for non-dev only..."
+nonDevInfo=$(composer info --no-dev --format=json)
+
+echonice "DEBUG: Filtering out direct dependencies from full info..."
+nonDirectPackages=$(echonice "$allInfo" | jq -r '
+  .installed[]
+  | select(.["direct-dependency"] == false)
+  | "\(.name):\(.version)"
+')
+echonice "DEBUG: Non-direct packages (name:version):"
+echonice "$nonDirectPackages"
+echo
+
+echonice "DEBUG: Getting list of package names from non-dev info..."
+nonDevNames=$(echonice "$nonDevInfo" | jq -r '.installed[] | .name')
+echonice "DEBUG: Non-dev package names:"
+echonice "$nonDevNames"
+echo
+
+while IFS= read -r line; do
+    pkgName=${line%%:*}
+    pkgVersion=${line#*:}
+    # Truncate pkgVersion at the first space to remove extra commit hash info.
+    pkgVersion=${pkgVersion%% *}
+
+    echonice "DEBUG: Processing package '$pkgName' with version '$pkgVersion'"
+
+    # Only process packages whose version starts with dev-master or dev-main.
+    if [[ "$pkgVersion" == dev-master* || "$pkgVersion" == dev-main* ]]; then
+        # Determine if this package is non-dev (i.e. present in the non-dev list).
+        if echonice "$nonDevNames" | grep -qx "$pkgName"; then
+            echonice "DEBUG: Package '$pkgName' is a non-dev dependency."
+            echonice "DEBUG: Running: composer require ${pkgName}:${pkgVersion}"
+            composer require "${pkgName}:${pkgVersion}"
+        else
+            echonice "DEBUG: Package '$pkgName' is a dev-only dependency."
+            echonice "DEBUG: Running: composer require -D ${pkgName}:${pkgVersion}"
+            composer require -D "${pkgName}:${pkgVersion}"
+        fi
+
+        echonice "DEBUG: Running: composer update ${pkgName} -W"
+        composer update "${pkgName}" -W
+    else
+        echonice "DEBUG: Package '$pkgName' version '$pkgVersion' does not start with dev-master or dev-main. Skipping."
+    fi
+
+    echonice "---------------------------------------"
+done <<<"$nonDirectPackages"
+
+echoend

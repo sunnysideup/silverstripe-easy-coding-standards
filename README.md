@@ -14,7 +14,10 @@ Install as global composer package and then try to access the commands, starting
  - sake-help
 
 # composer
+ - sake-composer-about
  - sake-composer-available-updates
+ - sake-composer-force-update
+ - sake-composer-require
  - sake-composer-update
 
 # find
