@@ -71,24 +71,25 @@ echonice "DEBUG: Getting list of package names from non-dev info..."
 nonDevNames=$(echonice "$nonDevInfo" | jq -r '.installed[] | .name')
 echonice "DEBUG: Non-dev package names:"
 echonice "$nonDevNames"
-echo
+
+nonDevPackagesProcessed=()
+devPackagesProcessed=()
 
 while IFS= read -r line; do
     pkgName=${line%%:*}
     pkgVersion=${line#*:}
-    # Truncate pkgVersion at the first space to remove extra commit hash info.
     pkgVersion=${pkgVersion%% *}
 
     echonice "DEBUG: Processing package '$pkgName' with version '$pkgVersion'"
 
-    # Only process packages whose version starts with dev-master or dev-main.
     if [[ "$pkgVersion" == dev-master* || "$pkgVersion" == dev-main* ]]; then
-        # Determine if this package is non-dev (i.e. present in the non-dev list).
         if echonice "$nonDevNames" | grep -qx "$pkgName"; then
+            nonDevPackagesProcessed+=("$pkgName")
             echonice "DEBUG: Package '$pkgName' is a non-dev dependency."
             echonice "DEBUG: Running: composer require ${pkgName}:${pkgVersion}"
             composer require "${pkgName}:${pkgVersion}"
         else
+            devPackagesProcessed+=("$pkgName")
             echonice "DEBUG: Package '$pkgName' is a dev-only dependency."
             echonice "DEBUG: Running: composer require -D ${pkgName}:${pkgVersion}"
             composer require -D "${pkgName}:${pkgVersion}"
@@ -100,7 +101,12 @@ while IFS= read -r line; do
         echonice "DEBUG: Package '$pkgName' version '$pkgVersion' does not start with dev-master or dev-main. Skipping."
     fi
 
-    echonice "---------------------------------------"
+    echoline
 done <<<"$nonDirectPackages"
+
+echoline
+echonice "Summary:"
+echonice "Non-dev packages updated: ${nonDevPackagesProcessed[*]}"
+echonice "Dev-only packages updated: ${devPackagesProcessed[*]}"
 
 echoend
