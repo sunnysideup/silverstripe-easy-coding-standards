@@ -64,7 +64,6 @@ fi
 ECHOHEAD "Easy to update"
 composer show -oD
 
-ECHOHEAD "Other notifications"
-composer outdated
-
+ECHOHEAD "Directly required packages out of date in composer.lock"
+composer outdated -D --locked
 echoend
