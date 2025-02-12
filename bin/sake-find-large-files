@@ -5,7 +5,7 @@ SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
 
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+sudoCmd='sudo'  # default to using sudo
 
 ############################################ DIR
 dir='./'
@@ -16,12 +16,16 @@ minSize="100M"
 
 while (($#)); do
     case $1 in
-    -h | --help)
+    -h|--help)
         help='yes'
         shift
         ;;
-    -m | --min-size)
+    -m|--min-size)
         minSize=$2
+        shift
+        ;;
+    --no-sudo)
+        sudoCmd=''  # disable sudo
         shift
         ;;
     -*)
@@ -35,17 +39,18 @@ done
 
 help_and_exit() {
 
-    ECHOHEAD "Find Large Files"
+    ECHOHEAD 'Find Large Files'
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
     echonice "Min Size:                      $minSize"
 
-    ECHOHEAD "Available settings:"
-    echonice "-h, --help                     show help information"
-    echonice "-m, --min-size                 minimum size to be picked up"
+    ECHOHEAD 'Available settings:'
+    echonice '-h, --help                     show help information'
+    echonice '-m, --min-size                 minimum size to be picked up'
+    echonice '--no-sudo                    run without sudo privileges'
 
-    ECHOHEAD "Example usage:"
-    echonice "sake-find-large-files -m 200M ./"
+    ECHOHEAD 'Example usage:'
+    echonice 'sake-find-large-files -m 200M --no-sudo ./'
 
     echofunctions
     exit
@@ -69,38 +74,39 @@ sizeToBytes() {
 # Function to find directories larger than a specified size and format output
 findLargeDirs() {
     local sizeThresholdBytes=$(sizeToBytes "$1")
-    echo -e "Size\t\tDirectory"
-    find . -type d -exec du -sb {} + | awk -v size="$sizeThresholdBytes" '$1 > size' |
+    echo -e 'Size\t\tDirectory'
+    ${sudoCmd} find . -type d -exec du -sb {} + | awk -v size="$sizeThresholdBytes" '$1 > size' |
         sort -rh | while read -r bytes dir; do
-        humanSize=$(numfmt --to=iec --format="%.1f" "$bytes")
+        humanSize=$(numfmt --to=iec --format='%.1f' "$bytes")
         relativeDir=${dir#./} # Remove './' prefix
-        printf "%-10s\t%s\n" "$humanSize" "$relativeDir"
+        printf '%-10s\t%s\n' "$humanSize" "$relativeDir"
     done
 }
 
 # Verify directory existence
 if [ -d "$dir" ]; then
     cd "$dir" || {
-        echonice "Failed to enter directory"
+        echonice 'Failed to enter directory'
         exit 1
     }
 else
-    echonice "Could not change directory to $dir"
+    echonice 'Could not change directory to' "$dir"
     help_and_exit
 fi
 
 echonice "Finding files larger than $minSize in $dir"
 
 # Finding large files and formatting output
-echo -e "Size\t\tFile"
-find . -xdev -type f -size +"$minSize" -exec du -sb {} + |
+echo -e 'Size\t\tFile'
+${sudoCmd} find . -xdev -type f -size +"$minSize" -exec du -sb {} + |
     sort -rh | head -n50 | while read -r bytes file; do
-    humanSize=$(numfmt --to=iec --format="%.1f" "$bytes")
+    humanSize=$(numfmt --to=iec --format='%.1f' "$bytes")
     relativeFile=${file#./} # Remove './' prefix
-    printf "%-10s\t%s\n" "$humanSize" "$relativeFile"
+    printf '%-10s\t%s\n' "$humanSize" "$relativeFile"
 done
 
 # Finding large directories
 findLargeDirs "$minSize"
 
 echoend
+

@@ -56,14 +56,9 @@ else
     help_and_exit
 fi
 
-set -euo pipefail
-
-echonice "DEBUG: Retrieving full composer info (including dev dependencies)..."
 allInfo=$(composer info --format=json)
-echonice "DEBUG: Retrieving composer info for non-dev only..."
 nonDevInfo=$(composer info --no-dev --format=json)
 
-echonice "DEBUG: Filtering out direct dependencies from full info..."
 nonDirectPackages=$(echonice "$allInfo" | jq -r '
   .installed[]
   | select(.["direct-dependency"] == false)
@@ -71,7 +66,6 @@ nonDirectPackages=$(echonice "$allInfo" | jq -r '
 ')
 echonice "DEBUG: Non-direct packages (name:version):"
 echonice "$nonDirectPackages"
-echo
 
 echonice "DEBUG: Getting list of package names from non-dev info..."
 nonDevNames=$(echonice "$nonDevInfo" | jq -r '.installed[] | .name')
