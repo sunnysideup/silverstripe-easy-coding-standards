@@ -66,6 +66,8 @@ nonDirectPackages=$(echo "$allInfo" | jq -r '
   | select(.["direct-dependency"] == false)
   | "\(.name):\(.version)"
 ')
+# Extract direct package names and their repository URLs
+
 # ECHOHEAD "Non-direct packages (name:version):"
 # echonice "$nonDirectPackages"
 
@@ -84,18 +86,10 @@ while IFS= read -r line; do
 
     ECHOHEAD "Processing package '$pkgName' with version '$pkgVersion'"
 
-    # Replace these with your actual details
-    # Construct the API URL
-    PACKAGIST_API_URL="https://packagist.org/api/update-package/?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_USERNAME_API_TOKEN}"
-
-    # Send a POST request to trigger the update
-    curl -XPOST -H "Content-Type: application/json" \
-        -d "{\"repository\":{\"url\":\"https://github.com/${PACKAGIST_USERNAME}/${pkgName}.git\"}}" \
-        "$PACKAGIST_API_URL"
-
     echonice "Update request sent to Packagist for ${pkgName}."
 
     if [[ "$pkgVersion" == dev-master* || "$pkgVersion" == dev-main* ]]; then
+
         if echo "$nonDevNames" | grep -qx "$pkgName"; then
             nonDevPackagesProcessed+=("$pkgName")
             echonice "Package '$pkgName' is a non-dev dependency."
@@ -113,6 +107,46 @@ while IFS= read -r line; do
 
     echoline
 done <<<"$nonDirectPackages"
+
+allInfo=$(composer info --format=json)
+directPackages=$(echo "$allInfo" | jq -r '
+  .installed[]
+  | select(.["direct-dependency"] == true)
+  | {name: .name, version: .version, repo: (.source // null)}
+  | @json
+')
+
+echo "$directPackages" | jq -c '.' | while read -r package; do
+    pkgName=$(echo "$package" | jq -r '.name')
+    pkgVersion=$(echo "$package" | jq -r '.version')
+    repoUrl=$(echo "$package" | jq -r '.repo')
+
+    if [[ -n "$repoUrl" && "$repoUrl" != "null" ]]; then
+
+        ECHOHEAD "Processing package '$pkgName' with version '$pkgVersion'"
+
+        if [[ "$pkgVersion" == dev-master* || "$pkgVersion" == dev-main* ]]; then
+            # Remove '/tree/master' or '/tree/main' or any other branch
+            repoUrl=$(echo "$repoUrl" | sed -E 's|/tree/[^/]+$||')
+            # Replace these with your actual details
+            # Construct the API URL
+            PACKAGIST_API_URL="https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_API_TOKEN}"
+
+            # Send a POST request to trigger the update
+            echonice "Posting to $PACKAGIST_API_URL with repo URL: ${repoUrl}"
+            RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
+                -d "{\"repository\":\"${repoUrl}\"}" \
+                "${PACKAGIST_API_URL}")
+            echonice "Response from Packagist: ${RESPONSE}"
+            composer update "${pkgName}" -W
+        else
+            echonice "Package '$pkgName' version '$pkgVersion' does not start with dev-master or dev-main. Skipping."
+        fi
+    else
+        echo "Skipping $pkgName ($pkgVersion): No repository URL found."
+    fi
+    echoline
+done <<<"$directPackages"
 
 echoline
 ECHOHEAD "Summary:"
