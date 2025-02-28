@@ -73,8 +73,6 @@ fi
 
 YMLFILELOCATION=$(realpath $WORKING_DIR/$YMLFILELOCATION)
 
-echo "$YMLFILELOCATION"
-
 if [[ "$YMLFILECREATE" == "yes" ]]; then
     php -r "
     require '${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php';
