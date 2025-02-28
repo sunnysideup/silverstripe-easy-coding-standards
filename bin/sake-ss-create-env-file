@@ -1,0 +1,74 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+YMLFILECREATE='no'
+YMLFILELOCATION='.env.yml'
+help='no'
+while (($#)); do
+    case $1 in
+    -c | --createymlfile)
+        YMLFILECREATE='yes'
+        shift
+        ;;
+    -y | --ymlfilelocation)
+        YMLFILELOCATION=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Create a .env file for Silverstripe based on a yml file of data"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to use:              $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-c, --createymlfile            create a yml file to enter data"
+    echonice "                            -> $YMLFILECREATE"
+    echonice "-y, --ymlfilelocation          location of the yml file:"
+    echonice "                            -> $YMLFILELOCATION"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-create-env-file "
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
+fi
+
+php -r 'require "MyClass.php"; MyClass::doSomething();'
+
+echoend

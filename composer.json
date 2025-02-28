@@ -29,7 +29,8 @@
     "squizlabs/php_codesniffer": "^3.6",
     "phpcompatibility/php-compatibility": "^9.3",
     "rector/rector": "^2.0",
-    "phan/phan": "*@stable"
+    "phan/phan": "*@stable",
+    "sunnysideup/env-file-generator": "dev-main"
   },
   "bin": [
     "bin/sake-composer-about",
@@ -68,6 +69,7 @@
     "bin/sake-self-update",
     "bin/sake-self-methods",
     "bin/sake-ss-add-site",
+    "bin/sake-ss-create-env-file",
     "bin/sake-ss-db-dump",
     "bin/sake-ss-db-import",
     "bin/sake-ss-db-open",
