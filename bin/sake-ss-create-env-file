@@ -50,6 +50,8 @@ help_and_exit() {
 
     ECHOHEAD "Example usage:"
     echonice "sake-ss-create-env-file "
+    echonice "sake-ss-create-env-file -c # create a yml file to complete data"
+    echonice "sake-ss-create-env-file -y myenv.yml # use a different yml file for output"
 
     echofunctions
     exit
@@ -69,6 +71,20 @@ else
     help_and_exit
 fi
 
-php -r 'require "MyClass.php"; MyClass::doSomething();'
+YMLFILELOCATION=$(realpath $WORKING_DIR/$YMLFILELOCATION)
+
+echo "$YMLFILELOCATION"
+
+if [[ "$YMLFILECREATE" == "yes" ]]; then
+    php -r "
+    require '${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php';
+    \\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::OutputExampleFile('${YMLFILELOCATION}');
+    "
+else
+    php -r "
+    require '${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php';
+    \\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::BuildEnvFile('${YMLFILELOCATION}');
+    "
+fi
 
 echoend
