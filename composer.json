@@ -32,6 +32,8 @@
     "phan/phan": "*@stable",
     "sunnysideup/env-file-generator": "dev-main"
   },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
   "bin": [
     "bin/sake-composer-about",
     "bin/sake-composer-available-updates",
