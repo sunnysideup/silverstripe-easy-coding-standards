@@ -94,8 +94,8 @@ if ! git fetch --quiet && git status | grep -q 'Your branch is up to date'; then
 fi
 
 echonice "Running composer install to get the already installed packages ..."
-git pull
-git push
+git pull origin $(git branch --show-current)
+git push origin $(git branch --show-current)
 composer install
 
 # Step: Capture the current package info before the update
