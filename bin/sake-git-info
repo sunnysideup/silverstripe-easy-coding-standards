@@ -77,9 +77,7 @@ fi
 # Check if the production branch exists
 if [ "$(git branch | grep production)" == "" ]; then
     # If it does not exist, create and push it
-    echo "Creating and pushing production branch..."
-    git checkout -b production develop
-    git push origin production
+    echo "RECOMMENDED: create production branch..."
 fi
 
 GIT_DIR=$(git rev-parse --show-toplevel)
