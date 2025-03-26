@@ -211,7 +211,6 @@ if test -f "$GIT_DIR/.git/config"; then
 
         if [ "$localHash" = "$remoteHash" ]; then
             echonice "✅ Branch is up-to-date."
-            exit 0
         elif [ "$localHash" = "$baseHash" ]; then
             echobad "🔄 Branch is behind. Pulling..."
             git pull --rebase
