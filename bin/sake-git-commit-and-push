@@ -210,16 +210,16 @@ if test -f "$GIT_DIR/.git/config"; then
         baseHash=$(git merge-base "$BRANCH" "origin/$BRANCH")
 
         if [ "$localHash" = "$remoteHash" ]; then
-            echo "✅ Branch is up-to-date."
+            echonice "✅ Branch is up-to-date."
             exit 0
         elif [ "$localHash" = "$baseHash" ]; then
-            echo "🔄 Branch is behind. Pulling..."
+            echobad "🔄 Branch is behind. Pulling..."
             git pull --rebase
         elif [ "$remoteHash" = "$baseHash" ]; then
-            echo "🔼 Branch is ahead. Pushing..."
+            echobad "🔼 Branch is ahead. Pushing..."
             git push
         else
-            echo "⚠️ Branch has diverged. Attempting sync..."
+            echobad "⚠️ Branch has diverged. Attempting sync..."
             git pull --rebase && git push
         fi
     fi
