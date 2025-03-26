@@ -195,17 +195,33 @@ if test -f "$GIT_DIR/.git/config"; then
         git commit . -m "$message"
         #git commit $WORKING_DIR/$also -m "$message"
         #git commit $WORKING_DIR/$logFile -m "$message"
-    fi
 
-    # ECHOHEAD "# pulling commits for the current branch from git repo"
-    # git pull origin $(git rev-parse --abbrev-ref HEAD) --ipv4
-    # git fetch --all --ipv4
-
-    if [[ "$commitAndPush" == "yes" ]]; then
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
         ECHOHEAD "# pushing commits to git repo, branch: $BRANCH"
         git push origin $(git rev-parse --abbrev-ref HEAD) --ipv4
+
+        # Fetch latest from origin
+        git fetch origin "$branch"
+
+        # Check if branch is behind or ahead
+        localHash=$(git rev-parse "$BRANCH")
+        remoteHash=$(git rev-parse "origin/$BRANCH")
+        baseHash=$(git merge-base "$BRANCH" "origin/$BRANCH")
+
+        if [ "$localHash" = "$remoteHash" ]; then
+            echo "✅ Branch is up-to-date."
+            exit 0
+        elif [ "$localHash" = "$baseHash" ]; then
+            echo "🔄 Branch is behind. Pulling..."
+            git pull --rebase
+        elif [ "$remoteHash" = "$baseHash" ]; then
+            echo "🔼 Branch is ahead. Pushing..."
+            git push
+        else
+            echo "⚠️ Branch has diverged. Attempting sync..."
+            git pull --rebase && git push
+        fi
     fi
 
     ECHOHEAD "# check git status"
