@@ -16,6 +16,7 @@ statusOnly='no'
 fullUpdate='yes'
 help='no'
 verbose='no'
+pullPush='no' # New option to control auto pull-push
 
 while (($#)); do
     case $1 in
@@ -36,7 +37,8 @@ while (($#)); do
         fullUpdate=$2
         shift
         ;;
-    --verbose) verbose='yes' ;;
+    -v | --verbose) verbose='yes' ;;
+    -p | --pull-push) pullPush='yes' ;; # New option
     -h | --help) help='yes' ;;
     -*)
         printf 'Unknown option: %q\n\n' "$1"
@@ -58,7 +60,8 @@ help_and_exit() {
     echonice "Create New tag (-v):           $newVersion"
     echonice "Status Only (-s):              $statusOnly"
     echonice "Full Composer Update (-f):     $fullUpdate"
-    echonice "Verbose (--verbose):           $verbose"
+    echonice "Verbose (--v):                 $verbose"
+    echonice "Pull-Push (--p):               $pullPush"
 
     ECHOHEAD "Available settings:"
     echonice "-m, --message                  message - e.g. MNT: Lint, defaults to last message"
@@ -66,7 +69,8 @@ help_and_exit() {
     echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no"
     echonice "-s, --status-only              check if there are changes git folder present, default: no"
     echonice "-f, --full-update              run a full composer update afterwards and commit, default: yes"
-    echonice "--verbose                      show detailed information about each repository"
+    echonice "-v, --verbose                  show detailed information about each repository"
+    echonice "-p, --pull-push                try git pull; git push to resolve false positives"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
@@ -102,8 +106,47 @@ if [[ "$statusOnly" != "yes" ]]; then
     sake-lint-remove-origs "$dir"
 fi
 
+# Function to try pull/push and check if it resolves the changes
+try_pull_push() {
+    local directory="$1"
+    local current_branch=$(git -C "$directory" rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+    # Skip if not on a branch (detached HEAD)
+    if [[ "$current_branch" == "HEAD" ]]; then
+        echonice "Repository $directory is in detached HEAD state, skipping pull/push"
+        return 1
+    fi
+
+    # Save current status before pull/push
+    local before_status=$(git -C "$directory" status --porcelain)
+    local before_ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+    local before_behind=$(git -C "$directory" rev-list HEAD..@{u} --count 2>/dev/null)
+
+    # Try pull and push
+    echonice "Trying git pull for $directory..."
+    git -C "$directory" pull --quiet
+
+    echonice "Trying git push for $directory..."
+    git -C "$directory" push --quiet
+
+    # Check status after pull/push
+    local after_status=$(git -C "$directory" status --porcelain)
+    local after_ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+    local after_behind=$(git -C "$directory" rev-list HEAD..@{u} --count 2>/dev/null)
+
+    # Compare before and after
+    if [[ "$after_status" == "" && "$after_ahead" == "0" && "$after_behind" == "0" ]]; then
+        echonice "✅ Pull/push resolved changes in $directory"
+        return 0
+    else
+        echonice "❌ Pull/push did not fully resolve changes in $directory"
+        return 1
+    fi
+}
+
 has_git_changes() {
     local directory="$1"
+    local try_fix="${2:-no}" # Whether to try auto pull-push
 
     # Check if the directory is a git repository
     if [[ ! -d "$directory/.git" ]]; then
@@ -111,30 +154,48 @@ has_git_changes() {
         return 1
     fi
 
+    local has_changes=0
+
     # Check for uncommitted changes (including untracked files)
     if [[ -n "$(git -C "$directory" status --porcelain)" ]]; then
         [[ "$verbose" == "yes" ]] && echonice "$directory has uncommitted changes"
-        return 0
+        has_changes=1
     fi
 
-    # Check for unpushed commits
-    local current_branch=$(git -C "$directory" rev-parse --abbrev-ref HEAD)
-    if [[ -n "$(git -C "$directory" log @{u}.. 2>/dev/null)" ]]; then
-        [[ "$verbose" == "yes" ]] && echonice "$directory has unpushed commits"
-        return 0
-    fi
+    # Only check for remote related issues if we don't already have local changes
+    if [[ $has_changes -eq 0 ]]; then
+        # Check if tracking a remote branch
+        if git -C "$directory" rev-parse @{u} >/dev/null 2>&1; then
+            # Check for unpushed commits
+            local ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+            if [[ "$ahead" != "0" ]]; then
+                [[ "$verbose" == "yes" ]] && echonice "$directory is ahead of remote by $ahead commits"
+                has_changes=1
+            fi
 
-    # Check if tracking a remote branch but the local branch is ahead
-    if git -C "$directory" rev-parse @{u} >/dev/null 2>&1; then
-        local ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
-        if [[ "$ahead" != "0" ]]; then
-            [[ "$verbose" == "yes" ]] && echonice "$directory is ahead of remote by $ahead commits"
-            return 0
+            # Check for unpulled commits (this might be causing false positives)
+            local behind=$(git -C "$directory" rev-list HEAD..@{u} --count 2>/dev/null)
+            if [[ "$behind" != "0" ]]; then
+                [[ "$verbose" == "yes" ]] && echonice "$directory is behind remote by $behind commits"
+                has_changes=1
+            fi
         fi
     fi
 
-    [[ "$verbose" == "yes" ]] && echonice "$directory has no changes to commit or push"
-    return 1
+    # If we have changes and pull-push is enabled, try to fix it
+    if [[ $has_changes -eq 1 && "$try_fix" == "yes" ]]; then
+        if try_pull_push "$directory"; then
+            has_changes=0 # Changes resolved by pull/push
+        fi
+    fi
+
+    # Return the result (0=true, 1=false in bash)
+    if [[ $has_changes -eq 1 ]]; then
+        return 0 # Changes found
+    else
+        [[ "$verbose" == "yes" ]] && echonice "$directory has no changes to commit or push"
+        return 1 # No changes
+    fi
 }
 
 process_directory() {
@@ -151,11 +212,23 @@ process_directory() {
         return
     fi
 
-    # Check for changes
-    if has_git_changes "$directory"; then
+    # Check for changes, with pull-push if enabled
+    if has_git_changes "$directory" "$pullPush"; then
         if [[ "$statusOnly" == "yes" ]]; then
             echobad "Changes detected in $directory"
+            ECHOHEAD "Git status for $directory:"
             git -C "$directory" status --short
+
+            # Show more detailed information about what's ahead/behind
+            if git -C "$directory" rev-parse @{u} >/dev/null 2>&1; then
+                local ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+                local behind=$(git -C "$directory" rev-list HEAD..@{u} --count 2>/dev/null)
+                if [[ "$ahead" != "0" || "$behind" != "0" ]]; then
+                    ECHOHEAD "Branch status:"
+                    [[ "$ahead" != "0" ]] && echonice "  $ahead commit(s) ahead of remote"
+                    [[ "$behind" != "0" ]] && echonice "  $behind commit(s) behind remote"
+                fi
+            fi
         else
             echonice "Processing changes in $directory"
             $SCRIPT_DIR/sake-git-commit-and-push "$directory" -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
