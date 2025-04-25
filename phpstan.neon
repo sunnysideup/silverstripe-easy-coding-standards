@@ -6,8 +6,8 @@ parameters:
         - /tests/*
         - '*/tests/*'
         - '*/_dev/*'
-        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
-        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
+        # - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
+        # - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
 
     inferPrivatePropertyTypeFromConstructor: true
 
