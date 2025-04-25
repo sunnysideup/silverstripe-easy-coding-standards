@@ -150,7 +150,7 @@ if test -f "$GIT_DIR/.git/config"; then
 
     echoline
 
-    sake-git-commit-and-push-vendor-packages -s yes
+    sake-git-commit-and-push-vendor-packages ./ -s yes
 
     echoline
 
