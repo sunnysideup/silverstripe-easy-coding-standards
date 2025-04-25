@@ -15,6 +15,7 @@ newVersion='no'
 statusOnly='no'
 fullUpdate='yes'
 help='no'
+verbose='no'
 
 while (($#)); do
     case $1 in
@@ -35,6 +36,7 @@ while (($#)); do
         fullUpdate=$2
         shift
         ;;
+    --verbose) verbose='yes' ;;
     -h | --help) help='yes' ;;
     -*)
         printf 'Unknown option: %q\n\n' "$1"
@@ -56,6 +58,7 @@ help_and_exit() {
     echonice "Create New tag (-v):           $newVersion"
     echonice "Status Only (-s):              $statusOnly"
     echonice "Full Composer Update (-f):     $fullUpdate"
+    echonice "Verbose (--verbose):           $verbose"
 
     ECHOHEAD "Available settings:"
     echonice "-m, --message                  message - e.g. MNT: Lint, defaults to last message"
@@ -63,6 +66,7 @@ help_and_exit() {
     echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no"
     echonice "-s, --status-only              check if there are changes git folder present, default: no"
     echonice "-f, --full-update              run a full composer update afterwards and commit, default: yes"
+    echonice "--verbose                      show detailed information about each repository"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
@@ -85,6 +89,7 @@ if [[ "$statusOnly" != "yes" ]]; then
         exit 1
     fi
 fi
+
 ############################################ CODE
 [[ ! -d "$WORKING_DIR" ]] && echobad "Could not change directory to $WORKING_DIR" && help_and_exit
 
@@ -97,64 +102,102 @@ if [[ "$statusOnly" != "yes" ]]; then
     sake-lint-remove-origs "$dir"
 fi
 
-process_directory() {
-    local directory=$1
-    cd "$directory" || return
+has_git_changes() {
+    local directory="$1"
 
-    if [[ ! -f "$directory/.git/config" ]]; then
-        echobad "$directory IS NOT A GIT REPO"
-    else
-        if has_git_changes; then
-            if [[ "$statusOnly" == "yes" ]]; then
-                echobad "Changes in $directory"
-            else
-                $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
-            fi
+    # Check if the directory is a git repository
+    if [[ ! -d "$directory/.git" ]]; then
+        [[ "$verbose" == "yes" ]] && echobad "$directory is not a git repository"
+        return 1
+    fi
+
+    # Check for uncommitted changes (including untracked files)
+    if [[ -n "$(git -C "$directory" status --porcelain)" ]]; then
+        [[ "$verbose" == "yes" ]] && echonice "$directory has uncommitted changes"
+        return 0
+    fi
+
+    # Check for unpushed commits
+    local current_branch=$(git -C "$directory" rev-parse --abbrev-ref HEAD)
+    if [[ -n "$(git -C "$directory" log @{u}.. 2>/dev/null)" ]]; then
+        [[ "$verbose" == "yes" ]] && echonice "$directory has unpushed commits"
+        return 0
+    fi
+
+    # Check if tracking a remote branch but the local branch is ahead
+    if git -C "$directory" rev-parse @{u} >/dev/null 2>&1; then
+        local ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+        if [[ "$ahead" != "0" ]]; then
+            [[ "$verbose" == "yes" ]] && echonice "$directory is ahead of remote by $ahead commits"
+            return 0
         fi
     fi
-    cd - >/dev/null
-}
 
-has_git_changes() {
-    # NOTE THAT 0 = true!!!!
-    # Check for uncommitted changes
-    if [[ -n $(git status --porcelain) ]]; then
-        # ZERO DENOTES A CHANGE
-        return 0
-    fi
-
-    # Check for unpushed changes
-    if [[ -n $(git cherry -v) ]]; then
-        # ZERO DENOTES A CHANGE
-        return 0
-    fi
-    # ONE DENOTES NO CHANGE
+    [[ "$verbose" == "yes" ]] && echonice "$directory has no changes to commit or push"
     return 1
 }
 
-matchingDirs=$(get_my_repos "$WORKING_DIR")
+process_directory() {
+    local directory=$1
 
-# Loop through the array and check for modifications
-for dir in $matchingDirs; do
-    process_directory "$dir"
+    if [[ ! -d "$directory" ]]; then
+        [[ "$verbose" == "yes" ]] && echobad "Directory does not exist: $directory"
+        return
+    fi
+
+    # Check if this is a git repository
+    if [[ ! -d "$directory/.git" ]]; then
+        [[ "$verbose" == "yes" ]] && echobad "$directory IS NOT A GIT REPO"
+        return
+    fi
+
+    # Check for changes
+    if has_git_changes "$directory"; then
+        if [[ "$statusOnly" == "yes" ]]; then
+            echobad "Changes detected in $directory"
+            git -C "$directory" status --short
+        else
+            echonice "Processing changes in $directory"
+            $SCRIPT_DIR/sake-git-commit-and-push "$directory" -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
+        fi
+    else
+        [[ "$verbose" == "yes" ]] && echonice "No changes in $directory"
+    fi
+}
+
+# Use both get_my_repos (if it exists) and direct directory scanning
+ECHOHEAD "Looking for repositories using get_my_repos function"
+if type get_my_repos >/dev/null 2>&1; then
+    matchingDirs=$(get_my_repos "$WORKING_DIR")
+    for repo in $matchingDirs; do
+        process_directory "$repo"
+    done
+else
+    echobad "get_my_repos function not found, falling back to directory scanning only"
+fi
+
+# Always scan vendor directories directly to ensure we don't miss any
+ECHOHEAD "Scanning for git repositories in $WORKING_DIR/$dir"
+find "$WORKING_DIR/$dir" -type d -name ".git" -exec dirname {} \; | while read repo; do
+    process_directory "$repo"
 done
 
-# ECHOHEAD "going to look for folders in $WORKING_DIR/themes"
-# find "$WORKING_DIR/themes" -mindepth 1 -maxdepth 1 -type d -print0 |
-#     while IFS= read -r -d '' line; do
-#         process_directory "$line"
-#     done
+# Check themes directory if it exists
+if [[ -d "$WORKING_DIR/themes" ]]; then
+    ECHOHEAD "Scanning for git repositories in $WORKING_DIR/themes"
+    find "$WORKING_DIR/themes" -type d -name ".git" -exec dirname {} \; | while read repo; do
+        process_directory "$repo"
+    done
+fi
 
-# ECHOHEAD "going to look for folders in $WORKING_DIR/$dir"
-# find "$WORKING_DIR/$dir" -mindepth 1 -maxdepth 1 -type d -print0 |
-#     while IFS= read -r -d '' line; do
-#         process_directory "$line"
-#     done
+# Return to the original directory
+cd "$WORKING_DIR" || exit
 
-# ECHOHEAD "back to the start: $WORKING_DIR"
-# cd "$WORKING_DIR"
-if [[ "$statusOnly" != "yes" ]]; then
-    [[ "$fullUpdate" == "yes" ]] && sake-composer-update && sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
+# Perform composer update if needed
+if [[ "$statusOnly" != "yes" && "$fullUpdate" == "yes" ]]; then
+    ECHOHEAD "Running composer update"
+    sake-composer-update
+    process_directory "$WORKING_DIR"
 fi
 
 echoend
