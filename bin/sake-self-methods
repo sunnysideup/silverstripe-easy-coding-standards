@@ -145,26 +145,59 @@ check_for_env_var() {
 get_my_repos() {
     check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
     WORKING_DIR=$1
-    # Paths to vendor directory and composer.lock
-    vendorDir="$WORKING_DIR/vendor"
-    composerLock="$WORKING_DIR/composer.lock"
-    # Extract package names and source URLs from composer.lock
-    packages=$(jq -r '.packages[] | "\(.name) \(.source.url)"' $composerLock)
 
     # Initialize an array for package directories
     declare -a packageDirs
+    declare -a found_dirs
 
-    while read -r packageName packageUrl; do
-        packageDir="$vendorDir/$packageName"
-        if [ -d "$packageDir/.git" ]; then
-            remoteUrl=$(git -C "$packageDir" config --get remote.origin.url)
-            if [[ "$remoteUrl" == *"$GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"* ]]; then
-                packageDirs+=("$packageDir")
-                echo $packageDir
+    # Step 1: First check composer.lock packages (original approach)
+    composerLock="$WORKING_DIR/composer.lock"
+    vendorDir="$WORKING_DIR/vendor"
+
+    if [[ -f "$composerLock" ]]; then
+        # Extract package names and source URLs from composer.lock
+        packages=$(jq -r '.packages[] | "\(.name) \(.source.url)"' "$composerLock" 2>/dev/null)
+
+        while read -r packageName packageUrl; do
+            if [[ -n "$packageName" ]]; then
+                packageDir="$vendorDir/$packageName"
+                if [ -d "$packageDir/.git" ]; then
+                    remoteUrl=$(git -C "$packageDir" config --get remote.origin.url 2>/dev/null)
+                    if [[ "$remoteUrl" == *"$GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"* ]]; then
+                        packageDirs+=("$packageDir")
+                        found_dirs+=("$packageDir")
+                    fi
+                fi
+            fi
+        done <<<"$packages"
+    fi
+
+    # Step 2: Find all git repositories and check their config files for the pattern
+    while IFS= read -r gitDir; do
+        repoDir=$(dirname "$gitDir")
+
+        # Skip if we've already found this directory through composer.lock
+        already_found=0
+        for dir in "${found_dirs[@]}"; do
+            if [[ "$dir" == "$repoDir" ]]; then
+                already_found=1
+                break
+            fi
+        done
+
+        if [[ $already_found -eq 0 ]]; then
+            # Check if this git repo's config contains the match pattern
+            if grep -q "$GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES" "$gitDir/config" 2>/dev/null; then
+                packageDirs+=("$repoDir")
+                found_dirs+=("$repoDir")
             fi
         fi
-    done <<<"$packages"
-    echonice "${packageDirs[@]}"
+    done < <(find "$WORKING_DIR" -path "*/\.*" -prune -o -name ".git" -type d -print)
+
+    # Output all found directories
+    for dir in "${packageDirs[@]}"; do
+        echo "$dir"
+    done
 }
 
 check_commit_message() {
