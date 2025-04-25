@@ -32,14 +32,26 @@ while (($#)); do
         newVersion=$2
         shift
         ;;
-    -s | --status-only) statusOnly='yes' ;;
+    -s | --status-only)
+        statusOnly='yes'
+        shift
+        ;;
     -f | --full-update)
         fullUpdate=$2
         shift
         ;;
-    -v | --verbose) verbose='yes' ;;
-    -p | --pull-push) pullPush='yes' ;; # New option
-    -h | --help) help='yes' ;;
+    -v | --verbose)
+        verbose='yes'
+        shift
+        ;;
+    -p | --pull-push)
+        pullPush='yes'
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
     -*)
         printf 'Unknown option: %q\n\n' "$1"
         help='yes'
