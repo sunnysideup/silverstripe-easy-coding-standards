@@ -16,7 +16,7 @@ statusOnly='no'
 fullUpdate='yes'
 help='no'
 verbose='no'
-pullPush='no' # New option to control auto pull-push
+pullPush='yes' # New option to control auto pull-push
 
 while (($#)); do
     case $1 in
@@ -111,12 +111,12 @@ fi
 
 installpackage "jq"
 
-if [[ "$statusOnly" != "yes" ]]; then
-    ECHOHEAD "Removing vendor folders that do not need to be there ..."
-    find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
-    ECHOHEAD "Removing orig files"
-    sake-lint-remove-origs "$dir"
-fi
+# if [[ "$statusOnly" != "yes" ]]; then
+#     ECHOHEAD "Removing vendor folders that do not need to be there ..."
+#     find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
+#     ECHOHEAD "Removing orig files"
+#     sake-lint-remove-origs "$dir"
+# fi
 
 # Function to try pull/push and check if it resolves the changes
 try_pull_push() {
@@ -212,6 +212,7 @@ has_git_changes() {
 
 process_directory() {
     local directory=$1
+    local message=$2
 
     if [[ ! -d "$directory" ]]; then
         [[ "$verbose" == "yes" ]] && echobad "Directory does not exist: $directory"
@@ -226,8 +227,8 @@ process_directory() {
 
     # Check for changes, with pull-push if enabled
     if has_git_changes "$directory" "$pullPush"; then
+        echobad "Changes detected in $directory"
         if [[ "$statusOnly" == "yes" ]]; then
-            echobad "Changes detected in $directory"
             ECHOHEAD "Git status for $directory:"
             git -C "$directory" status --short
 
@@ -242,8 +243,9 @@ process_directory() {
                 fi
             fi
         else
-            echonice "Processing changes in $directory"
-            $SCRIPT_DIR/sake-git-commit-and-push "$directory" -m "$message" -c $commitAndPush -s $statusOnly -v $newVersion
+            echonice "Running git commit and push for $directory with message: $message"
+            rel=${directory#"$PWD"}
+            $SCRIPT_DIR/sake-git-commit-and-push "$rel" -m "$message"
         fi
     else
         [[ "$verbose" == "yes" ]] && echonice "No changes in $directory"
@@ -255,7 +257,7 @@ ECHOHEAD "Looking for repositories using get_my_repos function"
 if type get_my_repos >/dev/null 2>&1; then
     matchingDirs=$(get_my_repos "$WORKING_DIR")
     for repo in $matchingDirs; do
-        process_directory "$repo"
+        process_directory "$repo" "$message"
     done
 else
     echobad "get_my_repos function not found, falling back to directory scanning only"
@@ -264,14 +266,14 @@ fi
 # Always scan vendor directories directly to ensure we don't miss any
 ECHOHEAD "Scanning for git repositories in $WORKING_DIR/$dir"
 find "$WORKING_DIR/$dir" -type d -name ".git" -exec dirname {} \; | while read repo; do
-    process_directory "$repo"
+    process_directory "$repo" "$message"
 done
 
 # Check themes directory if it exists
 if [[ -d "$WORKING_DIR/themes" ]]; then
     ECHOHEAD "Scanning for git repositories in $WORKING_DIR/themes"
     find "$WORKING_DIR/themes" -type d -name ".git" -exec dirname {} \; | while read repo; do
-        process_directory "$repo"
+        process_directory "$repo" "$message"
     done
 fi
 
