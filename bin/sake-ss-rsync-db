@@ -99,7 +99,7 @@ if [[ "$reverse" == "yes" ]]; then
     [[ "$confirm" != "yes" ]] && echonice "Aborted." && exit 1
 
     echonice "Dumping local database..."
-    mysqldump --column-statistics=0 --no-tablespaces -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" >"$localDumpFile"
+    mysqldump --no-tablespaces -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" >"$localDumpFile"
     [[ $? -ne 0 ]] && echobad "Local database dump failed." && exit 1
 
     echonice "Uploading dump to server..."
