@@ -48,7 +48,6 @@ help_and_exit() {
     ECHOHEAD "Available settings:"
     echonice "-w, --www-data-user            the apache user, default: www-data"
     echonice "-h, --help                     show help information"
-    echonice "-r, --reverse                  CAREFUL: reverse, push to server..."
 
     ECHOHEAD "Example usage:"
     echonice "sake-ss-rsync-assets my-server:/var/www/website-root"
@@ -88,6 +87,9 @@ if [ ! -z "$server" ]; then
         sudo chown $USER public/assets -R
         if [ -w "$WORKING_DIR/public/assets" ]; then
             if [[ "$reverse" == "yes" ]]; then
+                echowarn "You are about to overwrite the remote database with your local database."
+                read -p "Are you sure? (yes/[no]): " confirm
+                [[ "$confirm" != "yes" ]] && echonice "Aborted." && exit 1
                 rsync --stats -chavzPr ./public/assets/ $server/public/assets
             else
                 rsync --stats -chavzPr $server/public/assets/ ./public/assets
