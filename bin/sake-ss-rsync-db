@@ -56,7 +56,8 @@ help_and_exit() {
 
     ECHOHEAD "Example usage:"
     echonice "sake-ss-sync-db my-server:/var/www/website-root"
-    echonice "sake-ss-sync-db -r my-server"
+    echonice "sake-ss-sync-db my-server # default path is /container/application"
+    echonice "sake-ss-sync-db --reverse my-server"
 
     exit
 }
