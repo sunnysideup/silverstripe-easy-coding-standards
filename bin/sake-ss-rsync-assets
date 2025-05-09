@@ -87,7 +87,7 @@ if [ ! -z "$server" ]; then
         sudo chown $USER public/assets -R
         if [ -w "$WORKING_DIR/public/assets" ]; then
             if [[ "$reverse" == "yes" ]]; then
-                echowarn "You are about to overwrite the remote database with your local database."
+                echowarn "You are about to overwrite the remote ($server) assets with your local database."
                 read -p "Are you sure? (yes/[no]): " confirm
                 [[ "$confirm" != "yes" ]] && echonice "Aborted." && exit 1
                 rsync --stats -chavzPr ./public/assets/ $server/public/assets

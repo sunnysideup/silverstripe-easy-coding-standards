@@ -95,7 +95,7 @@ fi
 
 ############################################ SYNC PROCESS
 if [[ "$reverse" == "yes" ]]; then
-    echowarn "You are about to overwrite the remote database with your local database."
+    echowarn "You are about to overwrite the remote database ($server) with your local database."
     read -p "Are you sure? (yes/[no]): " confirm
     [[ "$confirm" != "yes" ]] && echonice "Aborted." && exit 1
 
