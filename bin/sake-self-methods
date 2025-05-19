@@ -239,15 +239,30 @@ check_commit_message() {
     return 1
 }
 
-# get .env variables
-
 # Check if .env file exists
-if [ ! -f $envFileLocation ]; then
+if [ ! -f "$envFileLocation" ]; then
     echobad ".env file not found here: $envFileLocation"
     exit 1
 fi
 
-# Load the .env file
-source $envFileLocation
+# use a different name for the associative array
+declare -A varsToAdd=(
+    [GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES]=''
+    [SCRUTINIZER_API_TOKEN]=''
+    [SCRUTINIZER_ORG]=''
+    [PACKAGIST_USERNAME]=''
+    [PACKAGIST_API_TOKEN]=''
+)
 
-echofunctions
+# Create .env file if it doesn't exist
+touch "$envFileLocation"
+
+# Loop through vars and add them if missing
+for key in "${!varsToAdd[@]}"; do
+    if ! grep -q "^$key=" "$envFileLocation"; then
+        echo "$key=${varsToAdd[$key]}" >>"$envFileLocation"
+    fi
+done
+
+# Load the .env file
+source "$envFileLocation"
