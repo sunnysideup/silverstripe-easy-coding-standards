@@ -98,10 +98,9 @@ composer require --dev sunnysideup/easy-coding-standards:dev-master
 1. open your terminal and type
 
 ```shell
+composer global config minimum-stability dev
+composer global config prefer-stable true
 composer global require sunnysideup/easy-coding-standards:dev-master
-cd ~/.config/composer/
-composer config minimum-stability dev
-composer config prefer-stable true
 ```
 
 2. then add path to `~/.bashrc` (or otherwise):
