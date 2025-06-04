@@ -1,0 +1,249 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+
+
+// Usage information
+if (in_array('--help', $argv) || in_array('-h', $argv) || ($argc < 3)) {
+    echo <<<EOL
+Usage: sake-lint-class-rename-comparison <dir> <oldBranch> <newBranch>
+  -h, --help                   Show this help message.
+  -f, --fix                    Fix the files with the renames.
+
+Examples:
+  sake-lint-class-rename-comparison app develop feature/new-class-structure
+
+EOL;
+    exit;
+}
+
+
+class SakeLintClassRenaceComparison
+{
+
+    protected $dir = 'app';
+
+    public function run(string $dir, string $oldBranch, string $newBranch, ?bool $fix = false): array
+    {
+        $this->dir = $dir;
+        // Ensure we're in a git repository
+        if (!is_dir('.git')) {
+            throw new RuntimeException('This script must be run from a Git repository.');
+        }
+
+        $originalBranch = $this->getCurrentBranch();
+
+        // Scan old branch
+        $this->checkoutBranch($oldBranch);
+        $oldClasses = $this->getClassesInCurrentTree();
+
+        // Scan new branch
+        $this->checkoutBranch($newBranch);
+        $newClasses = $this->getClassesInCurrentTree();
+
+        // Compute renames
+        $array =  $this->findRenamedClasses($oldClasses, $newClasses);
+        if ($fix) {
+            $this->checkoutBranch($newBranch);
+            $this->fix($array);
+        }
+
+        // Restore original branch
+        $this->checkoutBranch($originalBranch);
+
+        return $array;
+    }
+
+    public function fix($renames): void
+    {
+
+        // -- Main script starts here --
+
+        $appDir = __DIR__ . '/' . $this->dir;
+        $allFiles = $this->scanFiles($appDir);
+
+        foreach ($allFiles as $path) {
+            if ($this->updateFile($path, $renames)) {
+                echo 'Updated: ' . $path . PHP_EOL;
+            }
+        }
+    }
+
+    /**
+     * Recursively collects all PHP/YML/YAML files under $dir.
+     */
+    protected function scanFiles(string $dir): array
+    {
+        $files = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $fileInfo) {
+            /** @var SplFileInfo $fileInfo */
+            if (! $fileInfo->isFile()) {
+                continue;
+            }
+            $ext = strtolower($fileInfo->getExtension());
+            if (! in_array($ext, ['php', 'yml', 'yaml'], true)) {
+                continue;
+            }
+            $realPath = $fileInfo->getRealPath();
+            if ($realPath !== false) {
+                $files[] = $realPath;
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * Returns the current Git branch name.
+     */
+    protected function getCurrentBranch(): string
+    {
+        $branch = trim(shell_exec('git rev-parse --abbrev-ref HEAD') ?: '');
+        return $branch === '' ? 'error' : $branch;
+    }
+
+    /**
+     * Checks out the given branch (throws on failure).
+     */
+    protected function checkoutBranch(string $branch): void
+    {
+        $output = [];
+        $returnVar = 0;
+        exec('git checkout ' . escapeshellarg($branch) . ' 2>&1', $output, $returnVar);
+        if ($returnVar !== 0) {
+            throw new RuntimeException('Failed to checkout branch ' . $branch . ': ' . implode("\n", $output));
+        }
+    }
+
+    /**
+     * Recursively scans all PHP files under cwd and returns an array of FQCN => filePath.
+     */
+    public function getClassesInCurrentTree(): array
+    {
+        $classes = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator(getcwd(), RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+        foreach (new RegexIterator($iterator, '/\.php$/i') as $fileInfo) {
+            /** @var SplFileInfo $fileInfo */
+            $filePath = $fileInfo->getRealPath() ?: '';
+            if ($filePath === '' || !is_readable($filePath)) {
+                continue;
+            }
+            $source = file_get_contents($filePath);
+            if ($source === false) {
+                continue;
+            }
+            $tokens = token_get_all($source);
+            $namespace = '';
+            for ($i = 0, $n = count($tokens); $i < $n; $i++) {
+                if ($tokens[$i][0] === T_NAMESPACE) {
+                    $namespace = '';
+                    for ($j = $i + 1; $j < $n; $j++) {
+                        if ($tokens[$j][0] === T_STRING || $tokens[$j][0] === T_NAME_QUALIFIED) {
+                            $namespace .= $tokens[$j][1];
+                        } elseif ($tokens[$j] === ';' || $tokens[$j] === '{') {
+                            break;
+                        }
+                    }
+                }
+                if ($tokens[$i][0] === T_CLASS) {
+                    // Skip anonymous classes: ensure next meaningful token is class name
+                    $j = $i + 1;
+                    while ($j < $n && ($tokens[$j][0] === T_WHITESPACE || $tokens[$j][0] === T_COMMENT)) {
+                        $j++;
+                    }
+                    if ($tokens[$j][0] === T_STRING) {
+                        $className = $tokens[$j][1];
+                        $fqcn = $namespace !== '' ? '\\' . $namespace . '\\' . $className : '\\' . $className;
+                        $classes[$fqcn] = $filePath;
+                    }
+                }
+            }
+        }
+        return $classes;
+    }
+
+    /**
+     * Given two arrays of oldClasses and newClasses (both FQCN => path),
+     * returns an array of [oldFqcn => newFqcn] for classes with identical base names but different FQCN.
+     */
+    public function findRenamedClasses(array $oldClasses, array $newClasses): array
+    {
+        // Group new FQCNs by base name
+        $newByBase = [];
+        foreach ($newClasses as $fqcn => $_) {
+            $base = substr(strrchr($fqcn, '\\') ?: $fqcn, 1);
+            $newByBase[$base][] = $fqcn;
+        }
+
+        $renamed = [];
+        foreach ($oldClasses as $oldFqcn => $_) {
+            $base = substr(strrchr($oldFqcn, '\\') ?: $oldFqcn, 1);
+            if (!isset($newByBase[$base])) {
+                continue;
+            }
+            $candidates = $newByBase[$base];
+            // If exactly one candidate and FQCN differs, record rename
+            if (count($candidates) === 1 && $candidates[0] !== $oldFqcn) {
+                $oldFqcn = ltrim($oldFqcn, '\\');
+                $candidates[0] = ltrim($candidates[0], '\\');
+                $renamed[$oldFqcn] = $candidates[0];
+            }
+        }
+        return $renamed;
+    }
+
+    /**
+     * Loads the file at $filePath, replaces any occurrences of old FQCN (with or
+     * without leading backslash) with the new FQCN, and writes it back if changed.
+     *
+     * Returns true if the file was modified.
+     */
+    function updateFile(string $filePath, array $renames): bool
+    {
+        $content = file_get_contents($filePath);
+        if ($content === false) {
+            return false;
+        }
+
+        $original = $content;
+        foreach ($renames as $oldFqcn => $newFqcn) {
+            // Also prepare variants without leading backslash (e.g. for YAML)
+            $oldNoSlash = ltrim($oldFqcn, '\\');
+            $newNoSlash = ltrim($newFqcn, '\\');
+
+            // Replace occurrences with leading backslash
+            $content = str_replace($oldFqcn, $newFqcn, $content);
+            // Replace occurrences without leading backslash
+            $content = str_replace($oldNoSlash, $newNoSlash, $content);
+        }
+
+        if ($content !== $original) {
+            file_put_contents($filePath, $content);
+            return true;
+        }
+        return false;
+    }
+}
+
+$dir = $argv[1];
+$oldBranch = $argv[2];
+$newBranch = $argv[3];
+
+// CLI argument handling
+$options = getopt('f', ['fix:']);
+$fix = isset($options['fix']) || isset($options['f']) ? true : false;
+
+$renames = (new SakeLintClassRenaceComparison())->run($dir, $oldBranch, $newBranch, $fix);
+
+// Output CSV: oldFQCN,newFQCN
+foreach ($renames as $oldFqcn => $newFqcn) {
+    echo $oldFqcn . ': ' . $newFqcn . PHP_EOL;
+}

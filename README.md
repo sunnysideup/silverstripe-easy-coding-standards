@@ -40,6 +40,7 @@ Install as global composer package and then try to access the commands, starting
 
 # lint
  - sake-lint-all
+ - sake-lint-class-rename-comparison
  - sake-lint-compat
  - sake-lint-ecs
  - sake-lint-ide-annotator

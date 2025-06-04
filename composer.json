@@ -53,6 +53,7 @@
     "bin/sake-git-tag",
     "bin/sake-help",
     "bin/sake-lint-all",
+    "bin/sake-lint-class-rename-comparison",
     "bin/sake-lint-compat",
     "bin/sake-lint-ecs",
     "bin/sake-lint-ide-annotator",
