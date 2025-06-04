@@ -5,19 +5,6 @@ declare(strict_types=1);
 
 
 
-// Usage information
-if (in_array('--help', $argv) || in_array('-h', $argv) || ($argc < 3)) {
-    echo <<<EOL
-Usage: sake-lint-class-rename-comparison <dir> <oldBranch> <newBranch>
-  -h, --help                   Show this help message.
-  -f, --fix                    Fix the files with the renames.
-
-Examples:
-  sake-lint-class-rename-comparison app develop feature/new-class-structure
-
-EOL;
-    exit;
-}
 
 
 class SakeLintClassRenameComparison
@@ -32,9 +19,6 @@ class SakeLintClassRenameComparison
             throw new RuntimeException(sprintf('Directory "%s" does not exist or is not readable.', $dir));
         }
         // Ensure we're in a git repository
-        if (!is_dir($this->dir . '/.git')) {
-            throw new RuntimeException('This script must be run from a Git repository.');
-        }
 
         $originalBranch = $this->getCurrentBranch();
         try {
@@ -221,6 +205,12 @@ class SakeLintClassRenameComparison
             // Also prepare variants without leading backslash (e.g. for YAML)
             $oldNoSlash = ltrim($oldFqcn, '\\');
             $newNoSlash = ltrim($newFqcn, '\\');
+            if (strpos($oldNoSlash, '\\') === false) {
+                continue; // Skip if old FQCN not found
+            }
+            if (strpos($content, $oldNoSlash) === false) {
+                continue; // Skip if old FQCN not found
+            }
             $oldWithSlash = '\\' . $oldNoSlash;
             $newWithSlash = '\\' . $newNoSlash;
 
@@ -238,15 +228,56 @@ class SakeLintClassRenameComparison
     }
 }
 
-$options = getopt('f', ['fix']);
-$fix     = isset($options['f']) || isset($options['fix']);
+// Usage information
 
-// Remove flags from $argv so that $argv[1], $argv[2], $argv[3] are always dir/old/new
-$raw = array_values(array_filter($argv, fn($arg) => $arg !== '-f' && $arg !== '--fix'));
+function help()
+{
+    echo <<<EOL
+Usage: sake-lint-class-rename-comparison <dir> <oldBranch> <newBranch>
+  -h, --help                   Show this help message.
+  -f, --fix                    Fix the files with the renames.
+
+Examples:
+  sake-lint-class-rename-comparison app develop feature/new-class-structure
+
+EOL;
+    exit;
+}
+
+
+// 1) Parse flags (no colon = boolean flag)
+foreach ($argv as $arg) {
+    if ($arg === '-f' || $arg === '--fix') {
+        $fix = true;
+    } elseif ($arg === '-h' || $arg === '--help') {
+        help();
+        exit(0);
+    }
+}
+
+// 2) Now strip “-f”/“--fix” from $argv so that the remaining indexes are
+//    always: 0 => script, 1 => dir, 2 => oldBranch, 3 => newBranch
+$raw = array_values(
+    array_filter(
+        $argv,
+        fn(string $arg) => $arg !== '-f' && $arg !== '--fix'
+    )
+);
+
 $dir       = $raw[1] ?? '';
 $oldBranch = $raw[2] ?? '';
 $newBranch = $raw[3] ?? '';
 
+if ($dir === '' || $oldBranch === '' || $newBranch === '') {
+    help();
+    exit(1);
+}
+
+if (! $fix) {
+    die('not fixing');
+}
+
+// …rest of your code…
 
 $renames = (new SakeLintClassRenameComparison())->run($dir, $oldBranch, $newBranch, $fix);
 
@@ -254,6 +285,7 @@ if (empty($renames)) {
     echo 'No renamed classes found.' . PHP_EOL;
     exit(0);
 }
+
 // Output CSV: oldFQCN,newFQCN
 foreach ($renames as $oldFqcn => $newFqcn) {
     echo $oldFqcn . ': ' . $newFqcn . PHP_EOL;
