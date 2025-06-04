@@ -46,6 +46,8 @@ Install as global composer package and then try to access the commands, starting
  - sake-lint-ide-annotator
  - sake-lint-js
  - sake-lint-one-file
+ - sake-lint-phan
+ - sake-lint-psr-4-checker
  - sake-lint-rector
  - sake-lint-remove-origs
  - sake-lint-stan

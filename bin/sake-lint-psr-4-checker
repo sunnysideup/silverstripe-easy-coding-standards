@@ -1,0 +1,179 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+
+
+// Usage information
+if (in_array('--help', $argv) || in_array('-h', $argv) || ($argc < 3)) {
+    echo <<<EOL
+Usage: sake-lint-psr-4-checker <dir> <baseClassName>
+  -h, --help                   Show this help message.
+
+Examples:
+  sake-lint-psr-4-checker app MyCompany\\MyApp
+
+EOL;
+    exit;
+}
+
+
+
+
+class Psr4ComplianceChecker
+{
+    /**
+     * Scan $baseDir recursively, compute expected namespace for each file,
+     * and insert or correct the namespace declaration.
+     *
+     * @param string $baseDir       path to src (no trailing slash)
+     * @param string $baseNamespace e.g. 'MyApp'
+     *
+     * @return array<int, string>   List of update messages
+     */
+    public function addNamespaces(string $baseDir, string $baseNamespace): array
+    {
+        if (! is_dir($baseDir) || ! is_readable($baseDir)) {
+            echo 'Error: "' . $baseDir . '" is not a readable directory.' . PHP_EOL;
+            exit(1);
+        }
+        $messages = [];
+        $files = $this->getPhpFiles($baseDir);
+
+        foreach ($files as $filePath) {
+            $relativePath = substr($filePath, strlen($baseDir) + 1);
+            $dirPath = dirname($relativePath);
+            $expectedNamespace = $baseNamespace;
+            if ($dirPath !== '' && $dirPath !== '.') {
+                $expectedNamespace .= '\\' . str_replace(DIRECTORY_SEPARATOR, '\\', $dirPath);
+            }
+
+            $currentNamespace = $this->getNamespaceFromFile($filePath);
+            if ($currentNamespace !== $expectedNamespace) {
+                $this->setNamespaceInFile($filePath, $expectedNamespace);
+                $messages[] = sprintf(
+                    'Updated namespace in %s to %s',
+                    $filePath,
+                    $expectedNamespace
+                );
+            }
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Recursively collect all .php files under $dir.
+     *
+     * @param string $dir
+     * @return array<int, string>
+     */
+    private function getPhpFiles(string $dir): array
+    {
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir)
+        );
+
+        $files = [];
+        foreach ($iterator as $fileInfo) {
+            if ($fileInfo->isDir()) {
+                continue;
+            }
+
+            if ($fileInfo->getExtension() === 'php') {
+                $files[] = $fileInfo->getPathname();
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * Parse a PHP file and return its declared namespace, or empty if none.
+     *
+     * @param string $filePath
+     * @return string
+     */
+    private function getNamespaceFromFile(string $filePath): string
+    {
+        $src = file_get_contents($filePath);
+        if ($src === false) {
+            return '';
+        }
+
+        $tokens = token_get_all($src);
+        $namespace = '';
+        $count = count($tokens);
+        for ($i = 0; $i < $count; $i++) {
+            $token = $tokens[$i];
+            if (is_array($token) && $token[0] === T_NAMESPACE) {
+                $i++;
+                while (
+                    $i < $count
+                    && is_array($tokens[$i])
+                    && in_array($tokens[$i][0], [T_STRING, T_NS_SEPARATOR], true)
+                ) {
+                    $namespace .= $tokens[$i][1];
+                    $i++;
+                }
+
+                return $namespace;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Remove any existing namespace declaration and insert the correct one.
+     *
+     * @param string $filePath
+     * @param string $expectedNamespace
+     * @return void
+     */
+    private function setNamespaceInFile(string $filePath, string $expectedNamespace): void
+    {
+        $src = file_get_contents($filePath);
+        if ($src === false) {
+            return;
+        }
+
+        // Remove existing namespace declarations
+        $srcWithoutNs = preg_replace('#^namespace\s+[^;]+;\s*#m', '', $src);
+
+        // Determine insertion position: after <?php and optional declare()
+        $pos = 0;
+        if (preg_match('/<\?php\s*declare\s*\([^)]*\)\s*;\s*/', $srcWithoutNs, $matches, PREG_OFFSET_CAPTURE)) {
+            $pos = (int) ($matches[0][1] + strlen($matches[0][0]));
+        } elseif (preg_match('/<\?php\s*/', $srcWithoutNs, $matches, PREG_OFFSET_CAPTURE)) {
+            $pos = (int) ($matches[0][1] + strlen($matches[0][0]));
+        }
+
+        $newSrc = substr($src, 0, $pos)
+            . "\nnamespace $expectedNamespace;\n\n"
+            . substr($srcWithoutNs, $pos);
+
+        file_put_contents($filePath, $newSrc);
+    }
+}
+
+
+require __DIR__ . '/vendor/autoload.php';
+
+
+$checker = new Psr4ComplianceChecker();
+
+
+$baseDir = $argv[1];
+$baseNamespace = $argv[2];
+
+$mismatches = $checker->addNamespaces($baseDir, $baseNamespace);
+
+if (empty($mismatches)) {
+    echo 'All classes are PSR-4 compliant.' . PHP_EOL;
+} else {
+    foreach ($mismatches as $msg) {
+        echo $msg . PHP_EOL;
+    }
+}

@@ -20,40 +20,37 @@ EOL;
 }
 
 
-class SakeLintClassRenaceComparison
+class SakeLintClassRenameComparison
 {
 
-    protected $dir = 'app';
+    protected string $dir = '';
 
     public function run(string $dir, string $oldBranch, string $newBranch, ?bool $fix = false): array
     {
-        $this->dir = $dir;
+        $this->dir = realpath($dir);
+        if (! is_dir($this->dir) || ! is_readable($this->dir)) {
+            throw new RuntimeException(sprintf('Directory "%s" does not exist or is not readable.', $dir));
+        }
         // Ensure we're in a git repository
-        if (!is_dir('.git')) {
+        if (!is_dir($this->dir . '/.git')) {
             throw new RuntimeException('This script must be run from a Git repository.');
         }
 
         $originalBranch = $this->getCurrentBranch();
-
-        // Scan old branch
-        $this->checkoutBranch($oldBranch);
-        $oldClasses = $this->getClassesInCurrentTree();
-
-        // Scan new branch
-        $this->checkoutBranch($newBranch);
-        $newClasses = $this->getClassesInCurrentTree();
-
-        // Compute renames
-        $array =  $this->findRenamedClasses($oldClasses, $newClasses);
-        if ($fix) {
+        try {
+            $this->checkoutBranch($oldBranch);
+            $oldClasses = $this->getClassesInCurrentTree();
             $this->checkoutBranch($newBranch);
-            $this->fix($array);
+            $newClasses = $this->getClassesInCurrentTree();
+            $renames = $this->findRenamedClasses($oldClasses, $newClasses);
+            if ($fix) {
+                // Already on $newBranch, so no need to re-checkout
+                $this->fix($renames);
+            }
+        } finally {
+            $this->checkoutBranch($originalBranch);
         }
-
-        // Restore original branch
-        $this->checkoutBranch($originalBranch);
-
-        return $array;
+        return $renames;
     }
 
     public function fix($renames): void
@@ -61,7 +58,10 @@ class SakeLintClassRenaceComparison
 
         // -- Main script starts here --
 
-        $appDir = __DIR__ . '/' . $this->dir;
+        $appDir = realpath($this->dir);
+        if ($appDir === false) {
+            throw new RuntimeException(sprintf('Could not resolve path "%s"', $this->dir));
+        }
         $allFiles = $this->scanFiles($appDir);
 
         foreach ($allFiles as $path) {
@@ -105,7 +105,10 @@ class SakeLintClassRenaceComparison
     protected function getCurrentBranch(): string
     {
         $branch = trim(shell_exec('git rev-parse --abbrev-ref HEAD') ?: '');
-        return $branch === '' ? 'error' : $branch;
+        if ($branch === '') {
+            throw new RuntimeException('Could not determine current Git branch.');
+        }
+        return $branch;
     }
 
     /**
@@ -124,11 +127,11 @@ class SakeLintClassRenaceComparison
     /**
      * Recursively scans all PHP files under cwd and returns an array of FQCN => filePath.
      */
-    public function getClassesInCurrentTree(): array
+    protected function getClassesInCurrentTree(): array
     {
         $classes = [];
         $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator(getcwd(), RecursiveDirectoryIterator::SKIP_DOTS)
+            new RecursiveDirectoryIterator($this->dir, RecursiveDirectoryIterator::SKIP_DOTS)
         );
         foreach (new RegexIterator($iterator, '/\.php$/i') as $fileInfo) {
             /** @var SplFileInfo $fileInfo */
@@ -174,7 +177,7 @@ class SakeLintClassRenaceComparison
      * Given two arrays of oldClasses and newClasses (both FQCN => path),
      * returns an array of [oldFqcn => newFqcn] for classes with identical base names but different FQCN.
      */
-    public function findRenamedClasses(array $oldClasses, array $newClasses): array
+    protected function findRenamedClasses(array $oldClasses, array $newClasses): array
     {
         // Group new FQCNs by base name
         $newByBase = [];
@@ -206,7 +209,7 @@ class SakeLintClassRenaceComparison
      *
      * Returns true if the file was modified.
      */
-    function updateFile(string $filePath, array $renames): bool
+    protected function updateFile(string $filePath, array $renames): bool
     {
         $content = file_get_contents($filePath);
         if ($content === false) {
@@ -218,9 +221,11 @@ class SakeLintClassRenaceComparison
             // Also prepare variants without leading backslash (e.g. for YAML)
             $oldNoSlash = ltrim($oldFqcn, '\\');
             $newNoSlash = ltrim($newFqcn, '\\');
+            $oldWithSlash = '\\' . $oldNoSlash;
+            $newWithSlash = '\\' . $newNoSlash;
 
             // Replace occurrences with leading backslash
-            $content = str_replace($oldFqcn, $newFqcn, $content);
+            $content = str_replace($oldWithSlash, $newWithSlash, $content);
             // Replace occurrences without leading backslash
             $content = str_replace($oldNoSlash, $newNoSlash, $content);
         }
@@ -233,16 +238,22 @@ class SakeLintClassRenaceComparison
     }
 }
 
-$dir = $argv[1];
-$oldBranch = $argv[2];
-$newBranch = $argv[3];
+$options = getopt('f', ['fix']);
+$fix     = isset($options['f']) || isset($options['fix']);
 
-// CLI argument handling
-$options = getopt('f', ['fix:']);
-$fix = isset($options['fix']) || isset($options['f']) ? true : false;
+// Remove flags from $argv so that $argv[1], $argv[2], $argv[3] are always dir/old/new
+$raw = array_values(array_filter($argv, fn($arg) => $arg !== '-f' && $arg !== '--fix'));
+$dir       = $raw[1] ?? '';
+$oldBranch = $raw[2] ?? '';
+$newBranch = $raw[3] ?? '';
 
-$renames = (new SakeLintClassRenaceComparison())->run($dir, $oldBranch, $newBranch, $fix);
 
+$renames = (new SakeLintClassRenameComparison())->run($dir, $oldBranch, $newBranch, $fix);
+
+if (empty($renames)) {
+    echo 'No renamed classes found.' . PHP_EOL;
+    exit(0);
+}
 // Output CSV: oldFQCN,newFQCN
 foreach ($renames as $oldFqcn => $newFqcn) {
     echo $oldFqcn . ': ' . $newFqcn . PHP_EOL;

@@ -59,6 +59,8 @@
     "bin/sake-lint-ide-annotator",
     "bin/sake-lint-js",
     "bin/sake-lint-one-file",
+    "bin/sake-lint-phan",
+    "bin/sake-lint-psr-4-checker",
     "bin/sake-lint-rector",
     "bin/sake-lint-stan",
     "bin/sake-lint-remove-origs",
