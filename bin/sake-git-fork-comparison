@@ -10,7 +10,7 @@ class ForkDiffChecker
 
     public function __construct(string $repoUrl, ?string $token = '')
     {
-        $this->token = $token ?: getenv('GITHUB_TOKEN');
+        $this->token = $token;
 
         if (! preg_match('#github\.com/([^/]+)/([^/.]+)#', $repoUrl, $matches)) {
             throw new InvalidArgumentException('Invalid GitHub repo URL');
@@ -223,8 +223,8 @@ Usage:
   sake-git-fork-comparison <GitHubRepoURL|PackagistPackage> [token]
 
 Examples:
-  sake-git-fork-comparison https://github.com/vendor/repo 
-  sake-git-fork-comparison sunnysideup/cms-better 
+  sake-git-fork-comparison https://github.com/vendor/repo
+  sake-git-fork-comparison sunnysideup/cms-better
 
 EOT;
 }
@@ -237,6 +237,31 @@ if (in_array($input, ['--help', '-h', ''], true)) {
 }
 
 $token = $argv[2] ?? null;
+
+if (! $token) {
+
+    $token = getenv('GITHUB_TOKEN') ?: '';
+    if (! $token) {
+        $dir = __DIR__;
+        while ($dir) {
+            $envPath = $dir . '/.env';
+            if (is_file($envPath)) {
+                $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                foreach ($lines as $line) {
+                    if (strpos($line, 'GITHUB_TOKEN=') === 0) {
+                        $token = substr($line, strlen('GITHUB_TOKEN='));
+                        break 2;
+                    }
+                }
+            }
+            $parentDir = dirname($dir);
+            if ($parentDir === $dir) {
+                break;
+            }
+            $dir = $parentDir;
+        }
+    }
+}
 
 try {
     if (preg_match('#^(https?://|git@)#', $input)) {
