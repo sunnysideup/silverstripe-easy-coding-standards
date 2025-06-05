@@ -223,8 +223,8 @@ Usage:
   sake-git-fork-comparison <GitHubRepoURL|PackagistPackage> [token]
 
 Examples:
-  sake-git-fork-comparison https://github.com/vendor/repo abcd1234efgh5678ijkl9012mnop3456qrst7890
-  sake-git-fork-comparison sunnysideup/cms-better abcd1234efgh5678ijkl9012mnop3456qrst7890
+  sake-git-fork-comparison https://github.com/vendor/repo 
+  sake-git-fork-comparison sunnysideup/cms-better 
 
 EOT;
 }
