@@ -250,6 +250,7 @@ if (! $token) {
                 foreach ($lines as $line) {
                     if (strpos($line, 'GITHUB_TOKEN=') === 0) {
                         $token = substr($line, strlen('GITHUB_TOKEN='));
+                        $token = str_replace('"', '', $token);
                         break 2;
                     }
                 }
