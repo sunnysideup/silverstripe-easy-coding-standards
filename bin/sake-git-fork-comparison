@@ -6,18 +6,21 @@ class ForkDiffChecker
     private string $baseOwner;
     private string $baseRepo;
     private string $baseBranch;
+    private ?string $token;
 
-    public function __construct(string $repoUrl)
+    public function __construct(string $repoUrl, ?string $token = '')
     {
-        if (!preg_match('#github.com/([^/]+)/([^/.]+)#', $repoUrl, $matches)) {
+        $this->token = $token ?: getenv('GITHUB_TOKEN');
+
+        if (! preg_match('#github\.com/([^/]+)/([^/.]+)#', $repoUrl, $matches)) {
             throw new InvalidArgumentException('Invalid GitHub repo URL');
         }
 
         $this->baseOwner = $matches[1];
-        $this->baseRepo = $matches[2];
+        $this->baseRepo  = $matches[2];
 
         $info = $this->getRepoInfo($this->baseOwner, $this->baseRepo);
-        if (!$info) {
+        if (! $info) {
             throw new RuntimeException('Could not fetch base repo info');
         }
 
@@ -26,13 +29,27 @@ class ForkDiffChecker
 
     public function run(): void
     {
-        echo "Base repo: {$this->baseOwner}/{$this->baseRepo} (branch: {$this->baseBranch})\n\n";
+        $repoFullName = $this->baseOwner . '/' . $this->baseRepo;
+        $repoUrl      = 'https://github.com/' . $repoFullName;
 
-        $forks = $this->getForks($this->baseOwner, $this->baseRepo);
+        echo 'Base repo: ' . $repoFullName . ' (branch: ' . $this->baseBranch . ')' . PHP_EOL;
+        echo 'Repo URL: ' . $repoUrl . PHP_EOL;
+
+        $packageName = $this->getComposerPackageNameForRepo(
+            $this->baseOwner,
+            $this->baseRepo,
+            $this->baseBranch
+        );
+        if ($packageName) {
+            echo 'Package name: ' . $packageName . PHP_EOL;
+        }
+        echo PHP_EOL;
+
+        $forks   = $this->getForks($this->baseOwner, $this->baseRepo);
         $results = [];
 
         foreach ($forks as $fork) {
-            $forkOwner = $fork['owner']['login'];
+            $forkOwner  = $fork['owner']['login'];
             $forkBranch = $fork['default_branch'] ?? 'main';
 
             $result = $this->compareFork($forkOwner, $forkBranch);
@@ -41,85 +58,196 @@ class ForkDiffChecker
             }
         }
 
-        usort($results, fn($a, $b) => $b['aheadBy'] <=> $a['aheadBy']);
+        usort($results, fn(array $a, array $b): int => $b['aheadBy'] <=> $a['aheadBy']);
 
         foreach ($results as $res) {
-            echo "Fork: {$res['forkOwner']}\n";
-            echo "  Ahead by: {$res['aheadBy']} commits\n";
-            echo "  Behind by: {$res['behindBy']} commits\n";
-            echo "  Last commit: {$res['lastCommit']}\n";
-            echo "  Compare: {$res['diffUrl']}\n\n";
+            echo 'Fork: ' . $res['forkOwner'] . PHP_EOL;
+            echo '  Repo: ' . $res['forkRepoUrl'] . PHP_EOL;
+            echo '  Package: ' . ($res['packageName'] ?? 'unknown') . PHP_EOL;
+            echo '  Ahead by: ' . $res['aheadBy'] . ' commits' . PHP_EOL;
+            echo '  Behind by: ' . $res['behindBy'] . ' commits' . PHP_EOL;
+            echo '  Last commit: ' . $res['lastCommit'] . PHP_EOL;
+            echo '  Compare: ' . $res['diffUrl'] . PHP_EOL . PHP_EOL;
         }
 
         if (empty($results)) {
-            echo "No forks are ahead of base repo.\n";
+            echo 'No forks are ahead of base repo.' . PHP_EOL;
         }
     }
 
     private function getRepoInfo(string $owner, string $repo): ?array
     {
-        return $this->fetchJson("https://api.github.com/repos/$owner/$repo");
+        return $this->fetchJson('https://api.github.com/repos/' . $owner . '/' . $repo);
     }
 
     private function getForks(string $owner, string $repo): array
     {
-        return $this->fetchJson("https://api.github.com/repos/$owner/$repo/forks?per_page=100") ?? [];
+        return $this->fetchJson(
+            'https://api.github.com/repos/' . $owner . '/' . $repo . '/forks?per_page=100'
+        ) ?? [];
     }
 
     private function compareFork(string $forkOwner, string $forkBranch): ?array
     {
-        $url = "https://api.github.com/repos/{$this->baseOwner}/{$this->baseRepo}/compare/{$this->baseBranch}...$forkOwner:$forkBranch";
-        $data = $this->fetchJson($url);
+        $apiUrl     = 'https://api.github.com/repos/'
+            . $this->baseOwner . '/' . $this->baseRepo
+            . '/compare/' . $this->baseBranch . '...'
+            . $forkOwner . ':' . $forkBranch;
+        $compareUrl = 'https://github.com/'
+            . $this->baseOwner . '/' . $this->baseRepo
+            . '/compare/' . $this->baseBranch . '...'
+            . $forkOwner . ':' . $forkBranch;
+        $data       = $this->fetchJson($apiUrl);
 
-        if (!$data || ($data['ahead_by'] ?? 0) <= 0) {
+        if (
+            ! $data
+            || ($data['ahead_by'] ?? 0) <= 0
+            || ($data['behind_by'] ?? 0) > ($data['ahead_by'] ?? 0)
+        ) {
             return null;
         }
 
-        $lastCommit = $data['commits'] ? end($data['commits'])['commit']['committer']['date'] : 'unknown';
+        $commits     = $data['commits'] ?? [];
+        $lastRawDate = $commits ? end($commits)['commit']['committer']['date'] : null;
+        $lastCommit  = 'unknown';
+
+        if ($lastRawDate) {
+            $dateTime = new DateTime($lastRawDate);
+            $now      = new DateTime('now');
+            $interval = $dateTime->diff($now);
+            $daysAgo  = $interval->days;
+            $lastCommit = $daysAgo . ' day' . ($daysAgo === 1 ? '' : 's') . ' ago';
+        }
+
+        $forkRepoUrl  = 'https://github.com/' . $forkOwner . '/' . $this->baseRepo;
+        $packageName  = $this->getComposerPackageNameForRepo(
+            $forkOwner,
+            $this->baseRepo,
+            $forkBranch
+        );
 
         return [
-            'forkOwner' => $forkOwner,
-            'aheadBy' => $data['ahead_by'],
-            'behindBy' => $data['behind_by'],
-            'lastCommit' => $lastCommit,
-            'diffUrl' => $url
+            'forkOwner'   => $forkOwner,
+            'forkRepoUrl' => $forkRepoUrl,
+            'packageName' => $packageName,
+            'aheadBy'     => $data['ahead_by'],
+            'behindBy'    => $data['behind_by'],
+            'lastCommit'  => $lastCommit,
+            'diffUrl'     => $compareUrl,
         ];
+    }
+
+    private function getComposerPackageNameForRepo(
+        string $owner,
+        string $repo,
+        string $branch
+    ): ?string {
+        $rawUrl = sprintf(
+            'https://raw.githubusercontent.com/%s/%s/%s/composer.json',
+            $owner,
+            $repo,
+            $branch
+        );
+
+        $contextOptions = [
+            'http' => [
+                'user_agent' => 'ForkDiffChecker',
+            ],
+        ];
+        if ($this->token) {
+            $contextOptions['http']['header'] = 'Authorization: token ' . $this->token . "\r\n";
+        }
+        $context = stream_context_create($contextOptions);
+        $json    = @file_get_contents($rawUrl, false, $context);
+        if (! $json) {
+            return null;
+        }
+
+        $data = json_decode($json, true);
+        return $data['name'] ?? null;
     }
 
     private function fetchJson(string $url): ?array
     {
-        $context = stream_context_create([
-            'http' => ['user_agent' => 'ForkDiffChecker']
-        ]);
-        $json = @file_get_contents($url, false, $context);
+        $options = [
+            'http' => [
+                'user_agent' => 'ForkDiffChecker',
+            ],
+        ];
+        if ($this->token) {
+            $options['http']['header'] = 'Authorization: token ' . $this->token . "\r\n";
+        }
+        $context = stream_context_create($options);
+        $json    = @file_get_contents($url, false, $context);
         return $json ? json_decode($json, true) : null;
+    }
+
+    public static function resolveRepoUrlFromPackage(
+        string $packageName,
+        ?string $token = ''
+    ): string {
+        $url     = 'https://packagist.org/packages/' . $packageName . '.json';
+        $options = [
+            'http' => [
+                'user_agent' => 'ForkDiffChecker',
+            ],
+        ];
+        if ($token) {
+            $options['http']['header'] = 'Authorization: token ' . $token . "\r\n";
+        }
+        $context = stream_context_create($options);
+        $json    = @file_get_contents($url, false, $context);
+        if (! $json) {
+            throw new RuntimeException('Could not fetch Packagist info for ' . $packageName);
+        }
+
+        $data = json_decode($json, true);
+        $repo = $data['package']['repository'] ?? null;
+        if (! $repo || ! preg_match('#github\.com/[^/]+/[^/.]+#', $repo)) {
+            throw new RuntimeException('Invalid or unsupported repository URL for ' . $packageName);
+        }
+
+        if (! preg_match('#^https?://#', $repo)) {
+            $repo = str_replace('git@github.com:', 'https://github.com/', $repo);
+            $repo = rtrim($repo, '.git');
+        }
+
+        return $repo;
     }
 }
 
-
 function printHelp(): void
 {
-    echo <<<EOT
+    echo <<<'EOT'
 Usage:
-  sake-git-fork-comparison <GitHubRepoURL>
+  sake-git-fork-comparison <GitHubRepoURL|PackagistPackage> [token]
 
-Example:
-  sake-git-fork-comparison https://github.com/vendor/repo
+Examples:
+  sake-git-fork-comparison https://github.com/vendor/repo abcd1234efgh5678ijkl9012mnop3456qrst7890
+  sake-git-fork-comparison sunnysideup/cms-better abcd1234efgh5678ijkl9012mnop3456qrst7890
 
 EOT;
 }
 
-$repoUrl = $argv[1] ?? '';
+$input = $argv[1] ?? '';
 
-if (in_array($repoUrl, ['--help', '-h', ''], true)) {
+if (in_array($input, ['--help', '-h', ''], true)) {
     printHelp();
     exit(0);
 }
 
+$token = $argv[2] ?? null;
+
 try {
-    $checker = new ForkDiffChecker($repoUrl);
+    if (preg_match('#^(https?://|git@)#', $input)) {
+        $repoUrl = $input;
+    } else {
+        $repoUrl = ForkDiffChecker::resolveRepoUrlFromPackage($input, $token);
+    }
+
+    $checker = new ForkDiffChecker($repoUrl, $token);
     $checker->run();
 } catch (Throwable $e) {
-    echo 'Error: ' . $e->getMessage() . "\n";
+    echo 'Error: ' . $e->getMessage() . PHP_EOL;
     exit(1);
 }
