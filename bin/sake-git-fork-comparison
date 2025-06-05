@@ -1,0 +1,125 @@
+#!/usr/bin/env php
+<?php
+
+class ForkDiffChecker
+{
+    private string $baseOwner;
+    private string $baseRepo;
+    private string $baseBranch;
+
+    public function __construct(string $repoUrl)
+    {
+        if (!preg_match('#github.com/([^/]+)/([^/.]+)#', $repoUrl, $matches)) {
+            throw new InvalidArgumentException('Invalid GitHub repo URL');
+        }
+
+        $this->baseOwner = $matches[1];
+        $this->baseRepo = $matches[2];
+
+        $info = $this->getRepoInfo($this->baseOwner, $this->baseRepo);
+        if (!$info) {
+            throw new RuntimeException('Could not fetch base repo info');
+        }
+
+        $this->baseBranch = $info['default_branch'];
+    }
+
+    public function run(): void
+    {
+        echo "Base repo: {$this->baseOwner}/{$this->baseRepo} (branch: {$this->baseBranch})\n\n";
+
+        $forks = $this->getForks($this->baseOwner, $this->baseRepo);
+        $results = [];
+
+        foreach ($forks as $fork) {
+            $forkOwner = $fork['owner']['login'];
+            $forkBranch = $fork['default_branch'] ?? 'main';
+
+            $result = $this->compareFork($forkOwner, $forkBranch);
+            if ($result) {
+                $results[] = $result;
+            }
+        }
+
+        usort($results, fn($a, $b) => $b['aheadBy'] <=> $a['aheadBy']);
+
+        foreach ($results as $res) {
+            echo "Fork: {$res['forkOwner']}\n";
+            echo "  Ahead by: {$res['aheadBy']} commits\n";
+            echo "  Behind by: {$res['behindBy']} commits\n";
+            echo "  Last commit: {$res['lastCommit']}\n";
+            echo "  Compare: {$res['diffUrl']}\n\n";
+        }
+
+        if (empty($results)) {
+            echo "No forks are ahead of base repo.\n";
+        }
+    }
+
+    private function getRepoInfo(string $owner, string $repo): ?array
+    {
+        return $this->fetchJson("https://api.github.com/repos/$owner/$repo");
+    }
+
+    private function getForks(string $owner, string $repo): array
+    {
+        return $this->fetchJson("https://api.github.com/repos/$owner/$repo/forks?per_page=100") ?? [];
+    }
+
+    private function compareFork(string $forkOwner, string $forkBranch): ?array
+    {
+        $url = "https://api.github.com/repos/{$this->baseOwner}/{$this->baseRepo}/compare/{$this->baseBranch}...$forkOwner:$forkBranch";
+        $data = $this->fetchJson($url);
+
+        if (!$data || ($data['ahead_by'] ?? 0) <= 0) {
+            return null;
+        }
+
+        $lastCommit = $data['commits'] ? end($data['commits'])['commit']['committer']['date'] : 'unknown';
+
+        return [
+            'forkOwner' => $forkOwner,
+            'aheadBy' => $data['ahead_by'],
+            'behindBy' => $data['behind_by'],
+            'lastCommit' => $lastCommit,
+            'diffUrl' => $url
+        ];
+    }
+
+    private function fetchJson(string $url): ?array
+    {
+        $context = stream_context_create([
+            'http' => ['user_agent' => 'ForkDiffChecker']
+        ]);
+        $json = @file_get_contents($url, false, $context);
+        return $json ? json_decode($json, true) : null;
+    }
+}
+
+
+function printHelp(): void
+{
+    echo <<<EOT
+Usage:
+  sake-git-fork-comparison <GitHubRepoURL>
+
+Example:
+  sake-git-fork-comparison https://github.com/vendor/repo
+
+EOT;
+}
+
+$repoUrl = $argv[1] ?? '';
+
+if (in_array($repoUrl, ['--help', '-h', ''], true)) {
+    printHelp();
+    exit(0);
+}
+
+try {
+    $checker = new ForkDiffChecker($repoUrl);
+    $checker->run();
+} catch (Throwable $e) {
+    echo 'Error: ' . $e->getMessage() . "\n";
+    exit(1);
+}

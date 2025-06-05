@@ -1,10 +1,10 @@
-
+#!/usr/bin/env php
 <?php
 
 // Usage information
 if (in_array('--help', $argv) || in_array('-h', $argv)) {
     echo <<<EOL
-Usage: php git_diff_analyzer.php [--days=1] [--branch=develop] [--filter=sunnysideup] [--date=YYYY-MM-DD] [--line-changes-per-minute=1] [-v|-vv|-vvv]
+Usage: sake-git-diffs [--days=1] [--branch=develop] [--filter=sunnysideup] [--date=YYYY-MM-DD] [--line-changes-per-minute=1] [-v|-vv|-vvv]
 
 Options:
   --days=N                    Number of days to go back in time for the analysis (default: 1).
@@ -19,9 +19,9 @@ Options:
   -h, --help                   Show this help message.
 
 Examples:
-  php git_diff_analyzer.php --days=7 --branch=main --filter=myorganization
-  php git_diff_analyzer.php --date=2024-09-24 --line-changes-per-minute=2
-  php git_diff_analyzer.php -v --days=5 --filter=mycompany
+  sake-git-diffs --days=7 --branch=main --filter=myorganization
+  sake-git-diffs --date=2024-09-24 --line-changes-per-minute=2
+  sake-git-diffs -v --days=5 --filter=mycompany
 
 EOL;
     exit;
