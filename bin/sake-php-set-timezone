@@ -42,7 +42,7 @@ help_and_exit() {
     echonice "-h, --help                   show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "e.g. sake-find-in-files app/src -f 'piece of code'"
+    echonice "e.g. sake-php-set-timezone app/src -f 'piece of code'"
 
     echofunctions
     exit
