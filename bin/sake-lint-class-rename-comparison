@@ -244,6 +244,7 @@ EOL;
     exit;
 }
 
+$fix = false;
 
 // 1) Parse flags (no colon = boolean flag)
 foreach ($argv as $arg) {

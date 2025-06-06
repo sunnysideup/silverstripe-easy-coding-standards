@@ -170,8 +170,8 @@ $baseNamespace = str_replace(['/', '\\\\'], '\\', $rawNamespace);
 
 // Ensure provided directory ends with /src (same as before)…
 $baseDir = rtrim($argv[1], DIRECTORY_SEPARATOR);
-if (! str_ends_with($baseDir, DIRECTORY_SEPARATOR.'src')) {
-    $baseDir .= DIRECTORY_SEPARATOR.'src';
+if (! str_ends_with($baseDir, DIRECTORY_SEPARATOR . 'src')) {
+    $baseDir .= DIRECTORY_SEPARATOR . 'src';
 }
 
 
@@ -187,3 +187,11 @@ if (empty($mismatches)) {
     }
 }
 
+
+exec('composer dump-autoload -o', $output, $returnVar);
+if ($returnVar !== 0) {
+    echo 'Failed to regenerate autoload files.' . PHP_EOL;
+} else {
+    echo 'Autoload files regenerated successfully.' . PHP_EOL;
+}
+print_r($output);
