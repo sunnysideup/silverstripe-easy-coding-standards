@@ -3,24 +3,6 @@
 
 declare(strict_types=1);
 
-
-
-// Usage information
-if (in_array('--help', $argv) || in_array('-h', $argv) || ($argc < 3)) {
-    echo <<<EOL
-Usage: sake-lint-psr-4-checker <dir> <baseClassName>
-  -h, --help                   Show this help message.
-
-Examples:
-  sake-lint-psr-4-checker app MyCompany\\MyApp
-
-EOL;
-    exit;
-}
-
-
-
-
 class Psr4ComplianceChecker
 {
     /**
@@ -35,9 +17,10 @@ class Psr4ComplianceChecker
     public function addNamespaces(string $baseDir, string $baseNamespace): array
     {
         if (! is_dir($baseDir) || ! is_readable($baseDir)) {
-            echo 'Error: "' . $baseDir . '" is not a readable directory.' . PHP_EOL;
+            echo 'Error: \'' . $baseDir . '\' is not a readable directory.' . PHP_EOL;
             exit(1);
         }
+
         $messages = [];
         $files = $this->getPhpFiles($baseDir);
 
@@ -71,17 +54,18 @@ class Psr4ComplianceChecker
      */
     private function getPhpFiles(string $dir): array
     {
+        $flags = \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::FOLLOW_SYMLINKS;
         $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir)
+            new \RecursiveDirectoryIterator($dir, $flags)
         );
 
         $files = [];
         foreach ($iterator as $fileInfo) {
-            if ($fileInfo->isDir()) {
+            if (! $fileInfo->isFile()) {
                 continue;
             }
 
-            if ($fileInfo->getExtension() === 'php') {
+            if (strtolower($fileInfo->getExtension()) === 'php') {
                 $files[] = $fileInfo->getPathname();
             }
         }
@@ -158,17 +142,42 @@ class Psr4ComplianceChecker
     }
 }
 
+function printHelp(): void
+{
+    echo <<<'EOL'
+Usage: psr4-checker <dir> <baseNamespace>
+-h, --help                   Show this help message.
 
-require __DIR__ . '/vendor/autoload.php';
+Examples:
+sake-lint-psr4-checker app MyCompany\\MyApp
+sake-lint-psr4-checker app MyCompany/MyApp
+
+EOL;
+    exit;
+}
+
+if (in_array('--help', $argv, true) || in_array('-h', $argv, true) || ($argc < 3)) {
+    printHelp();
+    exit(0);
+}
+
+
+// Raw namespace argument:
+$rawNamespace = $argv[2];
+
+// Replace any forward-slashes or double-backslashes with a single backslash:
+$baseNamespace = str_replace(['/', '\\\\'], '\\', $rawNamespace);
+
+// Ensure provided directory ends with /src (same as before)…
+$baseDir = rtrim($argv[1], DIRECTORY_SEPARATOR);
+if (! str_ends_with($baseDir, DIRECTORY_SEPARATOR.'src')) {
+    $baseDir .= DIRECTORY_SEPARATOR.'src';
+}
 
 
 $checker = new Psr4ComplianceChecker();
-
-
-$baseDir = $argv[1];
-$baseNamespace = $argv[2];
-
 $mismatches = $checker->addNamespaces($baseDir, $baseNamespace);
+
 
 if (empty($mismatches)) {
     echo 'All classes are PSR-4 compliant.' . PHP_EOL;
@@ -177,3 +186,4 @@ if (empty($mismatches)) {
         echo $msg . PHP_EOL;
     }
 }
+
