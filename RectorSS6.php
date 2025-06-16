@@ -29,5 +29,10 @@ return RectorConfig::configure()
     // ->withSkip([
     //     //        ClassPropertyAssignToConstructorPromotionRector::class,
     //     //        ReturnNeverTypeRector::class
-    // ]);
+    // ])
+    // // any rules that are included in the selected sets you want to skip
+    // ->withSkip([
+    //     ClassPropertyAssignToConstructorPromotionRector::class,
+    //     ReturnNeverTypeRector::class
+    // ])
 ;
