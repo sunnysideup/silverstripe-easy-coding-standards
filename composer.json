@@ -31,8 +31,7 @@
     "rector/rector": "^2.0",
     "phan/phan": "*@stable",
     "sunnysideup/env-file-generator": "dev-main",
-    "wernerkrauss/silverstripe-rector": "dev-main",
-    "cambis/silverstripe-rector": "dev-main"
+    "wernerkrauss/silverstripe-rector": "dev-main"
   },
   "minimum-stability": "dev",
   "prefer-stable": true,
