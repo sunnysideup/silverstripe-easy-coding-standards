@@ -89,19 +89,18 @@ else
     help_and_exit
 fi
 
-rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/$rectorConfig"
 if [ ! -f "$rectorConfig" ]; then
-    echobad "Could not find rector config file: $rectorConfig"
-    help_and_exit
+    rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/$rectorConfig"
+    if [ ! -f "$rectorConfig" ]; then
+        echobad "Could not find rector config file: $rectorConfig"
+        help_and_exit
+    fi
 fi
 
 if test -f "$WORKING_DIR/$also"; then
-    cmd=("$SCRIPT_DIR/sake-lint-rector" -a 'nothing-here-hopefully' -r "$rectorConfig" "$WORKING_DIR/$also")
+    $SCRIPT_DIR/rector process "$WORKING_DIR/$also" --config $rectorConfig $verbose $dryRun
+    help_and_exit
 
-    [ -n "$verbose" ] && cmd+=(--verbose)
-    [ -n "$dryRun" ] && cmd+=(--dry-run)
-
-    "${cmd[@]}"
 fi
 
 $SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig $verbose $dryRun
