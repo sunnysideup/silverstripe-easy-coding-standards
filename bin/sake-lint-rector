@@ -89,7 +89,7 @@ else
     help_and_exit
 fi
 
-$rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/$rectorConfig"
+rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/$rectorConfig"
 if [ ! -f "$rectorConfig" ]; then
     echobad "Could not find rector config file: $rectorConfig"
     help_and_exit
