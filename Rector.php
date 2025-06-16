@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Rector\CodeQuality\Rector\Class_\CompleteDynamicPropertiesRector;
 use Rector\Config\RectorConfig;
-use Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer;
 
 return RectorConfig::configure()
 
@@ -16,7 +15,7 @@ return RectorConfig::configure()
     ->withSkip(
         [
             CompleteDynamicPropertiesRector::class,
-            //Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer
-            RemoveUselessDefaultCommentFixer::class,
+            //\Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer
+            //\Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer::class,
         ]
     );

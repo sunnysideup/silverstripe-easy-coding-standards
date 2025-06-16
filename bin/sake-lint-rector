@@ -11,7 +11,9 @@ dir='app/src'
 
 ############################################ SETTINGS
 also='app/_config.php'
-rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rector.php"
+dryRun=''
+rectorConfig="Rector.php"
+verbose=''
 help='no'
 while (($#)); do
     case $1 in
@@ -19,8 +21,16 @@ while (($#)); do
         also=$2
         shift
         ;;
+    -d | --dry-run)
+        dryRun='--dry-run'
+        shift
+        ;;
     -r | --rector-config)
         rectorConfig=$2
+        shift
+        ;;
+    -v | --verbose)
+        verbose='--debug'
         shift
         ;;
     -h | --help)
@@ -48,11 +58,17 @@ help_and_exit() {
 
     ECHOHEAD "Available settings:"
     echonice "-a, --also                     also lint - e.g. app/_config.php OR myfolder"
+    echonice "-d, --dry-run                  dry run"
     echonice "-r, --rector-config            rector config file locaton e.g. ../rector.php"
+    echonice "                               options are:"
+    echonice "                               - Rector.php"
+    echonice "                               - RectorSS5.php"
+    echonice "                               - RectorSS6.php"
+    echonice "-v, --verbose                  enable debug (verbose) mode"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-lint-rector -a app_more/_config.php   -r ./rector.php   foo/bar "
+    echonice "sake-lint-rector -a app_more/_config.php   -r ./RectorSS6.php   app/src "
     echoline
 
     echofunctions
@@ -73,10 +89,21 @@ else
     help_and_exit
 fi
 
-if test -f "$WORKING_DIR/$also"; then
-    $SCRIPT_DIR/sake-lint-rector -a 'nothing-here-hopefully' -r $ecsConfig $WORKING_DIR/$also
+$rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/$rectorConfig"
+if [ ! -f "$rectorConfig" ]; then
+    echobad "Could not find rector config file: $rectorConfig"
+    help_and_exit
 fi
 
-$SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig
+if test -f "$WORKING_DIR/$also"; then
+    cmd=("$SCRIPT_DIR/sake-lint-rector" -a 'nothing-here-hopefully' -r "$rectorConfig" "$WORKING_DIR/$also")
+
+    [ -n "$verbose" ] && cmd+=(--verbose)
+    [ -n "$dryRun" ] && cmd+=(--dry-run)
+
+    "${cmd[@]}"
+fi
+
+$SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig $verbose $dryRun
 
 echoend
