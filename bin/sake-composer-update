@@ -218,4 +218,6 @@ fi
 
 sake-composer-available-updates
 
+composer dump-autoload -o
+
 echoend
