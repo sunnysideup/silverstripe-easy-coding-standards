@@ -227,9 +227,9 @@ process_directory() {
 
     # Check for changes, with pull-push if enabled
     if has_git_changes "$directory" "$pullPush"; then
-        echobad "Changes detected in $directory"
+        ECHOHEAD "Changes detected in $directory"
         if [[ "$statusOnly" == "yes" ]]; then
-            ECHOHEAD "Git status for $directory:"
+            echobad "Git status for $directory:"
             git -C "$directory" status --short
 
             # Show more detailed information about what's ahead/behind
