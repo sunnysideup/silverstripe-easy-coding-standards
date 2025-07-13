@@ -75,9 +75,11 @@ YMLFILELOCATION=$(realpath $WORKING_DIR/$YMLFILELOCATION)
 echo "YML file location: $YMLFILELOCATION"
 
 if [[ "$YMLFILECREATE" == "yes" ]]; then
-    phpCode="require '${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php'; \Sunnysideup\EnvFileGenerator\EnvFileGenerator::OutputExampleFile('${YMLFILELOCATION}');"
+    phpCode="require '${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php';
+    \Sunnysideup\EnvFileGenerator\EnvFileGenerator::OutputExampleFile('"${YMLFILELOCATION}"');"
 else
-    phpCode="require '${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php'; \\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::BuildEnvFile('${YMLFILELOCATION}');"
+    phpCode="require '${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php';
+    \\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::BuildEnvFile('"${YMLFILELOCATION}"');"
 fi
 
 echo "Running: php -r \"$phpCode\""
