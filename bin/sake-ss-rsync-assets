@@ -47,6 +47,7 @@ help_and_exit() {
 
     ECHOHEAD "Available settings:"
     echonice "-w, --www-data-user            the apache user, default: www-data"
+    echonice "-r, --reverse                  CAREFUL: copy data to server"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
