@@ -64,6 +64,7 @@
     "bin/sake-lint-phan",
     "bin/sake-lint-psr-4-checker",
     "bin/sake-lint-rector",
+    "bin/sake-lint-security",
     "bin/sake-lint-stan",
     "bin/sake-lint-remove-origs",
     "bin/sake-npm-build",

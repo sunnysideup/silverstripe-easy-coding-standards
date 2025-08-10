@@ -39,7 +39,7 @@ Install as global composer package and then try to access the commands, starting
 # php
  - sake-php-set-timezone
 
-# lint
+# lint and security
  - sake-lint-all
  - sake-lint-class-rename-comparison
  - sake-lint-compat
@@ -51,6 +51,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-lint-psr-4-checker
  - sake-lint-rector
  - sake-lint-remove-origs
+ - sake-lint-security
  - sake-lint-stan
 
 # webpack
