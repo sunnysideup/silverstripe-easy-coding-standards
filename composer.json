@@ -33,8 +33,9 @@
     "phan/phan": "*@stable",
     "sunnysideup/env-file-generator": "dev-main",
     "wernerkrauss/silverstripe-rector": "dev-main",
-    "phpcs-security-audit/phpcs-security-audit": "*"
-
+    "phpcs-security-audit/phpcs-security-audit": "*",
+    "phpstan/phpstan-strict-rules": "*",
+    "pheromone/phpcs-security-audit": "*"
   },
   "minimum-stability": "dev",
   "prefer-stable": true,
