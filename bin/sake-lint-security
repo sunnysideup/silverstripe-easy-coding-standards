@@ -1,111 +1,111 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
-WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:-}"
+WORKING_DIR="$(pwd)"
+[[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/sake-self-methods" ]] && source "$SCRIPT_DIR/sake-self-methods"
 
-############################################ DIR
-if [ "$1" != "" ]; then
-    dir=$1
-else
-    dir='./'
-fi
-
-############################################ SETTINGS EXTRA
-while getopts a: flag; do
-    case "${flag}" in
-    a) dir=${OPTARG} ;;
-    esac
-done
-
-############################################ SETTINGS
-help='no'
-while (($#)); do
-    case $1 in
-    -h | --help)
-        help='yes'
-        shift
-        ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1"
-        help='yes'
-        ;;
-    *) dir=$1 ;;
-    esac
-    shift
-done
-
+############################################ HELP
 help_and_exit() {
-
     ECHOHEAD "Security Scan"
-
     ECHOHEAD "Current settings:"
-    echonice "files to analyse:             $WORKING_DIR"
+    echonice "project dir:                 $WORKING_DIR"
 
-    ECHOHEAD "Available settings:"
-    echonice "-h, --help                    show help information"
+    ECHOHEAD "Options:"
+    echonice "-h, --help                   show help information"
 
-    ECHOHEAD "Example usage:"
-    echonice "sake-lint-security ."
-    echonice "sake-lint-security app/client/javascript"
-    echonice "sake-lint-security foo/bar"
-
+    ECHOHEAD "Examples:"
+    echonice "sake-lint-security"
+    echonice "sake-lint-security mydirectory"
     echofunctions
-    exit
+    exit 0
 }
 
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     help_and_exit
 fi
 
-############################################ CODE
-
-if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
+############################################ ENTER PROJECT ROOT
+if [[ -d "$WORKING_DIR" ]]; then
+    cd "$WORKING_DIR"
 else
     echobad "Could not change directory to $WORKING_DIR"
     help_and_exit
 fi
 
-set -Eeuo pipefail
-
-
-
 status=0
-
 run() {
-  echo -e "\n> $* (cwd: $(pwd))"
+  echo -e "\n> $*  (cwd: $(pwd))"
   if ! "$@"; then
     status=1
     return 1
   fi
 }
 
-# 1) Composer audit
-run composer audit || true
+############################################ 1) Composer audit
+if command -v composer >/dev/null; then
+  run composer audit || true
+else
+  echo "Skipping Composer audit (composer not found)."
+fi
 
-# 2) Dry-run update for roave/security-advisories
-composer require --dev roave/security-advisories:dev-latest
-run composer update --dry-run roave/security-advisories || true
+############################################ 2) roave/security-advisories (dry-run if present)
+if command -v composer >/dev/null; then
+  if composer show roave/security-advisories >/dev/null 2>&1; then
+    run composer update --dry-run roave/security-advisories || true
+  else
+    echo "roave/security-advisories not required; skipping dry-run update."
+  fi
+fi
 
-# 3) For every package.json (excluding vendor and node_modules)
+############################################ 3) PHPStan
+if [[ -x vendor/bin/phpstan ]]; then
+  run vendor/bin/phpstan analyse --level=max app/ src/ || true
+else
+  echo "Skipping PHPStan (vendor/bin/phpstan not found)."
+fi
+
+############################################ 4) PHPCS (security ruleset)
+if [[ -x vendor/bin/phpcs ]]; then
+  run vendor/bin/phpcs --standard=phpcs-security-audit app/ src/ || true
+else
+  echo "Skipping PHPCS (vendor/bin/phpcs not found)."
+fi
+
+############################################ 5) Semgrep (OWASP + local rules)
+if command -v semgrep >/dev/null; then
+  run semgrep ci --config p/owasp-top-ten --config .semgrep/ || true
+elif [[ -x "$HOME/.local/bin/semgrep" ]]; then
+  run "$HOME/.local/bin/semgrep" ci --config p/owasp-top-ten --config .semgrep/ || true
+else
+  echo "Skipping Semgrep (not installed). Tip: pipx install semgrep"
+fi
+
+############################################ 6) For every package.json (exclude vendor/node_modules)
 while IFS= read -r -d '' pkg; do
   npmdir="$(dirname "$pkg")"
   echo -e "\n==> NPM audit in: $npmdir"
   pushd "$npmdir" >/dev/null
-
-  # audit (allow failure but record it), then try to fix
-  npm audit --audit-level=high || status=1
-  npm audit --fix || status=1
-
+  if command -v npm >/dev/null; then
+    npm audit --audit-level=high || status=1
+    npm audit --fix || status=1
+  else
+    echo "Skipping npm audit (npm not found)."
+  fi
   popd >/dev/null
 done < <(find . -type f -name 'package.json' \
           -not -path './vendor/*' \
           -not -path '*/node_modules/*' -print0)
 
-echo
+############################################ 7) ESLint (exclude vendor/node_modules)
+if npx --yes eslint -v >/dev/null 2>&1; then
+  npx --yes eslint "**/*.js" --ignore-pattern "vendor/**" --ignore-pattern "node_modules/**" || status=1
+else
+  echo "Skipping ESLint (eslint not installed). Tip: npm i -D eslint eslint-plugin-security eslint-plugin-no-unsanitized"
+fi
+
+ECHOHEAD "Security Scan Summary"
 if [[ $status -ne 0 ]]; then
   echo 'Security checks found issues.'
 else
