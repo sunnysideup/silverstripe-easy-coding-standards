@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 # nvm use node
 
+
+
 ############################################ BASICS
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:-}"
 WORKING_DIR="$(pwd)"
@@ -52,7 +54,7 @@ TARGETS=$(find . -maxdepth 1 -type d \
 if command -v composer >/dev/null; then
     run composer audit || true
 else
-    echo "Skipping Composer audit (composer not found)."
+    echobad "Skipping Composer audit (composer not found)."
 fi
 
 ############################################ 2) roave/security-advisories (dry-run if present)
@@ -60,8 +62,10 @@ if command -v composer >/dev/null; then
     if composer show roave/security-advisories >/dev/null 2>&1; then
         run composer update --dry-run roave/security-advisories || true
     else
-        echo "roave/security-advisories not required; skipping dry-run update."
+        echobad "roave/security-advisories not required; skipping dry-run update."
     fi
+else
+    echobad "Skipping roave/security-advisories (composer not found)."
 fi
 
 ############################################ 3) PHPStan
@@ -71,16 +75,16 @@ if command -v phpstan >/dev/null 2>&1; then
 elif [[ -x vendor/bin/phpstan ]]; then
     vendor/bin/phpstan analyse --level=1 $TARGETS || true
 else
-    echo 'Skipping PHPStan (phpstan not found).'
+    echobad 'Skipping PHPStan (phpstan not found).'
 fi
 
 ############################################ 4) PHPCS (security ruleset)
 if command -v phpcs >/dev/null 2>&1; then
-    run phpcs --standard=phpcs-security-audit $TARGETS || true
+    run phpcs --standard=Security $TARGETS || true
 elif [[ -x vendor/bin/phpcs ]]; then
-    run vendor/bin/phpcs --standard=phpcs-security-audit $TARGETS || true
+    run vendor/bin/phpcs --standard=Security $TARGETS || true
 else
-    echo 'Skipping PHPCS (phpcs not found).'
+    echobad 'Skipping PHPCS (phpcs not found).'
 fi
 
 ############################################ 5) Semgrep (OWASP + local rules)
@@ -89,19 +93,19 @@ if command -v semgrep >/dev/null; then
 elif [[ -x "$HOME/.local/bin/semgrep" ]]; then
     run "$HOME/.local/bin/semgrep" ci --config p/owasp-top-ten --config .semgrep/ || true
 else
-    echo "Skipping Semgrep (not installed). Tip: pipx install semgrep"
+    echobad "Skipping Semgrep (not installed). Tip: pipx install semgrep"
 fi
 
 ############################################ 6) For every package.json (exclude vendor/node_modules)
 while IFS= read -r -d '' pkg; do
     npmdir="$(dirname "$pkg")"
-    echo -e "\n==> NPM audit in: $npmdir"
+    echonice -e "\n==> NPM audit in: $npmdir"
     pushd "$npmdir" >/dev/null
     if command -v npm >/dev/null; then
         npm audit --audit-level=high || status=1
         npm audit --fix || status=1
     else
-        echo "Skipping npm audit (npm not found)."
+        echobad "Skipping npm audit (npm not found)."
     fi
     popd >/dev/null
 done < <(find . -type f -name 'package.json' \
@@ -109,17 +113,26 @@ done < <(find . -type f -name 'package.json' \
     -not -path '*/node_modules/*' -print0)
 
 ############################################ 7) ESLint (exclude vendor/node_modules)
+npm install -g eslint @eslint/js eslint-plugin-security eslint-plugin-security-node eslint-plugin-no-secrets
+
 if npx --yes eslint -v >/dev/null 2>&1; then
-    npx --yes eslint "**/*.js" --ignore-pattern "vendor/**" --ignore-pattern "node_modules/**" || status=1
+    npx --yes eslint  "**/*.js" --ignore-pattern "vendor/**" --ignore-pattern "node_modules/**" --config ~/.config/composer/vendor/sunnysideup/easy-coding-standards/npm/eslint.config.js || status=1
 else
-    echo "Skipping ESLint (eslint not installed). Tip: npm i -D eslint eslint-plugin-security eslint-plugin-no-unsanitized"
+    echobad "Skipping ESLint (eslint not installed). Tip: npm i -D eslint eslint-plugin-security eslint-plugin-no-unsanitized"
 fi
 
 ECHOHEAD "Security Scan Summary"
 if [[ $status -ne 0 ]]; then
-    echo 'Security checks found issues.'
+    echobad 'Security checks found issues.'
 else
-    echo 'All security checks passed.'
+    echonice 'All security checks passed.'
 fi
 
 exit "$status"
+
+
+# <?php
+#  $phpCodeSnifferConfig = array (
+#   'installed_paths' => '../../../vendor/pheromone/phpcs-security-audit/Security/',
+# );
+# ?>
