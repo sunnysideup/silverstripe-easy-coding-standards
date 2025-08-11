@@ -1,21 +1,30 @@
-// ~/.config/eslint-security/eslint.config.js
-import js from '@eslint/js';
-import pluginSecurity from 'eslint-plugin-security';
-import pluginSecurityNode from 'eslint-plugin-security-node';
-import pluginNoSecrets from 'eslint-plugin-no-secrets';
+import js from '@eslint/js'
+import globals from 'globals'
+import security from 'eslint-plugin-security'
+import securityNode from 'eslint-plugin-security-node'
+import noSecrets from 'eslint-plugin-no-secrets'
 
 export default [
   js.configs.recommended,
   {
+    languageOptions: {
+      globals: {
+        ...globals.browser, // for window, document, setTimeout
+        ...globals.node, // for require, module, process
+        jQuery: 'readonly',
+        $: 'readonly'
+      }
+    },
     plugins: {
-      security: pluginSecurity,
-      'security-node': pluginSecurityNode,
-      'no-secrets': pluginNoSecrets
+      security,
+      'security-node': securityNode,
+      'no-secrets': noSecrets
     },
     rules: {
-      ...pluginSecurity.configs.recommended.rules,
-      ...pluginSecurityNode.configs.recommended.rules,
+      ...security.configs.recommended.rules,
+      ...securityNode.configs.recommended.rules,
       'no-secrets/no-secrets': 'error'
-    }
+    },
+    ignores: ['vendor/**', 'node_modules/**']
   }
-];
+]
