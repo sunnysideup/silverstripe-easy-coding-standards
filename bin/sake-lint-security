@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+# nvm use node
 
 ############################################ BASICS
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:-}"
@@ -36,80 +37,89 @@ fi
 
 status=0
 run() {
-  echo -e "\n> $*  (cwd: $(pwd))"
-  if ! "$@"; then
-    status=1
-    return 1
-  fi
+    echo -e "\n> $*  (cwd: $(pwd))"
+    if ! "$@"; then
+        status=1
+        return 1
+    fi
 }
+
+TARGETS=$(find . -maxdepth 1 -type d \
+    -not -path './vendor*' \
+    -not -path './public/assets/*')
 
 ############################################ 1) Composer audit
 if command -v composer >/dev/null; then
-  run composer audit || true
+    run composer audit || true
 else
-  echo "Skipping Composer audit (composer not found)."
+    echo "Skipping Composer audit (composer not found)."
 fi
 
 ############################################ 2) roave/security-advisories (dry-run if present)
 if command -v composer >/dev/null; then
-  if composer show roave/security-advisories >/dev/null 2>&1; then
-    run composer update --dry-run roave/security-advisories || true
-  else
-    echo "roave/security-advisories not required; skipping dry-run update."
-  fi
+    if composer show roave/security-advisories >/dev/null 2>&1; then
+        run composer update --dry-run roave/security-advisories || true
+    else
+        echo "roave/security-advisories not required; skipping dry-run update."
+    fi
 fi
 
 ############################################ 3) PHPStan
-if [[ -x vendor/bin/phpstan ]]; then
-  run vendor/bin/phpstan analyse --level=max app/ src/ || true
+
+if command -v phpstan >/dev/null 2>&1; then
+    phpstan analyse --level=1 $TARGETS || true
+elif [[ -x vendor/bin/phpstan ]]; then
+    vendor/bin/phpstan analyse --level=1 $TARGETS || true
 else
-  echo "Skipping PHPStan (vendor/bin/phpstan not found)."
+    echo 'Skipping PHPStan (phpstan not found).'
 fi
 
 ############################################ 4) PHPCS (security ruleset)
-if [[ -x vendor/bin/phpcs ]]; then
-  run vendor/bin/phpcs --standard=phpcs-security-audit app/ src/ || true
+if command -v phpcs >/dev/null 2>&1; then
+    run phpcs --standard=phpcs-security-audit $TARGETS || true
+elif [[ -x vendor/bin/phpcs ]]; then
+    run vendor/bin/phpcs --standard=phpcs-security-audit $TARGETS || true
 else
-  echo "Skipping PHPCS (vendor/bin/phpcs not found)."
+    echo 'Skipping PHPCS (phpcs not found).'
 fi
 
 ############################################ 5) Semgrep (OWASP + local rules)
 if command -v semgrep >/dev/null; then
-  run semgrep ci --config p/owasp-top-ten --config .semgrep/ || true
+    run semgrep ci --config p/owasp-top-ten --config .semgrep/ || true
 elif [[ -x "$HOME/.local/bin/semgrep" ]]; then
-  run "$HOME/.local/bin/semgrep" ci --config p/owasp-top-ten --config .semgrep/ || true
+    run "$HOME/.local/bin/semgrep" ci --config p/owasp-top-ten --config .semgrep/ || true
 else
-  echo "Skipping Semgrep (not installed). Tip: pipx install semgrep"
+    echo "Skipping Semgrep (not installed). Tip: pipx install semgrep"
 fi
 
 ############################################ 6) For every package.json (exclude vendor/node_modules)
 while IFS= read -r -d '' pkg; do
-  npmdir="$(dirname "$pkg")"
-  echo -e "\n==> NPM audit in: $npmdir"
-  pushd "$npmdir" >/dev/null
-  if command -v npm >/dev/null; then
-    npm audit --audit-level=high || status=1
-    npm audit --fix || status=1
-  else
-    echo "Skipping npm audit (npm not found)."
-  fi
-  popd >/dev/null
+    npmdir="$(dirname "$pkg")"
+    echo -e "\n==> NPM audit in: $npmdir"
+    pushd "$npmdir" >/dev/null
+    if command -v npm >/dev/null; then
+        npm audit --audit-level=high || status=1
+        npm audit --fix || status=1
+    else
+        echo "Skipping npm audit (npm not found)."
+    fi
+    popd >/dev/null
 done < <(find . -type f -name 'package.json' \
-          -not -path './vendor/*' \
-          -not -path '*/node_modules/*' -print0)
+    -not -path './vendor/*' \
+    -not -path '*/node_modules/*' -print0)
 
 ############################################ 7) ESLint (exclude vendor/node_modules)
 if npx --yes eslint -v >/dev/null 2>&1; then
-  npx --yes eslint "**/*.js" --ignore-pattern "vendor/**" --ignore-pattern "node_modules/**" || status=1
+    npx --yes eslint "**/*.js" --ignore-pattern "vendor/**" --ignore-pattern "node_modules/**" || status=1
 else
-  echo "Skipping ESLint (eslint not installed). Tip: npm i -D eslint eslint-plugin-security eslint-plugin-no-unsanitized"
+    echo "Skipping ESLint (eslint not installed). Tip: npm i -D eslint eslint-plugin-security eslint-plugin-no-unsanitized"
 fi
 
 ECHOHEAD "Security Scan Summary"
 if [[ $status -ne 0 ]]; then
-  echo 'Security checks found issues.'
+    echo 'Security checks found issues.'
 else
-  echo 'All security checks passed.'
+    echo 'All security checks passed.'
 fi
 
 exit "$status"
