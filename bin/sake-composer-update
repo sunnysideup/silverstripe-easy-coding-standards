@@ -220,4 +220,6 @@ sake-composer-available-updates
 
 composer dump-autoload -o
 
+composer audit
+
 echoend

@@ -152,5 +152,5 @@ echoline
 ECHOHEAD "Summary:"
 echonice "Non-dev packages updated: ${nonDevPackagesProcessed[*]}"
 echonice "Dev-only packages updated: ${devPackagesProcessed[*]}"
-
+composer audit --fix
 echoend

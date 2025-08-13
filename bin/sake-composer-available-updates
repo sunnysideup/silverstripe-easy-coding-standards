@@ -66,4 +66,7 @@ composer show -oD
 
 ECHOHEAD "Directly required packages out of date in composer.lock"
 composer outdated -D --locked
+
+composer audit
+
 echoend
