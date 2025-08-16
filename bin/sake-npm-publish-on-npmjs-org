@@ -59,7 +59,12 @@ fi
 
 ############################################ CODE
 
+echonice "committing and pushing changes to git..."
+
 sake-git-commit-and-push .
+
+
+echonice "Checking if we are logged in to npmjs.org..."
 if ! npm whoami > /dev/null 2>&1; then
   npm login
 else
@@ -67,8 +72,11 @@ else
 fi
 
 
+echonice "Bumping version number..."
 npm version patch
-git push && git push --tags
+
+echonice "Bumping version to $(npm version | tail -n 1)"
+echonice "Publishing to npmjs.org..."
 
 npm publish --access public
 
