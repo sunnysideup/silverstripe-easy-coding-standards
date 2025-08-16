@@ -59,13 +59,6 @@ fi
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR/$webpackDir" ]; then
-    cd $WORKING_DIR/$webpackDir
-else
-    echonice "Could not change directory to $WORKING_DIR/$webpackDir"
-    help_and_exit
-fi
-
 sake-git-commit-and-push .
 if ! npm whoami > /dev/null 2>&1; then
   npm login
