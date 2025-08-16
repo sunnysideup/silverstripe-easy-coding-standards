@@ -55,11 +55,15 @@ Install as global composer package and then try to access the commands, starting
  - sake-lint-stan
 
 # webpack
+ - sake-npm-install
  - sake-npm-build
  - sake-npm-dev
- - sake-npm-install
- - sake-npm-update-self
  - sake-npm-watch
+
+ # npm / node
+ - sake-npm-update-self
+ - sake-npm-publish-on-npmjs-org
+
 
 # silverstripe
  - sake-ss-add-site
