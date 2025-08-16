@@ -79,5 +79,6 @@ echonice "Bumping version to $(npm version | tail -n 1)"
 echonice "Publishing to npmjs.org..."
 
 npm publish --access public
+sake-git-commit-and-push -m "MNT: pushing to npmjs.org"
 
 echoend
