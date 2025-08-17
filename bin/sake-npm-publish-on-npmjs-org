@@ -5,23 +5,17 @@ SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
 source $SCRIPT_DIR/sake-self-methods
 
-# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
-
 ############################################ DIR
 dir="./"
 
 ############################################ SETTINGS
 webpackDir='themes/sswebpack_engine_only/'
-themeDir=''
+type=''
 help='no'
 while (($#)); do
     case $1 in
-    -w | --webpack-dir)
-        webpackDir=$2
-        shift
-        ;;
-    -t | --theme-dir)
-        themeDir=$2
+    -t | --type)
+        type=$2
         shift
         ;;
     -h | --help)
@@ -37,6 +31,12 @@ while (($#)); do
     shift
 done
 
+# ensure type is valid or default to patch
+case "$type" in
+  major|minor|patch) ;;  # valid
+  *) type="patch" ;;     # default
+esac
+
 help_and_exit() {
     ECHOHEAD "NPM Publish on npmjs.org"
 
@@ -44,9 +44,10 @@ help_and_exit() {
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                    show help information"
+    echonice "-t, --type                    $type (patch, minor, major)"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-npm-publish-on-npmjs-org"
+    echonice "sake-npm-publish-on-npmjs-org -t minor"
 
     echofunctions
     exit
@@ -60,9 +61,7 @@ fi
 ############################################ CODE
 
 echonice "committing and pushing changes to git..."
-
 sake-git-commit-and-push .
-
 
 echonice "Checking if we are logged in to npmjs.org..."
 if ! npm whoami > /dev/null 2>&1; then
@@ -71,9 +70,8 @@ else
   echo "Already logged in as $(npm whoami)"
 fi
 
-
 echonice "Bumping version number..."
-npm version patch
+npm version "$type"
 
 echonice "Bumping version to $(npm version | tail -n 1)"
 echonice "Publishing to npmjs.org..."
