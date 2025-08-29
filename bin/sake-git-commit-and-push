@@ -18,6 +18,8 @@ alsoDoThemes='no'
 statusOnly='no'
 doBuild='yes'
 help='no'
+
+
 while (($#)); do
     case $1 in
     -c | --commit-and-push)
@@ -121,6 +123,14 @@ else
     echonice "Could not change directory to $WORKING_DIR/$dir"
     help_and_exit
 fi
+
+
+## do we need to build?
+# uncommitted?
+if ! git diff --quiet -- themes/; then doBuild='no'; fi
+# last commit touched themes/?
+if git rev-parse --verify HEAD^ >/dev/null 2>&1 && ! git diff --quiet HEAD^ HEAD -- themes/; then doBuild='no'; fi
+
 
 GIT_DIR=$(git rev-parse --show-toplevel)
 
