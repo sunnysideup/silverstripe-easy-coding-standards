@@ -70,6 +70,7 @@
     "bin/sake-lint-security",
     "bin/sake-lint-stan",
     "bin/sake-lint-remove-origs",
+    "bin/sake-npm-audit",
     "bin/sake-npm-build",
     "bin/sake-npm-dev",
     "bin/sake-npm-install",

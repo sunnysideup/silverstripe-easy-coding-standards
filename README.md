@@ -55,6 +55,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-lint-stan
 
 # webpack
+ - sake-npm-audit
  - sake-npm-install
  - sake-npm-build
  - sake-npm-dev
