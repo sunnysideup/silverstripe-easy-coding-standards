@@ -78,6 +78,7 @@ if [ "$themeDir" != "" ]; then
     cd $WORKING_DIR/$themeDir
 fi
 
+npm audit fix
 
 set -euo pipefail
 
