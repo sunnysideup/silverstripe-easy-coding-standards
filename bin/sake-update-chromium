@@ -27,13 +27,13 @@ done
 
 help_and_exit() {
 
-    ECHOHEAD "Update VS Code"
+    ECHOHEAD "Update Chromium"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-update-vs-code ."
+    echonice "sake-update-chromium ."
 
     echofunctions
     exit
@@ -45,14 +45,12 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 
-echohead "Updating VS Code to latest stable version"
 
-wget 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64' -O /tmp/code_latest_amd64.deb
-sudo dpkg -i /tmp/code_latest_amd64.deb
-
-echohead "VS Code updated"
-code --version
-
+echohead "Installing chromium latest"
+sudo apt-get update -y
+sudo apt-get install -y chromium-browser
+echohead "Chromium installed"
+chromium-browser --version
 
 
 echoend

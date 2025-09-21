@@ -25,6 +25,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-find-large-files
 
 # git
+ - sake-git-quick
  - sake-git-commit-and-push
  - sake-git-commit-and-push-vendor-packages
  - sake-git-diff-analyser
@@ -89,6 +90,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-scrutinizer-add
 
 # machine maintenance
+ - sake-update-chromium
  - sake-update-vs-code
 
 

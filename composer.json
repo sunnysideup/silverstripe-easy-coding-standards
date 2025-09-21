@@ -53,6 +53,7 @@
     "bin/sake-git-info",
     "bin/sake-git-merge-develop-and-production",
     "bin/sake-git-remove-stale-branches",
+    "bin/sake-git-quick",
     "bin/sake-git-squash-and-pr",
     "bin/sake-git-squash-commits",
     "bin/sake-git-tag",
@@ -92,6 +93,7 @@
     "bin/sake-ss-rsync-db",
     "bin/sake-ss-start-new-module",
     "bin/sake-test-site",
+    "bin/sake-chromium",
     "bin/sake-update-vs-code"
   ],
   "config": {

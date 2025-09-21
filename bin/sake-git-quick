@@ -1,0 +1,151 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+message=""
+help='no'
+
+
+while (($#)); do
+    case $1 in
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Git commit and push QUICK"
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to commit:           $dir (relative to $WORKING_DIR)"
+
+    ECHOHEAD "Current settings:"
+    echonice "Message (-m):                  $message"
+
+    ECHOHEAD "Available settings:"
+    echonice "-m, --message                  commit message, defaults to last message used"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-git-quick  -m 'FIX: something' "
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ GET MESSAGE
+
+message=$(check_commit_message "$message")
+
+retVal=$?
+
+if [[ $retVal -ne 0 ]]; then
+    echobad "Invalid commit message. Exiting script."
+    exit 1
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd $WORKING_DIR/$dir
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+
+
+GIT_DIR=$(git rev-parse --show-toplevel)
+
+if test -f "$GIT_DIR/.git/config"; then
+    # set the right way to look at branches
+    git config push.default matching
+
+    ECHOHEAD "# check git status"
+    git status
+
+    ECHOHEAD "# current commit"
+    git rev-parse --short --verify HEAD
+
+    echoline
+
+    sake-git-commit-and-push-vendor-packages ./ -s yes
+
+    echoline
+
+
+    ECHOHEAD "# adding files to git repo"
+    git add . -A
+
+    #git add $WORKING_DIR/$also
+    #git add $WORKING_DIR/$logFile
+
+    ECHOHEAD "Commit message: $message"
+
+    ECHOHEAD "# committing files to git repo"
+    git commit . -m "$message"
+    #git commit $WORKING_DIR/$also -m "$message"
+    #git commit $WORKING_DIR/$logFile -m "$message"
+
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+    ECHOHEAD "# pushing commits to git repo, branch: $BRANCH"
+    git push origin $(git rev-parse --abbrev-ref HEAD) --ipv4
+
+    if [ "$localHash" = "$remoteHash" ]; then
+        echonice "✅ Branch is up-to-date."
+    elif [ "$localHash" = "$baseHash" ]; then
+        echobad "🔄 Branch is behind. Pulling..."
+        git pull --rebase
+    elif [ "$remoteHash" = "$baseHash" ]; then
+        echobad "🔼 Branch is ahead. Pushing..."
+        git push
+    else
+        echobad "⚠️ Branch has diverged. Attempting sync..."
+        git pull --rebase && git push
+    fi
+
+    ECHOHEAD "# check git status"
+    git status
+    echoline
+
+    if output=$(git status --porcelain) && [ -z "$output" ]; then
+        echogood " # ALL COMMITTED"
+    else
+        echobad "Not all Code is Committed"
+    fi
+    if git diff-index --quiet HEAD --; then
+        echogood " # ALL PUSHED"
+    else
+        echobad "There are changes to push"
+    fi
+    echoline
+
+else
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO so I can not commit the changes."
+fi
+
+echoend

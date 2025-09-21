@@ -28,3 +28,7 @@ else
     echo " ERROR: could not find composer file in: $COMPOSER_DIR/composer.json"
     echo "===================================================="
 fi
+
+
+sake-update-chromium
+sake-update-vs-code
