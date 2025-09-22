@@ -46,10 +46,10 @@ fi
 
 
 
-echohead "Installing chromium latest"
+ECHOHEAD "Installing chromium latest"
 sudo apt-get update -y
 sudo apt-get install -y chromium-browser
-echohead "Chromium installed"
+ECHOHEAD "Chromium installed"
 chromium-browser --version
 
 
