@@ -95,7 +95,7 @@
     "bin/sake-ss-rsync-sspak",
     "bin/sake-ss-start-new-module",
     "bin/sake-test-site",
-    "bin/sake-chromium",
+    "bin/sake-update-chromium",
     "bin/sake-update-vs-code"
   ],
   "config": {
