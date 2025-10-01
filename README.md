@@ -82,6 +82,7 @@ Install as global composer package and then try to access the commands, starting
 - sake-test-site
 
 # rsync
+- sake-ss-rsync-all
 - sake-ss-rsync-assets
 - sake-ss-rsync-db
 - sake-ss-rsync-sspak

@@ -1,0 +1,61 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+
+############################################ SETTINGS
+server=''
+help='no'
+reverse='no'
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -r | --reverse)
+        reverse='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) server=$1 ;;
+    esac
+    shift
+done
+
+if [[ "$server" != *":/"* ]]; then
+    server="$server:/container/application"
+fi
+
+help_and_exit() {
+    ECHOHEAD "Sync Database and Assets"
+    echonice "Directory of script:           $SCRIPT_DIR"
+
+    ECHOHEAD "Available settings:"
+    echonice "-r, --reverse                  sync FROM local TO server"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-sync-all my-server:/var/www/website-root"
+    echonice "sake-ss-sync-all my-server # default path is /container/application"
+    echonice "sake-ss-sync-all --reverse my-server"
+
+    exit
+}
+
+if [[ "$help" == "yes" || -z "$server" ]]; then
+    help_and_exit
+fi
+
+sake-ss-rsync-db "$server" $( [[ "$reverse" == "yes" ]] && echo "--reverse" )
+sake-ss-rsync-assets "$server" $( [[ "$reverse" == "yes" ]] && echo "--reverse" )
+
+ECHOHEAD "Syncing all to/from server: $server COMPLETED"
+echoend

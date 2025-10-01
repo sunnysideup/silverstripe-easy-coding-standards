@@ -33,7 +33,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-update-vs-code ."
+    echonice "sake-update-vs-code"
 
     echofunctions
     exit
@@ -45,12 +45,12 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 
-ECHOHEAD "Updating VS Code to latest stable version"
+echohead "Updating VS Code to latest stable version"
 
 wget 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64' -O /tmp/code_latest_amd64.deb
 sudo dpkg -i /tmp/code_latest_amd64.deb
 
-ECHOHEAD "VS Code updated"
+echohead "VS Code updated"
 code --version
 
 
