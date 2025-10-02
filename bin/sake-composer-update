@@ -176,22 +176,26 @@ while read -r oldPackage; do
         commitMessage+=$(echo -e "\n\n==== $packageName changed from $oldRef to $newRef: \n\n")
         # Fetch the commits between the two references
         packagePath="vendor/$packageName"
-        if [ -d "$packagePath" ]; then
-            cd "$packagePath" || continue
-            if [ -d .git ]; then
-                git fetch --tags &>/dev/null
-                commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef")
-                if [ -n "$commits" ]; then
-                    commitMessage+=$(echo -e "\n\n$commits \n\n")
+        if [ -d vendor ]; then
+            if [ -d "$packagePath" ]; then
+                cd "$packagePath" || continue
+                if [ -d .git ]; then
+                    git fetch --tags &>/dev/null
+                    commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef")
+                    if [ -n "$commits" ]; then
+                        commitMessage+=$(echo -e "\n\n$commits \n\n")
+                    else
+                        commitMessage+=$(echo -e "\n\nNo new commits between $oldRef and $newRef. \n\n")
+                    fi
                 else
-                    commitMessage+=$(echo -e "\n\nNo new commits between $oldRef and $newRef. \n\n")
+                    commitMessage+=$(echo -e "\n\nNo git repository found in $packagePath. \n\n")
                 fi
+                cd - >/dev/null
             else
-                commitMessage+=$(echo -e "\n\nNo git repository found in $packagePath. \n\n")
+                commitMessage+=$(echo -e "\n\n$packageName: Package folder not found in vendor/. \n\n")
             fi
-            cd - >/dev/null
         else
-            commitMessage+=$(echo -e "\n\n$packageName: Vendor directory not found. \n\n")
+            commitMessage+=$(echo -e "\n\nNo further information available. \n\n")
         fi
     fi
 done <<<"$oldPackages"
