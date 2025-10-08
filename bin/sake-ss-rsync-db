@@ -9,9 +9,11 @@ source "$SCRIPT_DIR/sake-self-methods"
 localEnvFile="$WORKING_DIR/.env"
 remoteDumpFile="/tmp/db_dump.sql"
 localDumpFile="/tmp/db_dump.sql"
+toRemoteDumpFile="/tmp/db_dump_from_local.sql"
 
 ############################################ SETTINGS
 server=''
+toServer=''
 help='no'
 reverse='no'
 
@@ -25,6 +27,10 @@ while (($#)); do
         reverse='yes'
         shift
         ;;
+    -t | --to)
+        toServer=$2
+        shift
+        ;;
     -*)
         printf 'Unknown option: %q\n\n' "$1"
         help='yes'
@@ -34,36 +40,37 @@ while (($#)); do
     shift
 done
 
-if [[ "$server" != *":/"* ]]; then
-    server="$server:/container/application"
+if [[ -z "$server" || "$help" == "yes" ]]; then
+    ECHOHEAD "Sync Database"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Local .env File:               $localEnvFile"
+    echonice ""
+    ECHOHEAD "Available settings:"
+    echonice "-r, --reverse                  sync FROM local TO server"
+    echonice "-t, --to SERVER[:/path]        after pulling, also push dump to this server and import"
+    echonice "-h, --help                     show help information"
+    echonice ""
+    ECHOHEAD "Examples:"
+    echonice "sake-ss-sync-db my-server:/var/www/website-root"
+    echonice "sake-ss-sync-db my-server            # default path is /container/application"
+    echonice "sake-ss-sync-db --reverse my-server"
+    echonice "sake-ss-sync-db my-server --to other-server:/var/www/site"
+    exit
 fi
+
+[[ "$server" != *":/"* ]] && server="$server:/container/application"
 serverClean=$(echo "$server" | cut -d':' -f1)
 REMOTE_DIR=$(echo "$server" | cut -s -d':' -f2)
 REMOTE_DIR=${REMOTE_DIR:-/container/application}
 REMOTE_ENV_FILE="$REMOTE_DIR/.env"
 
-help_and_exit() {
-    ECHOHEAD "Sync Database"
-    echonice "Directory of script:           $SCRIPT_DIR"
-    echonice "Remote server address:         $serverClean"
-    echonice "Remote dir:                    $REMOTE_DIR"
-    echonice "Remote .env file:              $REMOTE_ENV_FILE"
-    echonice "Local .env File:               $localEnvFile"
-
-    ECHOHEAD "Available settings:"
-    echonice "-r, --reverse                  sync FROM local TO server"
-    echonice "-h, --help                     show help information"
-
-    ECHOHEAD "Example usage:"
-    echonice "sake-ss-sync-db my-server:/var/www/website-root"
-    echonice "sake-ss-sync-db my-server # default path is /container/application"
-    echonice "sake-ss-sync-db --reverse my-server"
-
-    exit
-}
-
-if [[ "$help" == "yes" || -z "$server" ]]; then
-    help_and_exit
+# If --to provided, normalize it as well
+if [[ -n "$toServer" ]]; then
+    [[ "$toServer" != *":/"* ]] && toServer="$toServer:/container/application"
+    toServerClean=$(echo "$toServer" | cut -d':' -f1)
+    TO_REMOTE_DIR=$(echo "$toServer" | cut -s -d':' -f2)
+    TO_REMOTE_DIR=${TO_REMOTE_DIR:-/container/application}
+    TO_REMOTE_ENV_FILE="$TO_REMOTE_DIR/.env"
 fi
 
 ############################################ EXTRACT .env VARIABLES
@@ -84,13 +91,25 @@ remoteDbName=$(ssh "$serverClean" "grep '^SS_DATABASE_NAME=' $REMOTE_ENV_FILE | 
 remoteDbHost=$(ssh "$serverClean" "grep '^SS_DATABASE_SERVER=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
 
 if [[ -z "$remoteDbUser" || -z "$remoteDbPass" || -z "$remoteDbName" || -z "$remoteDbHost" ]]; then
-    echobad "Could not retrieve database credentials from the server."
+    echobad "Could not retrieve database credentials from the source server."
     exit 1
 fi
 
 if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localDbHost" ]]; then
     echobad "Could not retrieve database credentials from the local .env file."
     exit 1
+fi
+
+# If --to: fetch its DB credentials now
+if [[ -n "$toServer" ]]; then
+    toRemoteDbUser=$(ssh "$toServerClean" "grep '^SS_DATABASE_USERNAME=' $TO_REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
+    toRemoteDbPass=$(ssh "$toServerClean" "grep '^SS_DATABASE_PASSWORD=' $TO_REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
+    toRemoteDbName=$(ssh "$toServerClean" "grep '^SS_DATABASE_NAME=' $TO_REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
+    toRemoteDbHost=$(ssh "$toServerClean" "grep '^SS_DATABASE_SERVER=' $TO_REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
+    if [[ -z "$toRemoteDbUser" || -z "$toRemoteDbPass" || -z "$toRemoteDbName" || -z "$toRemoteDbHost" ]]; then
+        echobad "Could not retrieve database credentials from the --to server."
+        exit 1
+    fi
 fi
 
 ############################################ SYNC PROCESS
@@ -100,38 +119,42 @@ if [[ "$reverse" == "yes" ]]; then
     [[ "$confirm" != "yes" ]] && echonice "Aborted." && exit 1
 
     echonice "Dumping local database..."
-    mysqldump --no-tablespaces -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" >"$localDumpFile"
+    mysqldump --no-tablespaces -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" > "$localDumpFile"
     [[ $? -ne 0 ]] && echobad "Local database dump failed." && exit 1
 
-    echonice "Uploading dump to server..."
-    rsync -chavzP "$localDumpFile" "$serverClean:$remoteDumpFile"
-    [[ $? -ne 0 ]] && echobad "Failed to upload dump." && exit 1
+    echonice "Uploading dump to source server..."
+    rsync -chavzP "$localDumpFile" "$serverClean:$remoteDumpFile" || { echobad "Failed to upload dump."; exit 1; }
 
-    echonice "Importing on server..."
-    ssh "$serverClean" "mysql -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName < $remoteDumpFile"
-    [[ $? -ne 0 ]] && echobad "Failed to import on server." && exit 1
+    echonice "Importing on source server..."
+    ssh "$serverClean" "mysql -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName < $remoteDumpFile" || { echobad "Failed to import on source server."; exit 1; }
+
 else
-    echonice "Dumping remote database..."
-    ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName > $remoteDumpFile"
-    [[ $? -ne 0 ]] && echobad "Remote database dump failed." && exit 1
+    # PULL: source server -> local
+    echonice "Dumping remote database (source)..."
+    ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName > $remoteDumpFile" || { echobad "Remote database dump failed."; exit 1; }
 
-    echonice "Downloading dump from server..."
-    rsync -chavzP "$serverClean:$remoteDumpFile" "$localDumpFile"
-    [[ $? -ne 0 ]] && echobad "Failed to download dump." && exit 1
+    echonice "Downloading dump from source server..."
+    rsync -chavzP "$serverClean:$remoteDumpFile" "$localDumpFile" || { echobad "Failed to download dump."; exit 1; }
 
     echonice "Importing locally..."
-    mysql -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" <"$localDumpFile"
-    [[ $? -ne 0 ]] && echobad "Failed to import locally." && exit 1
+    mysql -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" < "$localDumpFile" || { echobad "Failed to import locally."; exit 1; }
+
+    # If --to provided: send THIS downloaded dump to the --to server and import there
+    if [[ -n "$toServer" ]]; then
+        echowarn "Also importing the same dump into --to server ($toServer)..."
+        rsync -chavzP "$localDumpFile" "$toServerClean:$toRemoteDumpFile" || { echobad "Failed to upload dump to --to server."; exit 1; }
+        ssh "$toServerClean" "mysql -u $toRemoteDbUser -p$toRemoteDbPass -h $toRemoteDbHost $toRemoteDbName < $toRemoteDumpFile" || { echobad "Failed to import on --to server."; exit 1; }
+        # Clean up on --to server
+        ssh "$toServerClean" "rm -f $toRemoteDumpFile" || echowarn "Failed to clean up dump on --to server."
+    fi
 fi
 
-############################################ CLEANUP
-echonice "Cleaning up remote dump file..."
-ssh "$serverClean" "rm -f $remoteDumpFile"
-[[ $? -ne 0 ]] && echowarn "Failed to clean up the remote dump file."
+############################################ CLEANUP (source server + local)
+echonice "Cleaning up remote dump file on source server..."
+ssh "$serverClean" "rm -f $remoteDumpFile" || echowarn "Failed to clean up the remote dump file."
 
 echonice "Cleaning up local dump file..."
-rm -f "$localDumpFile"
-[[ $? -ne 0 ]] && echowarn "Failed to clean up the local dump file."
+rm -f "$localDumpFile" || echowarn "Failed to clean up the local dump file."
 
 echonice "Database sync completed successfully."
 echoend

@@ -3,16 +3,18 @@
 ############################################ BASICS
 SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
 dir="./"
 
 ############################################ SETTINGS
 server=''
+toServer=''
 wwwDataUser='www-data'
 help='no'
 reverse='no'
+
 while (($#)); do
     case $1 in
     -w | --www-data-user)
@@ -27,6 +29,10 @@ while (($#)); do
         reverse='yes'
         shift
         ;;
+    -t | --to)
+        toServer=$2
+        shift
+        ;;
     -*)
         printf 'Unknown option: %q\n\n' "$1"
         help='yes'
@@ -37,21 +43,21 @@ while (($#)); do
 done
 
 help_and_exit() {
-
     ECHOHEAD "Rsync assets from server"
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to copy from:        $server/public/assets"
     echonice "Directory to copy to:          $WORKING_DIR/public/assets"
-
     echonice "Apache user (-w):              $wwwDataUser"
 
     ECHOHEAD "Available settings:"
     echonice "-w, --www-data-user            the apache user, default: www-data"
     echonice "-r, --reverse                  CAREFUL: copy data to server"
+    echonice "-t, --to                       after pulling locally, push to another server"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
     echonice "sake-ss-rsync-assets my-server:/var/www/website-root"
+    echonice "sake-ss-rsync-assets my-server:/var/www/website-root --to other-server:/var/www/website-root"
 
     ECHOHEAD "NOTE"
     echonice "correct setup is rsync folder/ newfolder (with slash, without slash)"
@@ -70,40 +76,54 @@ if [[ "$reverse" == "yes" ]]; then
 fi
 
 ############################################ CODE
-
 if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
+    cd "$WORKING_DIR" || exit 1
 else
     echobad "Could not change directory to $WORKING_DIR"
     help_and_exit
 fi
 
+
+
 mkdir -p ./public/assets
 
-if [ ! -z "$server" ]; then
+if [[ "$reverse" == "yes" ]]; then
+    ECHOHEAD "Now syncing local assets to $server ..."
+else
+    ECHOHEAD "Now clearing local assets..."
+    rm -rf ./public/assets/*
+fi
+
+if [ -n "$server" ]; then
     if [[ "$server" != *":/"* ]]; then
         server="$server:/container/application"
     fi
     if [ -d "$WORKING_DIR/public/assets/" ]; then
-        sudo chown $USER public/assets -R
+        sudo chown "$USER" public/assets -R
         if [ -w "$WORKING_DIR/public/assets" ]; then
             if [[ "$reverse" == "yes" ]]; then
-                echowarn "You are about to overwrite the remote ($server) assets with your local database."
+                echowarn "You are about to overwrite the remote ($server) assets with your local assets."
                 read -p "Are you sure? (yes/[no]): " confirm
                 [[ "$confirm" != "yes" ]] && echonice "Aborted." && exit 1
-                rsync --stats -chavzPr ./public/assets/ $server/public/assets
+                rsync --stats -chavzPr ./public/assets/ "$server/public/assets"
             else
-                rsync --stats -chavzPr $server/public/assets/ ./public/assets
+                rsync --stats -chavzPr "$server/public/assets/" ./public/assets
             fi
         else
             echobad "Could not write to $WORKING_DIR/public/assets"
         fi
-        sudo chown $wwwDataUser public/assets -R
+        sudo chown "$wwwDataUser" public/assets -R
     else
-        echobad "Could not find  $WORKING_DIR/public/assets"
+        echobad "Could not find $WORKING_DIR/public/assets"
     fi
 else
-    echobad "no server specified $server"
+    echobad "No server specified $server"
+fi
+
+############################################ TO SERVER SYNC
+if [ -n "$toServer" ] && [ "$reverse" != "yes" ]; then
+    ECHOHEAD "Now syncing local assets to $toServer ..."
+    "$0" --reverse "$toServer" -w "$wwwDataUser"
 fi
 
 echoend
