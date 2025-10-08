@@ -13,11 +13,13 @@ use Sunnysideup\EasyCodingStandards\GitDiffAnalyser;
 // Usage information
 if (in_array('--help', $argv) || in_array('-h', $argv)) {
     echo <<<EOL
-Usage: sake-git-diff-analyser [--days=1] [--branch=develop] [--filter=sunnysideup] [--date=YYYY-MM-DD] [--minutes-for-first-line=1] [--mysetting=blue] [directory]
+Usage: sake-git-diff-analyser [--days=1] [--committer] [--committer-mode] [--branch=develop] [--filter=sunnysideup] [--date=YYYY-MM-DD] [--minutes-for-first-line=1] [--mysetting=blue] [directory]
 
 Options:
   --days=N                     Number of days to go back in time for the analysis (default: 1).
-  --branch=NAME                Specify the branch to analyze (default: develop).
+  --committer=STRING           Specify the committer to analyze (default: current user).
+  --committer-mode=STRING      Specify the committer mode (default: author), one of: author, committer.
+  --branch=STRING              Specify the branch to analyze (default: develop).
   --filter=STRING              Filter git repos by their remote URL (default: 'sunnysideup').
   --date=YYYY-MM-DD            Analyze for a specific date instead of days back.
   --show-estimated-effort=B    Show the estimated effort for the work done.
@@ -45,6 +47,8 @@ $options = getopt(
     'v::',
     [
         'days:',
+        'committer:',
+        'committer-mode:',
         'branch:',
         'filter:',
         'minutes-for-first-line:',
@@ -58,8 +62,13 @@ $options = getopt(
 
 $days = isset($options['days']) ? (int)$options['days'] : 1;
 $date = $options['date'] ?? null;
-
 $branch = $options['branch'] ?? 'develop';
+$committer = (string) ($options['committer'] ?? '');
+$committerMode = (string) ($options['committer-mode'] ?? 'author');
+if (!in_array($committerMode, ['author', 'committer'])) {
+    echo "Invalid committer-mode. Allowed values are: author, committer.\n";
+    exit(1);
+}
 $filter = $options['filter'] ?? 'sunnysideup';
 $minutesForFirstLineChange = isset($options['minutes-for-first-line']) ? (float)$options['minutes-for-first-line'] : 0;
 $showEstimatedEffort = isset($options['show-estimated-effort']) ? true : false;
@@ -95,5 +104,7 @@ if ($date) {
     ->setVerbosity($verbosity)
     ->setShowFullDiff($showFullDiff)
     ->setDebug($debug)
+    ->setCommitter($committer)
+    ->setCommitterMode((string) $committerMode)
     ->setShowEstimatedEffort($showEstimatedEffort)
     ->run();

@@ -25,6 +25,8 @@ class GitDiffAnalyser
     protected string|null $currentDir = null;
     protected array $branchesToCheck = ['develop', 'main', 'master'];
     protected $totalChangesPerDayPerRepo = [];
+    protected ?string $committer = null;           // e.g. name or email
+    protected string $committerMode = 'author';    // 'author' or 'committer'
 
     protected $fileTypes = [
         ['extension' => '\.php', 'type' => 'PHP'],
@@ -176,13 +178,28 @@ class GitDiffAnalyser
         return $this;
     }
 
+    public function setCommitter(string $committer): static
+    {
+        $this->committer = $committer;
+        return $this;
+    }
 
+    public function setCommitterMode(string $mode): static
+    {
+        $this->committerMode = in_array($mode, ['author', 'committer'], true) ? $mode : 'author';
+        return $this;
+    }
+
+    protected function hasCommitterFilter(): bool
+    {
+        return $this->committer !== null && $this->committer !== '';
+    }
     /**
      * Run the Git diff analysis for the specified number of days or a specific date.
      */
     public function run(): void
     {
-        $this->output(PHP_EOL."Starting Git Diff Analysis", 1, 1);
+        $this->output(PHP_EOL . "Starting Git Diff Analysis", 1, 1);
         // Find all Git repositories that match the filter
         if ($this->date) {
             $this->gitDiffForDay($this->date);
@@ -193,7 +210,7 @@ class GitDiffAnalyser
             }
         }
         $this->changeDir($this->directory); // Go back to the parent directory
-        $this->output(PHP_EOL."End of Git Diff Analysis", 1, 1);
+        $this->output(PHP_EOL . "End of Git Diff Analysis", 1, 1);
     }
 
     /**
@@ -215,75 +232,85 @@ class GitDiffAnalyser
         $this->outputEffort($date, array_sum($this->totalChangesPerDayPerRepo[$date]), 2, 1);
     }
 
-    /**
-        * Analyze Git diffs for the given day.
-        */
     protected function gitDiffForDayForRepo(string $date, string $repo): int
     {
         $noOfChanges = 0;
-        // Check which branch to use: develop, main, or master
-        $branch = $this->getAvailableBranch();
 
+        $branch = $this->getAvailableBranch();
         if ($branch === null) {
-            $this->outputDebug("[ERROR] No branch found for repository {$this->currentDir}. Skipping.");
+            $this->outputDebug('[ERROR] No branch found for repository ' . $this->currentDir . '. Skipping.');
             return 0;
         }
 
-        // Get the start and end commits for the day
-        $startOfDayCommit = trim(shell_exec("git rev-list -n 1 --before='$date 00:00' $branch"));
-        $endOfDayCommit = trim(shell_exec("git rev-list -n 1 --before='$date 23:59' $branch"));
-        $this->outputDebug("Last commit from previous day: $startOfDayCommit", 4);
-        $this->outputDebug("Last commit from current day: $endOfDayCommit", 4);
-        // Check if valid commits are found for the day
-        if (empty($startOfDayCommit) || empty($endOfDayCommit)) {
-            return 0; // Skip if no commits found for the date
+        $since = $date . ' 00:00';
+        $until = $date . ' 23:59';
+
+        // two modes: range diff (default) vs filtered log (committer)
+        if ($this->hasCommitterFilter() && 1 === 2) {
+            // $by = $this->committerMode === 'committer' ? '--committer' : '--author';
+            // $diffOutput = shell_exec(
+            //     'git log -p '
+            //         . $by . '=' . escapeshellarg($this->committer) . ' '
+            //         . '--since=' . escapeshellarg($since) . ' '
+            //         . '--until=' . escapeshellarg($until) . ' '
+            //         . escapeshellarg($branch) . ' | grep -v \'/dist/\''
+            // ) ?? '';
+
+
+            // // files changed (unique)
+            // $filesChanged = $this->getFilesChangedFiltered($since, $until, $branch, $by, $this->committer);
+            // $commitMessagesArray = $this->getCommitMessagesFiltered($since, $until, $branch, $by, $this->committer, $this->verbosity);
+        } else {
+            $startOfDayCommit = trim(shell_exec("git rev-list -n 1 --before='$since' $branch") ?? '');
+            $endOfDayCommit   = trim(shell_exec("git rev-list -n 1 --before='$until' $branch") ?? '');
+            $this->outputDebug('Last commit from previous day: ' . $startOfDayCommit, 4);
+            $this->outputDebug('Last commit from current day: ' . $endOfDayCommit, 4);
+            if ($startOfDayCommit === '' || $endOfDayCommit === '') {
+                return 0;
+            }
+            $committerPhrase = $this->getCommitterPhrase();
+            $diffOutput = shell_exec("git log -p $committerPhrase $startOfDayCommit..$endOfDayCommit | grep -v '/dist/'") ?? '';
+
+            $filesChanged = $this->getFilesChangedRange($startOfDayCommit, $endOfDayCommit);
+            $commitMessagesArray = $this->getCommitMessagesRange($startOfDayCommit, $endOfDayCommit, $this->verbosity);
         }
 
-        // Fetch the diff for the day
-        $diffOutput = shell_exec("git diff $startOfDayCommit $endOfDayCommit | grep -v '/dist/'");
+        // prune overly long lines
+        $diffOutput = implode('' . PHP_EOL, array_filter(
+            explode('' . PHP_EOL, $diffOutput),
+            fn($line) => strlen($line) < 1000
+        ));
 
-        // remove empty lines and lines that are too long
-        $diffOutput = implode("".PHP_EOL, array_filter(explode("".PHP_EOL, $diffOutput), function ($line) {
-            return strlen($line) < 1000;
-        }));
-
-        $filesChanged = $this->getFilesChanged($startOfDayCommit, $endOfDayCommit);
-        $commitMessagesArray = $this->getCommitMessages($startOfDayCommit, $endOfDayCommit);
         if (count($filesChanged) > 0 || count($commitMessagesArray) > 0) {
-            $this->output('Total files changed for '.$repo .': '. count($filesChanged), 2, 1);
+            $this->output('Total files changed for ' . $repo . ': ' . count($filesChanged), 2, 1);
         } else {
             return 0;
         }
 
-        $this->output("Commit Messages", 4, 1);
+        $this->output('Commit Messages', 4, 1);
         $this->output($commitMessagesArray, 0, 1);
 
-
-        // Loop through the file types and process changes
         foreach ($this->fileTypes as $fileType) {
             $fileTypeChanges = 0;
             $filesChangedForOutput = [];
             foreach ($filesChanged as $key => $fileChanged) {
-                if (preg_match('/'.$fileType['extension'].'$/', $fileChanged)) {
-                    unset($filesChanged[$key]);  // Remove the found file from the array
+                if (preg_match('/' . $fileType['extension'] . '$/', $fileChanged)) {
+                    unset($filesChanged[$key]);
                     $fileTypeChanges += $this->extractChangesForFileName($diffOutput, $fileChanged);
                     $filesChangedForOutput[] = $fileChanged;
                 }
             }
             if ($fileTypeChanges > 0) {
-                $this->output('Total changes for '.$fileType['type'] . ': ' . $fileTypeChanges, 4, 3);
+                $this->output('Total changes for ' . $fileType['type'] . ': ' . $fileTypeChanges, 4, 3);
                 $this->output($filesChangedForOutput, 0, 4);
             }
             $noOfChanges += $fileTypeChanges;
         }
 
-        // If no changes in any file types, skip output for this repository
-
-        // Display total changes and estimated time
         $this->outputEffort($repo, $noOfChanges, 3, 2);
-
         return $noOfChanges;
     }
+
 
     /**
      * Determine the branch to use by checking for branchesToCheck values
@@ -400,7 +427,8 @@ class GitDiffAnalyser
     protected function getCommitMessages(string $startOfDayCommit, string $endOfDayCommit, int $verbosity = 1): array
     {
         $format = $this->verbosity > 2 ? '%B' : '%s'; // Full message if verbosity > 2, else just the subject line
-        $commitLog = shell_exec("git log --pretty=format:$format $startOfDayCommit..$endOfDayCommit");
+        $committerPhrase = $this->getCommitterPhrase();
+        $commitLog = shell_exec("git log --pretty=format:$format $committerPhrase $startOfDayCommit..$endOfDayCommit");
 
         $delimiter = $this->verbosity > 2 ? PHP_EOL . PHP_EOL : PHP_EOL;
         $commitMessages = array_filter(array_map('trim', explode($delimiter, $commitLog)));
@@ -412,8 +440,10 @@ class GitDiffAnalyser
      */
     protected function getFilesChanged(string $startOfDayCommit, string $endOfDayCommit): array
     {
-        $commitLog = shell_exec("git diff --name-only $startOfDayCommit $endOfDayCommit");
-        $filesChanged = array_filter(array_map('trim', explode("".PHP_EOL, $commitLog)));
+        // to do, change to git log -p
+        $committerPhrase = $this->getCommitterPhrase();
+        $commitLog = shell_exec("git log --name-only --pretty=format: $committerPhrase $startOfDayCommit..$endOfDayCommit");
+        $filesChanged = array_filter(array_map('trim', explode("" . PHP_EOL, $commitLog)));
         return array_unique($filesChanged);
     }
 
@@ -449,12 +479,12 @@ class GitDiffAnalyser
         $name = str_replace($this->directory, './', $name);
         $name = str_replace('//', '/', $name);
         $this->output(
-            "Summary of efforf $name:",
+            "Summary of effort $name:",
             $headerLevel,
             $verbosityLevel
         );
-        $this->output($numberOfChanges .' (changes)', 0, $verbosityLevel);
-        $this->output($time .' ('.$timeInDecimals.' rounded decimal hours)', 0, $verbosityLevel);
+        $this->output($numberOfChanges . ' (changes)', 0, $verbosityLevel);
+        $this->output($time . ' (' . $timeInDecimals . ' rounded decimal hours)', 0, $verbosityLevel);
     }
 
     protected function outputDebug(string|array $message, $headerLevel = 0, ?int $verbosityLevel = null)
@@ -545,12 +575,12 @@ class GitDiffAnalyser
     {
         $lines = explode("\n", $diffContent); // Split the string into lines
         $lineCount = count($lines);
-        $string = 'Total line changes: '.$lineCount.PHP_EOL;
+        $string = 'Total line changes: ' . $lineCount . PHP_EOL;
         if ($this->verbosity < 4 && $lineCount < $this->maxLinesToShowAll) {
             return $diffContent;
         }
         if ($lineCount < $this->maxLinesToShowAdditionsOnly) {
-            $string .= "Showing additions only".PHP_EOL;
+            $string .= "Showing additions only" . PHP_EOL;
             foreach ($lines as $line) {
                 // Check if the line starts with a '+'
                 if (strpos($line, '+') === 0) {
@@ -568,25 +598,115 @@ class GitDiffAnalyser
         // List of typical coding words to remove
         $codingWords = [
             // Control structures
-            'if', 'else', 'elseif', 'endif', 'then', 'for', 'foreach', 'while', 'do',
-            'switch', 'case', 'break', 'continue', 'default', 'return', 'yield', 'throw', 'try', 'catch', 'finally', 'goto',
+            'if',
+            'else',
+            'elseif',
+            'endif',
+            'then',
+            'for',
+            'foreach',
+            'while',
+            'do',
+            'switch',
+            'case',
+            'break',
+            'continue',
+            'default',
+            'return',
+            'yield',
+            'throw',
+            'try',
+            'catch',
+            'finally',
+            'goto',
 
             // Functions and classes
-            'function', 'class', 'abstract', 'interface', 'trait', 'public', 'private', 'protected', 'static', 'final',
-            'extends', 'implements', 'new', 'clone', 'self', 'parent', 'this', 'namespace', 'use', 'global', 'const', 'var', 'static',
+            'function',
+            'class',
+            'abstract',
+            'interface',
+            'trait',
+            'public',
+            'private',
+            'protected',
+            'static',
+            'final',
+            'extends',
+            'implements',
+            'new',
+            'clone',
+            'self',
+            'parent',
+            'this',
+            'namespace',
+            'use',
+            'global',
+            'const',
+            'var',
+            'static',
 
             // Data types
-            'int', 'float', 'string', 'bool', 'boolean', 'array', 'object', 'resource', 'null', 'void', 'mixed', 'iterable', 'callable',
+            'int',
+            'float',
+            'string',
+            'bool',
+            'boolean',
+            'array',
+            'object',
+            'resource',
+            'null',
+            'void',
+            'mixed',
+            'iterable',
+            'callable',
 
             // PHP specific
-            'echo', 'print', 'include', 'include_once', 'require', 'require_once', 'construct', 'destruct', 'call', 'get',
-            'set', 'isset', 'unset', 'toString', 'invoke', 'clone', 'debugInfo',
+            'echo',
+            'print',
+            'include',
+            'include_once',
+            'require',
+            'require_once',
+            'construct',
+            'destruct',
+            'call',
+            'get',
+            'set',
+            'isset',
+            'unset',
+            'toString',
+            'invoke',
+            'clone',
+            'debugInfo',
 
             // JavaScript specific
-            'let', 'const', 'var', 'await', 'async', 'function', 'return', 'class', 'constructor', 'import', 'export',
+            'let',
+            'const',
+            'var',
+            'await',
+            'async',
+            'function',
+            'return',
+            'class',
+            'constructor',
+            'import',
+            'export',
 
             // Miscellaneous
-            'true', 'false', 'null', 'undefined', 'NaN', 'Infinity', 'typeof', 'instanceof', 'in', 'as', 'with', 'extends', 'super', 'delete',
+            'true',
+            'false',
+            'null',
+            'undefined',
+            'NaN',
+            'Infinity',
+            'typeof',
+            'instanceof',
+            'in',
+            'as',
+            'with',
+            'extends',
+            'super',
+            'delete',
         ];
 
         // Remove all non-alpha characters and replace them with a space
@@ -611,9 +731,60 @@ class GitDiffAnalyser
 
         // Get the top 20 words (keys only)
         return array_keys(array_slice($wordCounts, 0, $this->maxNumberOfKeywords, true));
-
     }
 
+    protected function getCommitMessagesFiltered(string $since, string $until, string $branch, string $byFlag, string $who, int $verbosity = 1): array
+    {
+        $format = $this->verbosity > 2 ? '%B' : '%s';
+        $cmd = 'git log --pretty=format:' . escapeshellarg($format) . ' '
+            . $byFlag . '=' . escapeshellarg($who) . ' '
+            . '--since=' . escapeshellarg($since) . ' '
+            . '--until=' . escapeshellarg($until) . ' '
+            . escapeshellarg($branch);
+        $commitLog = shell_exec($cmd) ?? '';
+        $delimiter = $this->verbosity > 2 ? PHP_EOL . PHP_EOL : PHP_EOL;
+        $commitMessages = array_filter(array_map('trim', explode($delimiter, $commitLog)));
+        return array_unique($commitMessages);
+    }
 
+    protected function getFilesChangedFiltered(string $since, string $until, string $branch, string $byFlag, string $who): array
+    {
+        $cmd = 'git log --name-only --pretty=format: '
+            . $byFlag . '=' . escapeshellarg($who) . ' '
+            . '--since=' . escapeshellarg($since) . ' '
+            . '--until=' . escapeshellarg($until) . ' '
+            . escapeshellarg($branch);
+        $out = shell_exec($cmd) ?? '';
+        $files = array_filter(array_map('trim', explode('' . PHP_EOL, $out)));
+        // remove empty lines that come from separators
+        $files = array_values(array_filter($files, fn($l) => $l !== ''));
+        return array_values(array_unique($files));
+    }
 
+    protected function getCommitMessagesRange(string $startOfDayCommit, string $endOfDayCommit): array
+    {
+        $format = $this->verbosity > 2 ? '%B' : '%s';
+        $committerPhrase = $this->getCommitterPhrase();
+        $commitLog = shell_exec("git log --pretty=format:$format $committerPhrase $startOfDayCommit..$endOfDayCommit") ?? '';
+        $delimiter = $this->verbosity > 2 ? PHP_EOL . PHP_EOL : PHP_EOL;
+        $commitMessages = array_filter(array_map('trim', explode($delimiter, $commitLog)));
+        return array_unique($commitMessages);
+    }
+
+    protected function getFilesChangedRange(string $startOfDayCommit, string $endOfDayCommit): array
+    {
+        $committerPhrase = $this->getCommitterPhrase();
+        $commitLog = shell_exec("git log --name-only --pretty=format: $committerPhrase $startOfDayCommit..$endOfDayCommit") ?? '';
+        $filesChanged = array_filter(array_map('trim', explode('' . PHP_EOL, $commitLog)));
+        return array_unique($filesChanged);
+    }
+
+    protected function getCommitterPhrase(): string
+    {
+        if ($this->hasCommitterFilter()) {
+            $by = $this->committerMode === 'committer' ? '--committer' : '--author';
+            return $by . '=' . escapeshellarg($this->committer) . ' ';
+        }
+        return '';
+    }
 }
