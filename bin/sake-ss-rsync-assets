@@ -45,8 +45,12 @@ done
 help_and_exit() {
     ECHOHEAD "Rsync assets from server"
     echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Working Directory:             $WORKING_DIR"
     echonice "Directory to copy from:        $server/public/assets"
     echonice "Directory to copy to:          $WORKING_DIR/public/assets"
+    echonice "Server to sync with:           $server"
+    echonice "Do reverse sync:               $reverse"
+    echonice "To server (if any):            $toServer"
     echonice "Apache user (-w):              $wwwDataUser"
 
     ECHOHEAD "Available settings:"
@@ -85,13 +89,13 @@ fi
 
 
 
-mkdir -p ./public/assets
+sudo mkdir -p ./public/assets
 
 if [[ "$reverse" == "yes" ]]; then
     ECHOHEAD "Now syncing local assets to $server ..."
 else
     ECHOHEAD "Now clearing local assets..."
-    rm -rf ./public/assets/*
+    sudo rm -rf ./public/assets/*
 fi
 
 if [ -n "$server" ]; then
@@ -123,7 +127,7 @@ fi
 ############################################ TO SERVER SYNC
 if [ -n "$toServer" ] && [ "$reverse" != "yes" ]; then
     ECHOHEAD "Now syncing local assets to $toServer ..."
-    "$0" --reverse "$toServer" -w "$wwwDataUser"
+    "$0"   -w "$wwwDataUser" --reverse "$toServer"
 fi
 
 echoend

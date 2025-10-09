@@ -43,7 +43,16 @@ done
 if [[ -z "$server" || "$help" == "yes" ]]; then
     ECHOHEAD "Sync Database"
     echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Server to sync with:           $server"
+    echonice "Do reverse sync:               $reverse"
+    echonice "To server (if any):            $toServer"
+    echonice "Apache user (-w):              $wwwDataUser"
+    echonice ""
     echonice "Local .env File:               $localEnvFile"
+    echonice "Remote dump file:              $remoteDumpFile"
+    echonice "Local dump file:               $localDumpFile"
+    echonice "To server dump file:           $toRemoteDumpFile"
+
     echonice ""
     ECHOHEAD "Available settings:"
     echonice "-r, --reverse                  sync FROM local TO server"

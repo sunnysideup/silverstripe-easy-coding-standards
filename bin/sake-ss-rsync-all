@@ -41,6 +41,10 @@ fi
 help_and_exit() {
     ECHOHEAD "Sync Database and Assets"
     echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Working Directory:             $WORKING_DIR"
+    echonice "Server to sync with:           $server"
+    echonice "Do reverse sync:               $reverse"
+    echonice "To server (if any):            $toServer"
 
     ECHOHEAD "Available settings:"
     echonice "-r, --reverse                  sync FROM local TO server"
