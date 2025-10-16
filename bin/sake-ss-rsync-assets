@@ -59,9 +59,9 @@ help_and_exit() {
     echonice "-h, --help                     Show this help."
 
     ECHOHEAD 'Usage'
-    echonice "Pull:     sake-ss-rsync-assets user@host:/var/www/site"
-    echonice "Pull+Push: sake-ss-rsync-assets user@hostA:/var/www/site --to user@hostB:/var/www/site"
-    echonice "Push:     sake-ss-rsync-assets -r user@host:/var/www/site"
+    echonice "Pull:       sake-ss-rsync-assets user@host:/var/www/site"
+    echonice "Pull+Push:  sake-ss-rsync-assets user@hostA:/var/www/site --to user@hostB:/var/www/site"
+    echonice "Push:       sake-ss-rsync-assets -r user@host:/var/www/site"
     echonice "Note: Use trailing slashes correctly in rsync semantics (src/ vs src)."
 
     echofunctions

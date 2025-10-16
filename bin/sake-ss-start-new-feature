@@ -1,0 +1,141 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+feature=""
+branch="develop"
+server=""
+alsoGetAssets="no"
+
+
+
+while (($#)); do
+    case $1 in
+    -a | --assets-get-assets)
+        alsoGetAssets=$2
+        shift
+        ;;
+    -b | --branch)
+        branch=$2
+        shift
+        ;;
+    -s | --server)
+        server=$2
+        shift
+        ;;
+    -f | --feature)
+        feature=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Git commit and push"
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to commit:           $dir (relative to $WORKING_DIR)"
+
+    ECHOHEAD "Current settings:"
+    echonice "Branch (-b):                   $branch"
+    echonice "Server (-s):                   $server"
+    echonice "Feature (-f):                  $feature"
+
+    ECHOHEAD "Available settings:"
+    echonice "-f, --feature                  new feature: ''"
+    echonice "-b, --branch                   target branch, default: develop"
+    echonice "-s, --server                   target server for getting database"
+    echonice "-a, --assets-get-assets        whether to also get assets, default: no"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-ss-start-new-feature -f "my awesome feature" -b develop -s hello@111.222.333.444"
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ GET MESSAGE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd "$WORKING_DIR/$dir"
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+echonice "Checking out $branch..."
+git checkout "$branch" || exit 1
+
+echonice "Pulling latest changes from origin/$branch..."
+git pull origin "$branch" || exit 1
+
+############################################ CREATE FEATURE BRANCH
+if [[ -n "$feature" ]]; then
+    # make safe branch name
+    safeFeature=$(echo "$feature" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9_-')
+    echonice "Creating feature branch: $safeFeature"
+    git checkout -b "$safeFeature" || exit 1
+fi
+
+############################################ RUN COMPOSER INSTALL
+ECHOHEAD "RUN COMPOSER INSTALL"
+echonice "Running sake-composer install..."
+composer install --prefer-source || exit 1
+
+############################################ RUN SERVER SYNC
+ECHOHEAD "Sync from server: $server"
+
+if [[ -z "$server" ]]; then
+    envFile="$WORKING_DIR/$dir/.env"
+    if [[ -f "$envFile" ]]; then
+        server=$(grep '^SAKE-SERVER-LOCATION=' "$envFile" | cut -d '=' -f2- | xargs)
+    fi
+
+    if [[ -z "$server" ]]; then
+        echobad "Server not set and no SAKE-SERVER-LOCATION found in $envFile"
+        exit 1
+    fi
+fi
+
+if [[ -n "$server" ]]; then
+    if [[ "$alsoGetAssets" != 'no' ]]; then
+        echonice "Running: sake-ss-rsync-all $server"
+        sake-ss-rsync-all "$server" || exit 1
+    else
+        echonice "Running: sake-ss-rsync-db $server"
+        sake-ss-rsync-db "$server" || exit 1
+    fi
+else
+    echowarn "No server set — skipping sync."
+fi
+
+############################################ RUN DEV/BUILD
+
+echonice "Running sake-ss-dev-build..."
+sake-ss-dev-build || exit 1
+
+############################################ DONE
+
+echoend

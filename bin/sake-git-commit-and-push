@@ -18,6 +18,7 @@ alsoDoThemes='no'
 statusOnly='no'
 doBuild='yes'
 help='no'
+quiet='no'
 
 
 while (($#)); do
@@ -44,6 +45,10 @@ while (($#)); do
         ;;
     -n | --no-build)
         doBuild='no'
+        shift
+        ;;
+    -q | --quiet)
+        quiet=$2
         shift
         ;;
     -s | --status-only)
@@ -77,6 +82,7 @@ help_and_exit() {
     echonice "Message (-m):                  $message"
     echonice "New Version (-v):              $newVersion"
     echonice "Also check (-a):               $also (relative to $WORKING_DIR)"
+    echonice "Quiet Mode (-q):               $quiet"
     echonice "Status Only (-s):              $statusOnly"
     echonice "Review First (-r):             $review"
     echonice "Also include themes (-t):      $alsoDoThemes"
@@ -88,6 +94,7 @@ help_and_exit() {
     echonice "-a, --also                     also do vendor - e.g. vendor/silverstripe OR vendor/sunnysideup"
     echonice "-n, --no-build                 do not run build script"
     echonice "-t, --themes-also              include folders in themes, default: no"
+    echonice "-q, --quiet                    quiet mode, default: no"
     echonice "-s, --status-only              status only, default: no !!!"
     echonice "-r, --review                   review first, default: yes"
     echonice "-h, --help                     show help information"
@@ -105,7 +112,9 @@ if [[ "$help" == "yes" ]]; then
 fi
 
 ############################################ GET MESSAGE
-
+if [[ -z "$message" && "$quiet" != 'no' ]]; then
+  message='MNT: WIP'
+fi
 message=$(check_commit_message "$message")
 
 retVal=$?
@@ -118,7 +127,7 @@ fi
 ############################################ CODE
 
 if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
+    cd "$WORKING_DIR/$dir"
 else
     echonice "Could not change directory to $WORKING_DIR/$dir"
     help_and_exit
@@ -179,7 +188,7 @@ if test -f "$GIT_DIR/.git/config"; then
 
         ECHOHEAD "# adding files to git repo"
         git add . -A
-        if [[ "$review" == "yes" ]]; then
+        if [[ "$review" == "yes" && "$quiet" != 'no' ]]; then
             if command -v meld &>/dev/null; then
                 # Get the count of changed lines and files
                 output=$(git diff --cached --stat)
@@ -187,13 +196,9 @@ if test -f "$GIT_DIR/.git/config"; then
                 fileCount=$(echo "$output" | grep -c '|')
 
                 # Check conditions
-                if [[ "$lineCount" -gt 3 || "$fileCount" -gt 1 ]]; then
-                    echonice "Plenty of changes! ($lineCount lines changed across $fileCount files)"
-                    # Add your action here, e.g., exit 1 or some other command
-                    meld .
-                else
-                    echonice "Changes are within acceptable limits, no need for a review."
-                fi
+                echonice "Plenty of changes! ($lineCount lines changed across $fileCount files)"
+                # Add your action here, e.g., exit 1 or some other command
+                meld .
             else
                 echobad "Meld is not installed."
             fi

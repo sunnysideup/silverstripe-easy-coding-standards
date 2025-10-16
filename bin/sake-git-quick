@@ -70,7 +70,7 @@ fi
 ############################################ CODE
 
 if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
+    cd "$WORKING_DIR/$dir"
 else
     echonice "Could not change directory to $WORKING_DIR/$dir"
     help_and_exit

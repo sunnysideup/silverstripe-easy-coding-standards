@@ -93,6 +93,7 @@
     "bin/sake-ss-rsync-assets",
     "bin/sake-ss-rsync-db",
     "bin/sake-ss-rsync-sspak",
+    "bin/sake-ss-start-new-feature",
     "bin/sake-ss-start-new-module",
     "bin/sake-test-site",
     "bin/sake-update-chromium",
