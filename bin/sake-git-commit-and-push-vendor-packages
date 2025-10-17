@@ -73,6 +73,7 @@ help_and_exit() {
     echonice "Status Only (-s):              $statusOnly"
     echonice "Full Composer Update (-f):     $fullUpdate"
     echonice "Verbose (--v):                 $verbose"
+    echonice "Quiet (--q):                   $quiet"
     echonice "Pull-Push (--p):               $pullPush"
 
     ECHOHEAD "Available settings:"
@@ -82,6 +83,7 @@ help_and_exit() {
     echonice "-s, --status-only              check if there are changes git folder present, default: no"
     echonice "-f, --full-update              run a full composer update afterwards and commit, default: yes"
     echonice "-v, --verbose                  show detailed information about each repository"
+    echonice "-q, --quiet                    show less detailed information about each repository"
     echonice "-p, --pull-push                try git pull; git push to resolve false positives"
     echonice "-h, --help                     show help information"
 
