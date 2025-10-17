@@ -28,7 +28,7 @@ while (($#)); do
         commitAndPush=$2
         shift
         ;;
-    -v | --new-version)
+    -n | --new-version)
         newVersion=$2
         shift
         ;;
@@ -69,10 +69,10 @@ help_and_exit() {
     ECHOHEAD "Current settings:"
     echonice "Message (-m):                  $message"
     echonice "Commit and Push (-c):          $commitAndPush"
-    echonice "Create New tag (-v):           $newVersion"
+    echonice "Create New tag (-n):           $newVersion"
     echonice "Status Only (-s):              $statusOnly"
     echonice "Full Composer Update (-f):     $fullUpdate"
-    echonice "Verbose (--v):                 $verbose"
+    echonice "Verbose (-v):                  $verbose"
     echonice "Quiet (--q):                   $quiet"
     echonice "Pull-Push (--p):               $pullPush"
 
