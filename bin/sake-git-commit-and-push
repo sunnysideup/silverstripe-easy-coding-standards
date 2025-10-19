@@ -188,7 +188,7 @@ if test -f "$GIT_DIR/.git/config"; then
 
         ECHOHEAD "# adding files to git repo"
         git add . -A
-        if [[ "$review" == "yes" && "$quiet" != 'no' ]]; then
+        if [[ "$review" == "yes" && "$quiet" == 'no' ]]; then
             if command -v meld &>/dev/null; then
                 # Get the count of changed lines and files
                 output=$(git diff --cached --stat)
