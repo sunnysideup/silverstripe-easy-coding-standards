@@ -15,7 +15,7 @@ class GitDiffAnalyser
     protected string $filter = '';
     protected float $instantiationCostInMinutes = 10;
     protected float $minutesForFirstLineChange = 3;
-    protected float $decreaseFactor = 0.99;
+    protected float $decreaseFactor = 0.7;
     protected int $verbosity = 2;
     protected bool $showFullDiff = false;
     protected bool $showEstimatedEffort = false;
@@ -27,6 +27,20 @@ class GitDiffAnalyser
     protected $totalChangesPerDayPerRepo = [];
     protected ?string $committer = null;           // e.g. name or email
     protected string $committerMode = 'author';    // 'author' or 'committer'
+
+    protected bool $useCSV = false;
+    protected array $csvOutput = [];
+
+    protected array $commitMessageArrayPerDay = [];
+
+    protected const REMOVE_COMMIT_MESSAGES_CONTAINING = [
+        'Merge branch',
+        'Merged in',
+        'Merged production',
+        'DOC:',
+        'MNT:',
+        'FIX: updating packages',
+    ];
 
     protected $fileTypes = [
         ['extension' => '\.php', 'type' => 'PHP'],
@@ -190,6 +204,12 @@ class GitDiffAnalyser
         return $this;
     }
 
+    public function setUseCSV(bool $useCSV): static
+    {
+        $this->useCSV = $useCSV;
+        return $this;
+    }
+
     protected function hasCommitterFilter(): bool
     {
         return $this->committer !== null && $this->committer !== '';
@@ -211,6 +231,28 @@ class GitDiffAnalyser
         }
         $this->changeDir($this->directory); // Go back to the parent directory
         $this->output(PHP_EOL . "End of Git Diff Analysis", 1, 1);
+        $this->outputToCSV();
+    }
+
+    protected function outputToCSV(): void
+    {
+        if ($this->useCSV) {
+            $csvFile = $this->directory . '/git-diff-analysis.csv';
+            $fp = fopen($csvFile, 'w');
+            if ($fp === false) {
+                user_error("Could not open file for writing: $csvFile");
+            }
+            // Write CSV header
+            if (!empty($this->csvOutput)) {
+                fputcsv($fp, array_keys($this->csvOutput[0]));
+                // Write CSV rows
+                foreach ($this->csvOutput as $row) {
+                    fputcsv($fp, $row);
+                }
+            }
+            fclose($fp);
+            $this->output("CSV output written to: $csvFile", 1, 1);
+        }
     }
 
     /**
@@ -269,10 +311,18 @@ class GitDiffAnalyser
                 return 0;
             }
             $committerPhrase = $this->getCommitterPhrase();
-            $diffOutput = shell_exec("git log -p $committerPhrase $startOfDayCommit..$endOfDayCommit | grep -v '/dist/'") ?? '';
-
+            $diffOutput = shell_exec(
+                "git log -p $committerPhrase $startOfDayCommit..$endOfDayCommit | grep -vE '(/dist/|composer\.lock|package-lock\.json)'"
+            ) ?? '';
             $filesChanged = $this->getFilesChangedRange($startOfDayCommit, $endOfDayCommit);
-            $commitMessagesArray = $this->getCommitMessagesRange($startOfDayCommit, $endOfDayCommit, $this->verbosity);
+            $commitMessagesArray = $this->getCommitMessagesRange($startOfDayCommit, $endOfDayCommit);
+        }
+        $commitMessagesArray = $this->cleanupCommitMessages($commitMessagesArray);
+        foreach ($commitMessagesArray as $key => $msg) {
+            $repoName = $this->getRepoName($repo);
+            if ($repoName !== '') {
+                $commitMessagesArray[$key] .= ' (' . $repoName . ')';
+            }
         }
 
         // prune overly long lines
@@ -289,6 +339,10 @@ class GitDiffAnalyser
 
         $this->output('Commit Messages', 4, 1);
         $this->output($commitMessagesArray, 0, 1);
+        $this->commitMessageArrayPerDay = array_merge(
+            $this->commitMessageArrayPerDay,
+            $commitMessagesArray
+        );
 
         foreach ($this->fileTypes as $fileType) {
             $fileTypeChanges = 0;
@@ -309,6 +363,17 @@ class GitDiffAnalyser
 
         $this->outputEffort($repo, $noOfChanges, 3, 2);
         return $noOfChanges;
+    }
+
+    protected function getRepoName($repoPath): string
+    {
+        $currentDirName = basename($this->directory);
+        $name = basename($repoPath);
+        if ($name === $currentDirName) {
+            return '';
+        }
+        $name = str_replace($this->directory . '_', ' ', $name);
+        return $name;
     }
 
 
@@ -403,7 +468,7 @@ class GitDiffAnalyser
                     // Print the result in the desired format
                     $this->output("$fileName: $fileChanges changes", 5, 4);
                 }
-                if (($this->verbosity > 2 && $this->showFullDiff) || $this->verbosity > 3) {
+                if ($this->showFullDiff || $this->verbosity > 3) {
                     $this->output($this->extractDiffInfo($fileDiff), 0, 4);
                 }
             }
@@ -432,8 +497,11 @@ class GitDiffAnalyser
 
         $delimiter = $this->verbosity > 2 ? PHP_EOL . PHP_EOL : PHP_EOL;
         $commitMessages = array_filter(array_map('trim', explode($delimiter, $commitLog)));
-
-        return array_unique($commitMessages);
+        $this->commitMessageArrayPerDay = array_merge(
+            $this->commitMessageArrayPerDay,
+            $commitMessages
+        );
+        return $commitMessages;
     }
     /**
      * Fetch the commit messages for a given day.
@@ -485,7 +553,61 @@ class GitDiffAnalyser
         );
         $this->output($numberOfChanges . ' (changes)', 0, $verbosityLevel);
         $this->output($time . ' (' . $timeInDecimals . ' rounded decimal hours)', 0, $verbosityLevel);
+        // Only clean and show when this is the day summary
+        if ($this->isSummaryOfDay($name)) {
+            $messages = $this->cleanupCommitMessages($this->commitMessageArrayPerDay);
+            $this->output($messages, 0, 1);
+            $this->commitMessageArrayPerDay = [];
+            $this->csvOutput[] = [
+                'date' => $name,
+                'changes' => $numberOfChanges,
+                'time_in_minutes' => $timeInMinutes,
+                'time_in_decimal_hours' => $timeInDecimals,
+                'commit_messages' => implode(PHP_EOL, $messages)
+            ];
+        }
     }
+
+    protected function isSummaryOfDay(string $name): bool
+    {
+        return preg_match('/\d{4}-\d{2}-\d{2}/', $name) === 1;
+    }
+
+    protected function cleanupCommitMessages(string|array $messages): array|string
+    {
+        $isArray = is_array($messages);
+        if ($isArray) {
+            $messages = array_unique($messages);
+        } else {
+            $messages = [$messages];
+        }
+        $remove = self::REMOVE_COMMIT_MESSAGES_CONTAINING;
+
+        $messages = array_values(
+            array_filter(
+                $messages,
+                function ($line) use ($remove) {
+                    $line = trim($line);
+                    foreach ($remove as $removePhrase) {
+                        if (
+                            strpos($line, $removePhrase) === 0
+                        ) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            )
+        );
+        if ($isArray) {
+            return $messages;
+        } elseif (isset($messages[0])) {
+            return $messages[0];
+        } else {
+            return '';
+        }
+    }
+
 
     protected function outputDebug(string|array $message, $headerLevel = 0, ?int $verbosityLevel = null)
     {
@@ -742,9 +864,10 @@ class GitDiffAnalyser
             . '--until=' . escapeshellarg($until) . ' '
             . escapeshellarg($branch);
         $commitLog = shell_exec($cmd) ?? '';
-        $delimiter = $this->verbosity > 2 ? PHP_EOL . PHP_EOL : PHP_EOL;
+        $delimiter =  PHP_EOL;
+        // $delimiter = $this->verbosity > 2 ? PHP_EOL . PHP_EOL : PHP_EOL;
         $commitMessages = array_filter(array_map('trim', explode($delimiter, $commitLog)));
-        return array_unique($commitMessages);
+        return $commitMessages;
     }
 
     protected function getFilesChangedFiltered(string $since, string $until, string $branch, string $byFlag, string $who): array
@@ -768,7 +891,8 @@ class GitDiffAnalyser
         $commitLog = shell_exec("git log --pretty=format:$format $committerPhrase $startOfDayCommit..$endOfDayCommit") ?? '';
         $delimiter = $this->verbosity > 2 ? PHP_EOL . PHP_EOL : PHP_EOL;
         $commitMessages = array_filter(array_map('trim', explode($delimiter, $commitLog)));
-        return array_unique($commitMessages);
+        // $commitMessages = array_slice($commitMessages, 1);
+        return $commitMessages;
     }
 
     protected function getFilesChangedRange(string $startOfDayCommit, string $endOfDayCommit): array

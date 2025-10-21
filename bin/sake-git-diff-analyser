@@ -24,12 +24,14 @@ Options:
   --date=YYYY-MM-DD            Analyze for a specific date instead of days back.
   --show-estimated-effort=B    Show the estimated effort for the work done.
   --show-full-diff=B           set show full diff (default: false).
-  --minutes-for-first-line=N   Set the number of minutes for the first line of code change (default: 20).
+  --minutes-for-first-line=N   Set the number of minutes for the first line of code change (default: 10).
+  --csv=B                      Set the output format to CSV (default: false).
   --debug=B                    set debug mode (default: false).
   -v, -vv, -vvv                Set verbosity level:
   -v                           - Show total time and total changes only.
   -vv                          - Show commit messages, file changes, and total time (default).
-  -vvv                         - Show detailed changes for each file.
+  -vvv                         - Show changes for each file type.
+  -vvvv                        - Show detailed changes for each file.
   -h, --help                   Show this help message.
 
   directory                    Directory to run the analysis in (default: current directory).
@@ -56,6 +58,7 @@ $options = getopt(
         'date:',
         'mysetting:',
         'show-full-diff:',
+        'csv:',
         'debug:',
     ]
 );
@@ -75,6 +78,7 @@ $showEstimatedEffort = isset($options['show-estimated-effort']) ? true : false;
 $verbosity = isset($options['v']) ? strlen($options['v']) + 1 : 2;
 $debug = isset($options['debug']) ? true : false;
 $showFullDiff = isset($options['show-full-diff']) ? true : false;
+$useCSV = isset($options['csv']) ? true : false;
 
 
 // Check if a directory is passed as the last argument
@@ -107,4 +111,5 @@ if ($date) {
     ->setCommitter($committer)
     ->setCommitterMode((string) $committerMode)
     ->setShowEstimatedEffort($showEstimatedEffort)
+    ->setUseCSV($useCSV)
     ->run();
