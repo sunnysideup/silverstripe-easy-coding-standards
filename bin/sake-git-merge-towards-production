@@ -1,0 +1,157 @@
+#!/bin/bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+message=''
+from='develop'
+to='test'
+direct='no'
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -from | --from)
+        from=$2
+        shift
+        ;;
+    -to | --to)
+        to=$2
+        shift
+        ;;
+    -d | --direct)
+        direct='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help_and_exit 1
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+if [[ -z "$message" ]]; then
+    message='Merge: merge development branches towards production'
+fi
+
+message=$(check_commit_message "$message")
+retVal=$?
+if [[ $retVal -ne 0 ]]; then
+    echobad 'Invalid commit message. Exiting script.'
+    exit 1
+fi
+
+help_and_exit() {
+    ECHOHEAD 'Merge branches in order: develop → test → staging → production'
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to commit:           $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+    echonice "-from, --from                  source branch to start from (default: develop)"
+    echonice "-to, --to                      target branch to merge into (default: test)"
+    echonice "-d, --direct                   don't do stepwise merges, just merge directly"
+
+    echonice 'Usage example:'
+    echonice '  sake-git-merge-towards-production ./ --from develop --to staging'
+    echonice '  sake-git-merge-towards-production ./ --from develop --to production --direct'
+    echofunctions
+    exit
+}
+
+if [[ "$help" == 'yes' ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd "$WORKING_DIR/$dir" || exit 1
+else
+    echobad "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+# Normalize staging alias
+[[ "$to" == "stage" ]] && to="staging"
+[[ "$from" == "stage" ]] && from="staging"
+
+# Define flow order
+FLOW=('develop' 'test' 'staging' 'production')
+
+# Helper: get index in flow
+get_index() {
+    local value=$1
+    for i in "${!FLOW[@]}"; do
+        [[ "${FLOW[$i]}" == "$value" ]] && echo "$i" && return
+    done
+    echo "-1"
+}
+
+fromIndex=$(get_index "$from")
+toIndex=$(get_index "$to")
+
+if (( fromIndex == -1 || toIndex == -1 )); then
+    echobad "Invalid branch name. Must be one of: ${FLOW[*]}"
+    exit 1
+fi
+
+if (( fromIndex > toIndex )); then
+    echobad "Cannot merge backwards (from $from to $to)"
+    exit 1
+fi
+
+# Build merge steps
+steps=()
+if [[ "$direct" == "yes" ]]; then
+    steps=("${from}→${to}")
+else
+    for (( i=$fromIndex; i<$toIndex; i++ )); do
+        steps+=("${FLOW[$i]}→${FLOW[$((i+1))]}")
+    done
+fi
+
+# Run merges
+for step in "${steps[@]}"; do
+    IFS='→' read -r fromBranch toBranch <<< "$step"
+    echonice "### Processing merge: $fromBranch → $toBranch ###"
+
+    # Reverse merge first
+    git fetch origin "$toBranch" "$fromBranch"
+    git checkout "$fromBranch"
+    git pull origin "$fromBranch"
+    git merge origin/"$toBranch" --no-edit || {
+        echobad "Reverse merge failed: $toBranch into $fromBranch"
+        exit 1
+    }
+    git push origin "$fromBranch"
+
+    # Forward merge
+    git checkout "$toBranch"
+    git pull origin "$toBranch"
+    git merge origin/"$fromBranch" --no-edit || {
+        echobad "Forward merge failed: $fromBranch into $toBranch"
+        exit 1
+    }
+    git push origin "$toBranch"
+
+    echonice "✓ Completed $fromBranch ↔ $toBranch"
+done
+
+git checkout develop
+echoend

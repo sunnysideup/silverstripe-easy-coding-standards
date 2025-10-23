@@ -31,7 +31,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-diff-analyser
  - sake-git-fork-comparison
  - sake-git-remove-stale-branches
- - sake-git-merge-develop-and-production
+ - sake-git-merge-towards-production
  - sake-git-squash-and-pr
  - sake-git-squash-commits
  - sake-git-tag
