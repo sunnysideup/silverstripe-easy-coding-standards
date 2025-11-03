@@ -177,6 +177,12 @@ if test -f "$GIT_DIR/.git/config"; then
         exit 0
     fi
 
+    # Check if there are any changes before proceeding
+    if git diff --quiet && git diff --cached --quiet; then
+        echonice "No changes detected. Nothing to commit."
+        exit 0
+    fi
+
     if [[ "$commitAndPush" == "yes" ]]; then
         if [[ "$doBuild" == "yes" ]]; then
             if [[ -x "bin/npm-build.sh" ]]; then
@@ -195,10 +201,13 @@ if test -f "$GIT_DIR/.git/config"; then
                 lineCount=$(echo "$output" | awk '{added += $1; deleted += $3} END {print added + deleted}')
                 fileCount=$(echo "$output" | grep -c '|')
 
-                # Check conditions
-                echonice "Plenty of changes! ($lineCount lines changed across $fileCount files)"
-                # Add your action here, e.g., exit 1 or some other command
-                meld .
+                # Check if there are enough changes to warrant review
+                if [[ "$lineCount" -gt 0 ]]; then
+                    echonice "Plenty of changes! ($lineCount lines changed across $fileCount files)"
+                    meld .
+                else
+                    echonice "No significant changes to review."
+                fi
             else
                 echobad "Meld is not installed."
             fi
