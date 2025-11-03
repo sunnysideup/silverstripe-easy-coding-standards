@@ -61,12 +61,17 @@ help_and_exit() {
     ECHOHEAD 'Merge branches in order: develop → test → staging → production'
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $WORKING_DIR/$dir"
+    echonice "from:                          $from"
+    echonice "to:                            $to"
+    echonice "direct:                        $direct"
+    echonice "message:                       $message"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
+    echonice "-m, --message                  commit message to use (default: auto-generated)"
     echonice "-from, --from                  source branch to start from (default: develop)"
     echonice "-to, --to                      target branch to merge into (default: test)"
-    echonice "-d, --direct                   don't do stepwise merges, just merge directly"
+    echonice "-d, --direct                   don't do stepwise merges, just merge directly A → Z"
 
     echonice 'Usage example:'
     echonice '  sake-git-merge-towards-production ./ --from develop --to staging'
