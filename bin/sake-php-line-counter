@@ -91,13 +91,14 @@ nonVendorLines=$(find . -type f -name '*.php' \
 vendorLines=$(find vendor -type f -name '*.php' -print0 \
   | xargs -0 cat | wc -l)
 
-minutes=$(( (vendorLines + nonVendorWeight * nonVendorLines) / divisor ))
-
+minutes=$(( (vendorLines + (nonVendorWeight * nonVendorLines)) / divisor ))
+hours$(( (minutes) / 60 ))
 ECHOHEAD "Results"
 echonice "Non-vendor PHP lines:         $nonVendorLines"
 echonice "Vendor PHP lines:             $vendorLines"
 echonice "Weight applied to non-vendor: $nonVendorWeight"
 echonice "Minutes:                      $minutes"
+echonice "Hours:                        $minutes"
 
 cd "$WORKING_DIR"
 
