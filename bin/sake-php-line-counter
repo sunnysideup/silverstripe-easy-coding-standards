@@ -9,18 +9,18 @@ source $SCRIPT_DIR/sake-self-methods
 dir="./"
 
 ############################################ SETTINGS
-nonVendorWeight=7
-divisor=60
+divisor=250
+minutesPerPackage=20
 help='no'
 
 while (($#)); do
     case $1 in
-    -w | --weight)
-        nonVendorWeight=$2
-        shift
-        ;;
     -d | --divisor)
         divisor=$2
+        shift
+        ;;
+    -m | --minutes-per-package)
+        minutesPerPackage=$2
         shift
         ;;
     -h | --help)
@@ -37,20 +37,20 @@ done
 
 help_and_exit() {
     ECHOHEAD "PHP Line Counter"
-    echonice "Directory of script:          $SCRIPT_DIR"
-    echonice "Directory to scan:            $WORKING_DIR/$dir"
+    echonice "Directory of script:            $SCRIPT_DIR"
+    echonice "Directory to scan:              $WORKING_DIR/$dir"
 
     ECHOHEAD "Current settings:"
-    echonice "Non-vendor weight (-w):       $nonVendorWeight"
-    echonice "Divisor (-d):                 $divisor"
+    echonice "Divisor (-d):                   $divisor"
+    echonice "Minutes per package (-m):       $minutesPerPackage"
 
     ECHOHEAD "Available settings:"
-    echonice "-w, --weight <num>            weight applied to non-vendor PHP lines"
-    echonice "-d, --divisor <num>           divisor to convert weighted lines into minutes"
-    echonice "-h, --help                    show help information"
+    echonice "-d, --divisor <num>             divisor to convert weighted lines into minutes"
+    echonice "-m, --minutes-per-package <num> minutes allocated per direct package"
+    echonice "-h, --help                      show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-php-line-counter -w 7 -d 120"
+    echonice "sake-php-line-counter -d 120 -m 30 "
 
     echofunctions
     exit
@@ -79,6 +79,14 @@ while IFS= read -r folder; do
     excludeArgs+=(-not -path "$folder/*")
 done <<< "$excludePatterns"
 
+
+echo "Scanning direct packages…"
+packageCount=$(
+  composer show --direct 2>/dev/null \
+    | grep -E '^[[:alnum:]_.-]+/[[:alnum:]_.-]+' \
+    | wc -l
+)
+
 echonice "Counting lines …"
 
 # Non-vendor PHP lines (excluding vendor + excluded folders)
@@ -91,16 +99,20 @@ nonVendorLines=$(find . -type f -name '*.php' \
 vendorLines=$(find vendor -type f -name '*.php' -print0 \
   | xargs -0 cat | wc -l)
 
-minutes=$(( (vendorLines + (nonVendorWeight * nonVendorLines)) / divisor ))
+totalLines=$((nonVendorLines))
+minutes=$(( (totalLines / divisor) + (packageCount * minutesPerPackage) ))
 hours=$(( (minutes) / 60 ))
 
 ECHOHEAD "Results"
+echonice "Divisor:                      $divisor - number of lines per minute"
+echonice "Minutes per package:          $minutesPerPackage"
 echonice "Non-vendor PHP lines:         $nonVendorLines"
-echonice "Vendor PHP lines:             $vendorLines"
-echonice "Weight applied to non-vendor: $nonVendorWeight"
+echonice "Total Lines:                  $totalLines"
+echonice "Direct packages:              $packageCount"
+echonice "Vendor Lines:                 $vendorLines"
 echonice "Minutes:                      $minutes"
 echonice "Hours:                        $hours"
 
-cd "$WORKING_DIR"
+
 
 echoend
