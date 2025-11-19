@@ -39,6 +39,7 @@ Install as global composer package and then try to access the commands, starting
 
 # php
  - sake-php-set-timezone
+ - sake-php-line-counter
 
 # lint and security
  - sake-lint-all

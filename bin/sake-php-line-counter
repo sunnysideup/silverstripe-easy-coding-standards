@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir="./"
+
+############################################ SETTINGS
+nonVendorWeight=7
+divisor=60
+help='no'
+
+while (($#)); do
+    case $1 in
+    -w | --weight)
+        nonVendorWeight=$2
+        shift
+        ;;
+    -d | --divisor)
+        divisor=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "PHP Line Counter"
+    echonice "Directory of script:          $SCRIPT_DIR"
+    echonice "Directory to scan:            $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+    echonice "Non-vendor weight (-w):       $nonVendorWeight"
+    echonice "Divisor (-d):                 $divisor"
+
+    ECHOHEAD "Available settings:"
+    echonice "-w, --weight <num>            weight applied to non-vendor PHP lines"
+    echonice "-d, --divisor <num>           divisor to convert weighted lines into minutes"
+    echonice "-h, --help                    show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-php-line-counter -w 7 -d 120"
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd "$WORKING_DIR/$dir"
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+echonice "Finding excluded folders …"
+
+# Find folders containing _manifest_exclude
+excludePatterns=$(find . -type f -name '_manifest_exclude' -printf '%h\n')
+
+excludeArgs=()
+while IFS= read -r folder; do
+    excludeArgs+=(-not -path "$folder/*")
+done <<< "$excludePatterns"
+
+echonice "Counting lines …"
+
+# Non-vendor PHP lines (excluding vendor + excluded folders)
+nonVendorLines=$(find . -type f -name '*.php' \
+  ! -path './vendor/*' \
+  "${excludeArgs[@]}" \
+  -print0 | xargs -0 cat | wc -l)
+
+# Vendor PHP lines (always count all vendor PHP files)
+vendorLines=$(find vendor -type f -name '*.php' -print0 \
+  | xargs -0 cat | wc -l)
+
+minutes=$(( (vendorLines + nonVendorWeight * nonVendorLines) / divisor ))
+
+ECHOHEAD "Results"
+echonice "Non-vendor PHP lines:         $nonVendorLines"
+echonice "Vendor PHP lines:             $vendorLines"
+echonice "Weight applied to non-vendor: $nonVendorWeight"
+echonice "Minutes:                      $minutes"
+
+cd "$WORKING_DIR"
+
+echoend
