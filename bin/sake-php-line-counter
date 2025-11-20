@@ -81,11 +81,22 @@ done <<< "$excludePatterns"
 
 
 echo "Scanning direct packages…"
-packageCount=$(
-  composer show --direct 2>/dev/null \
-    | grep -E '^[[:alnum:]_.-]+/[[:alnum:]_.-]+' \
-    | wc -l
-)
+packages=$(composer show --no-dev | awk '{print $1}')
+
+packageCount=0
+for pkg in $packages; do
+    total=$((total+1))
+
+
+    # Check type field
+    type=$(echo "$data" | jq -r '.type // ""')
+
+    # Only process SS modules
+    if [[ "$type" == silverstripe-* ]]; then
+        packageCount=$((packageCount+1))
+
+    fi
+done
 
 echonice "Counting lines …"
 
