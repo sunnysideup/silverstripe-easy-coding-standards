@@ -99,10 +99,8 @@ fi
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/rector process "$WORKING_DIR/$also" --config $rectorConfig $verbose $dryRun
-    help_and_exit
-
 fi
 
-$SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig $verbose $dryRun
+$SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig $verbose $dryRun --debug
 
 echoend
