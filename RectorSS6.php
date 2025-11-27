@@ -2,37 +2,31 @@
 
 declare(strict_types=1);
 
-use Netwerkstatt\SilverstripeRector\Rector\Injector\UseCreateRector;
-use Rector\Config\RectorConfig;
-use Netwerkstatt\SilverstripeRector\Rector\DataObject\EnsureTableNameIsSetRector;
-use Rector\Set\ValueObject\LevelSetList;
-use Rector\Set\ValueObject\SetList;
-use Netwerkstatt\SilverstripeRector\Set\SilverstripeSetList;
 use Netwerkstatt\SilverstripeRector\Set\SilverstripeLevelSetList;
+use Netwerkstatt\SilverstripeRector\Set\SilverstripeSetList;
+use Rector\Config\RectorConfig;
+
+$paths = [
+    __DIR__ . '/app/_config.php',
+    __DIR__ . '/app/src',
+    __DIR__ . '/_config.php',
+    __DIR__ . '/src',
+];
+
+foreach ($paths as $key => $path) {
+    if (!file_exists($path)) {
+        unset($paths[$key]);
+    }
+}
 
 return RectorConfig::configure()
-    ->withPreparedSets(
-        deadCode: true,
-        codeQuality: true
-    )
+    ->withPaths($paths)
+    // uncomment to reach your current PHP version
+    ->withPhpSets()
     ->withSets([
-        //rector lists
-        LevelSetList::UP_TO_PHP_83,
-        SetList::CODE_QUALITY,
-        SetList::CODING_STYLE,
-        //silverstripe rector
         SilverstripeSetList::CODE_STYLE,
         SilverstripeLevelSetList::UP_TO_SS_6_0
     ])
-
-    // any rules that are included in the selected sets you want to skip
-    // ->withSkip([
-    //     //        ClassPropertyAssignToConstructorPromotionRector::class,
-    //     //        ReturnNeverTypeRector::class
-    // ])
-    // // any rules that are included in the selected sets you want to skip
-    // ->withSkip([
-    //     ClassPropertyAssignToConstructorPromotionRector::class,
-    //     ReturnNeverTypeRector::class
-    // ])
-;
+    ->withTypeCoverageLevel(0)
+    ->withDeadCodeLevel(0)
+    ->withCodeQualityLevel(0);

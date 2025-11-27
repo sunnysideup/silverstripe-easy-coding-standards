@@ -83,10 +83,18 @@ done <<< "$excludePatterns"
 echo "Scanning direct packages…"
 packages=$(composer show --no-dev | awk '{print $1}')
 
-packageCount=0
+total=0
+ssPackages=0
+ss6Ready=0
+ss6NotReady=0
+
 for pkg in $packages; do
     total=$((total+1))
 
+
+    if [[ -z "$data" ]]; then
+        continue
+    fi
 
     # Check type field
     type=$(echo "$data" | jq -r '.type // ""')
