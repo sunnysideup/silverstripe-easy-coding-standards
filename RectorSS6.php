@@ -59,6 +59,7 @@ return static function (RectorConfig $rectorConfig): void {
         'SilverStripe\ORM\Limitable' => 'SilverStripe\Model\List\Limitable',
         'SilverStripe\ORM\Sortable' => 'SilverStripe\Model\List\Sortable',
 
+<<<<<<< HEAD
         'SilverStripe\SecurityReport\Forms\GridFieldExportReportButton' => 'SilverStripe\Reports\SecurityReport\Forms\GridFieldExportReportButton',
         'SilverStripe\SecurityReport\Forms\GridFieldPrintReportButton' => 'SilverStripe\Reports\SecurityReport\Forms\GridFieldPrintReportButton',
         'SilverStripe\SecurityReport\MemberReportExtension' => 'SilverStripe\Reports\SecurityReport\MemberReportExtension',
@@ -132,3 +133,15 @@ return static function (RectorConfig $rectorConfig): void {
         new RenameClassAndConstFetch('SilverStripe\Admin\LeftAndMain', 'SCHEMA_HEADER', 'SilverStripe\Forms\Schema\FormSchema', 'SCHEMA_HEADER'),
     ]);
 };
+=======
+return RectorConfig::configure()
+    ->withPaths($paths)
+    // uncomment to reach your current PHP version
+    ->withPhpSets()
+    ->withSets([
+        SilverstripeSetList::SS_6_0,
+    ])
+    ->withTypeCoverageLevel(0)
+    ->withDeadCodeLevel(0)
+    ->withCodeQualityLevel(0);
+>>>>>>> d174a6e75b13de02ae52764d996c9747cb51928a

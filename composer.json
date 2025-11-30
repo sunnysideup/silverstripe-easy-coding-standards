@@ -101,7 +101,10 @@
     "bin/sake-update-vs-code"
   ],
   "config": {
-    "sort-packages": true
+    "sort-packages": true,
+    "allow-plugins": {
+      "phpstan/extension-installer": false
+    }
   },
   "autoload": {
     "psr-4": {
