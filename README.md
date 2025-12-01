@@ -14,11 +14,11 @@ Install as global composer package and then try to access the commands, starting
  - sake-help
 
 # composer
- - sake-composer-about
- - sake-composer-available-updates
+ - sake-composer-about - get details about composer recipe at hand
+ - sake-composer-available-updates 
  - sake-composer-force-update
- - sake-composer-require
- - sake-composer-update
+ - sake-composer-require - composer require with extras
+ - sake-composer-update - composer update with extras
 
 # find
  - sake-find-in-files
@@ -27,12 +27,12 @@ Install as global composer package and then try to access the commands, starting
 # git
  - sake-git-quick
  - sake-git-commit-and-push
- - sake-git-commit-and-push-vendor-packages
+ - sake-git-commit-and-push-vendor-packages - goes through all vendor packages for uncommitted work
  - sake-git-diff-analyser
- - sake-git-fork-comparison
- - sake-git-remove-stale-branches
- - sake-git-merge-towards-production
- - sake-git-squash-and-pr
+ - sake-git-fork-comparison - finds all the works and sees which one is ahead
+ - sake-git-remove-stale-branches 
+ - sake-git-merge-towards-production - take develop to production 
+ - sake-git-squash-and-pr - squash and make a pull request
  - sake-git-squash-commits
  - sake-git-tag
 
@@ -76,11 +76,11 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-db-open
  - sake-ss-dev-build
  - sake-ss-flush
+ - sake-ss-ready
  - sake-ss-rsync-asset
  - sake-ss-start-new-module
 
-# test
-- sake-test-site
+
 
 # rsync
 - sake-ss-rsync-all
@@ -89,6 +89,9 @@ Install as global composer package and then try to access the commands, starting
 - sake-ss-rsync-start-new-feature
 - sake-ss-rsync-start-new-module
 - sake-ss-rsync-sspak
+
+# test
+- sake-test-site test a live site response times
 
 # scrutinizer
  - sake-scrutinizer-add

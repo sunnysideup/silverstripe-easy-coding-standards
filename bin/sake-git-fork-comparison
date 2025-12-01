@@ -224,7 +224,7 @@ Usage:
 
 Examples:
   sake-git-fork-comparison https://github.com/vendor/repo
-  sake-git-fork-comparison sunnysideup/cms-better
+  sake-git-fork-comparison vendor/repo
 
 EOT;
 }
@@ -239,28 +239,38 @@ if (in_array($input, ['--help', '-h', ''], true)) {
 $token = $argv[2] ?? null;
 
 if (! $token) {
+    // 1. auth.json
+    $authPath = getenv('HOME') . '/.config/composer/auth.json';
+    if (is_file($authPath)) {
+        $json = json_decode(file_get_contents($authPath), true);
+        $token = $json['github-oauth']['github.com'] ?? '';
+    }
+}
 
+if (! $token) {
+    // 2. ENV
     $token = getenv('GITHUB_TOKEN') ?: '';
-    if (! $token) {
-        $dir = __DIR__;
-        while ($dir) {
-            $envPath = $dir . '/.env';
-            if (is_file($envPath)) {
-                $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                foreach ($lines as $line) {
-                    if (strpos($line, 'GITHUB_TOKEN=') === 0) {
-                        $token = substr($line, strlen('GITHUB_TOKEN='));
-                        $token = str_replace('"', '', $token);
-                        break 2;
-                    }
+}
+
+if (! $token) {
+    // 3. .env up the tree
+    $dir = __DIR__;
+    while ($dir) {
+        $envPath = $dir . '/.env';
+        if (is_file($envPath)) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos($line, 'GITHUB_TOKEN=') === 0) {
+                    $token = str_replace('"', '', substr($line, 13));
+                    break 2;
                 }
             }
-            $parentDir = dirname($dir);
-            if ($parentDir === $dir) {
-                break;
-            }
-            $dir = $parentDir;
         }
+        $parentDir = dirname($dir);
+        if ($parentDir === $dir) {
+            break;
+        }
+        $dir = $parentDir;
     }
 }
 

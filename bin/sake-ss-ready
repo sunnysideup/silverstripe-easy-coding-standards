@@ -1,0 +1,402 @@
+#!/usr/bin/env bash
+
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+format="json"
+test="SS6"
+help='no'
+while (($#)); do
+    case $1 in
+    -f | --format)
+        format=$2
+        shift
+        ;;
+    -t | --test)
+        test=$2
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Check if a SilverStripe package is ready for $test"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-f, --format                   output format, default: json"
+    echonice "-t, --test                     test to perform, default: SS6"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-ready sunnysideup/templateoverview ."
+    echonice "sake-ss-ready https://github.com/vendor/silverstripe-module"
+
+    echofunctions
+    exit 1
+}
+
+declare -A SS4=(
+    ["silverstripe/framework"]="^4"
+    ["silverstripe/recipe-cms"]="^4"
+    ["silverstripe/recipe-core"]="^4"
+    ["silverstripe/cms"]="^4"
+    ["silverstripe/admin"]="^1"
+)
+declare -A SS5=(
+    ["silverstripe/framework"]="^5"
+    ["silverstripe/recipe-cms"]="^5"
+    ["silverstripe/recipe-core"]="^5"
+    ["silverstripe/cms"]="^5"
+    ["silverstripe/admin"]="^2"
+)
+declare -A SS6=(
+    ["silverstripe/framework"]="^6"
+    ["silverstripe/recipe-cms"]="^6"
+    ["silverstripe/recipe-core"]="^6"
+    ["silverstripe/cms"]="^6"
+    ["silverstripe/admin"]="^3"
+)
+declare -A SS7=(
+    ["silverstripe/framework"]="^7"
+    ["silverstripe/recipe-cms"]="^7"
+    ["silverstripe/recipe-core"]="^7"
+    ["silverstripe/cms"]="^7"
+    ["silverstripe/admin"]="^4"
+)
+
+declare -A BRANCH_RESULTS
+eval "CORE_PKGS=(\"\${!$ACTIVE_RULESET[@]}\")"
+
+
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+if [ -z "$1" ]; then
+    echobad "Usage: sake-ss-ready <composer-package OR git-url>"
+    help_and_exit
+fi
+
+
+# break on errors
+set -e
+
+
+target="$1"
+tmpDir="${TMPDIR:-/tmp}/scan_tmp"
+mkdir -p "$tmpDir"
+
+# -------------------------------------
+# Load GitHub token from composer auth
+# -------------------------------------
+
+
+authFile="$HOME/.config/composer/auth.json"
+
+if [ -f "$authFile" ]; then
+    GITHUB_TOKEN=$(jq -r '.["github-oauth"]["github.com"] // empty' "$authFile")
+fi
+
+if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" = "null" ]; then
+    echobad "❌ No GitHub token found."
+    echobad "Make sure you have a token in:"
+    echobad "  ~/.config/composer/auth.json"
+    echoline
+    echobad "Or set it manually:"
+    echobad "  export GITHUB_TOKEN=xxxx"
+    exit 1
+fi
+
+echonice "✔ Loaded GitHub token from composer auth.json"
+echoline
+
+# ----------------------------------------------------
+# 1. VERSION RULE SETS (edit here)
+# ----------------------------------------------------
+# A repo is READY if ANY rule in the chosen ruleset matches.
+
+
+# Choose which ruleset to apply
+ACTIVE_RULESET="SS6"
+eval "ruleset_keys=(\"\${!$ACTIVE_RULESET[@]}\")"
+
+ECHOHEAD "Using ruleset: $ACTIVE_RULESET"
+
+
+get_rule_value() {
+    local key="$1"
+    eval "echo \"\${$ACTIVE_RULESET[$key]}\""
+}
+
+# ----------------------------------------------------
+# 2. Resolve composer package → repo URL
+# ----------------------------------------------------
+resolve_repo_from_composer() {
+    pkg="$1"
+    curl -s "https://repo.packagist.org/p2/$pkg.json" \
+        | jq -r '.packages[][].source.url' \
+        | sed 's|git://|https://|; s|git@github.com:|https://github.com/|' \
+        | head -n1
+}
+
+if [[ "$target" =~ ^https?:// ]]; then
+    repoUrl="$target"
+else
+    echobad "Resolving '$target' via Packagist..."
+    repoUrl=$(resolve_repo_from_composer "$target")
+fi
+
+if [ -z "$repoUrl" ]; then
+    echobad "❌ Could not resolve repository."
+    exit 1
+fi
+
+# Extract GitHub owner/repo
+if [[ "$repoUrl" =~ github.com[:/]+([^/]+)/([^/.]+) ]]; then
+    owner="${BASH_REMATCH[1]}"
+    repo="${BASH_REMATCH[2]}"
+else
+    echobad "❌ Only GitHub repositories supported."
+    exit 1
+fi
+
+echo "Repository: $owner/$repo"
+echo
+
+# ----------------------------------------------------
+# 3. Fetch all forks
+# ----------------------------------------------------
+echo "Fetching forks…"
+
+forksUrl="https://api.github.com/repos/$owner/$repo/forks?per_page=100"
+
+apiResponse=$(curl -s \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "$forksUrl"
+)
+
+if [[ "$apiResponse" == "" ]] || [[ "$apiResponse" =~ "<" ]]; then
+    echobad "❌ GitHub returned non-JSON output:"
+    echobad "$apiResponse"
+    exit 1
+fi
+
+jsonType=$(echo "$apiResponse" | jq -r 'type')
+
+if [ "$jsonType" = "object" ]; then
+    message=$(echo "$apiResponse" | jq -r '.message // empty')
+    if [ -n "$message" ] && [ "$message" != "null" ]; then
+        echobad "❌ GitHub API error: $message"
+        echobad "Full response:"
+        echobad "$apiResponse"
+        exit 1
+    fi
+
+    echobad "❌ Unexpected JSON object instead of array:"
+    echobad "$apiResponse"
+    exit 1
+fi
+
+if [ "$jsonType" != "array" ]; then
+    echobad "❌ Unexpected JSON type: $jsonType"
+    echobad "$apiResponse"
+    exit 1
+fi
+
+forks=$(echo "$apiResponse" | jq -r '.[].full_name')
+
+# Build list of all repos (original + forks)
+allRepos=("$owner/$repo")
+
+if [ -n "$forks" ]; then
+    while read -r f; do
+        allRepos+=("$f")
+    done <<< "$forks"
+fi
+
+# ----------------------------------------------------
+# 4. Branch + composer checks
+# ----------------------------------------------------
+check_branch() {
+    local full="$1"
+    local branch="$2"
+
+    echonice "  Checking branch: $branch"
+
+    tree=$(curl -s \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$full/git/trees/$branch?recursive=1"
+    )
+
+    if [[ -z "$tree" ]] || [[ "$tree" =~ "<" ]]; then
+        return 1
+    fi
+
+    paths=$(echo "$tree" | jq -r '.tree[] | select(.path | endswith("composer.json")) | .path')
+
+    if [ -z "$paths" ]; then
+        return 1
+    fi
+
+    while read -r path; do
+
+        comp=$(curl -s -L \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            "https://raw.githubusercontent.com/$full/$branch/$path"
+        )
+
+        if ! echo "$comp" | jq '.' >/dev/null 2>&1; then
+            continue
+        fi
+
+        # Evaluate early-exit and matches
+        found_any_ss_pkg="no"
+        declare -A matched_pkgs=()
+
+        for pkg in "${ruleset_keys[@]}"; do
+            need=$(get_rule_value "$pkg")
+            have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
+            major=${need#"^"}
+
+            # track core dependencies
+            if printf '%s\n' "${CORE_PKGS[@]}" | grep -q "^$pkg$"; then
+                if [[ -n "$have" ]]; then
+                    found_any_ss_pkg="yes"
+                fi
+            fi
+
+            # SS6 match
+            if [[ -n "$have" && ( "$have" == "$need"* || "$have" == "$major"* ) ]]; then
+                matched_pkgs["$pkg"]="$have"
+            fi
+        done
+
+        # EARLY EXIT RULE: no SS dependencies → automatically ready
+        if [[ "$found_any_ss_pkg" == "no" ]]; then
+            add_json_record "$full" "$branch" "$path" "NOT_A_SILVERSTRIPE_DEPENDENCY" "false"
+        else
+            # Record normal matches
+            if (( ${#matched_pkgs[@]} > 0 )); then
+                local match_list=""
+                for k in "${!matched_pkgs[@]}"; do
+                    match_list+="\"$k\": \"${matched_pkgs[$k]}\","
+                done
+                match_list="${match_list%,}"
+
+                add_json_record "$full" "$branch" "$path" "{$match_list}" "true"
+            else
+                add_json_record "$full" "$branch" "$path" "NONE" "true"
+            fi
+        fi
+
+    done <<< "$paths"
+
+    return 0
+}
+
+
+check_repo() {
+    full="$1"
+    ECHOHEAD "Checking $full"
+
+    branches=$(curl -s \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$full/branches?per_page=100" \
+        | jq -r '.[].name'
+    )
+
+    if [ -z "$branches" ]; then
+        echobad "  ❌ could not fetch branches"
+        echoline
+        return
+    fi
+
+    for branch in $branches; do
+        check_branch "$full" "$branch" && {
+            echonice "  ✔ READY (via branch: $branch)"
+            echoline
+            return
+        }
+    done
+
+    echo "  ✗ no SS6-ready branch found"
+    echoline
+}
+
+# ----------------------------------------------------
+# 5. Process all repos
+# ----------------------------------------------------
+rm -f "$tmpDir/ready.txt"
+
+for r in "${allRepos[@]}"; do
+    check_repo "$r"
+done
+
+ECHOHEAD "READY repos for ruleset $ACTIVE_RULESET:"
+if [ -f "$tmpDir/ready.txt" ]; then
+    cat "$tmpDir/ready.txt"
+else
+    echonice "(none)"
+fi
+echoline
+
+ECHOHEAD "Creating JSON output…"
+
+output="{"
+output+="\"repository\": \"$owner/$repo\","
+output+="\"branches\": {"
+
+branch_json=""
+
+for key in "${!BRANCH_RESULTS[@]}"; do
+    IFS="::" read -r full branch path <<< "$key"
+    IFS="|" read -r matched deps_present <<< "${BRANCH_RESULTS[$key]}"
+
+    branch_json+=$(cat <<EOF
+"$branch-$path": {
+    "path": "$path",
+    "matches": $(
+        if [[ "$matched" == "NOT_A_SILVERSTRIPE_DEPENDENCY" ]]; then
+            echo "\"NOT_A_SILVERSTRIPE_DEPENDENCY\""
+        elif [[ "$matched" == "NONE" ]]; then
+            echo "[]"
+        else
+            echo "{ $matched }"
+        fi
+    ),
+    "coreDependenciesPresent": $deps_present
+},
+EOF
+)
+done
+
+branch_json="${branch_json%,}"  # strip trailing comma
+
+output+="$branch_json"
+output+="}}"
+
+echo "$output" | jq .
+
+
+echoend

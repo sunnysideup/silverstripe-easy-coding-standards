@@ -90,6 +90,7 @@
     "bin/sake-ss-db-open",
     "bin/sake-ss-dev-build",
     "bin/sake-ss-flush",
+    "bin/sake-ss-ready",
     "bin/sake-ss-rsync-all",
     "bin/sake-ss-rsync-assets",
     "bin/sake-ss-rsync-db",
