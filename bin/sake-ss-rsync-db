@@ -89,6 +89,7 @@ extract_env_var() {
     grep "^$varName=" "$file" | cut -d '=' -f 2- | tr -d '"' | xargs
 }
 
+
 localDbUser=$(extract_env_var "$localEnvFile" "SS_DATABASE_USERNAME")
 localDbPass=$(extract_env_var "$localEnvFile" "SS_DATABASE_PASSWORD")
 localDbName=$(extract_env_var "$localEnvFile" "SS_DATABASE_NAME")
@@ -99,9 +100,18 @@ remoteDbPass=$(ssh "$serverClean" "grep '^SS_DATABASE_PASSWORD=' $REMOTE_ENV_FIL
 remoteDbName=$(ssh "$serverClean" "grep '^SS_DATABASE_NAME=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
 remoteDbHost=$(ssh "$serverClean" "grep '^SS_DATABASE_SERVER=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
 
+escapedRemotePass=$(escape_for_single_quotes "$remoteDbPass")
+escapedLocalPass=$(escape_for_single_quotes "$localDbPass")
+
 if [[ -z "$remoteDbUser" || -z "$remoteDbPass" || -z "$remoteDbName" || -z "$remoteDbHost" ]]; then
     echobad "Could not retrieve database credentials from the source server."
     exit 1
+else
+    echonice "Retrieved source server DB credentials:"
+    echonice "  User: $remoteDbUser"
+    echonice "  Name: $remoteDbName"
+    echonice "  Host: $remoteDbHost"
+    echonice " Password: $remoteDbPass (hidden)"
 fi
 
 if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localDbHost" ]]; then
@@ -135,7 +145,7 @@ if [[ "$reverse" == "yes" ]]; then
     rsync -chavzP "$localDumpFile" "$serverClean:$remoteDumpFile" || { echobad "Failed to upload dump."; exit 1; }
 
     echonice "Importing on source server..."
-    ssh "$serverClean" "mysql -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName < $remoteDumpFile" || { echobad "Failed to import on source server."; exit 1; }
+    ssh "$serverClean" "mysql -u '$remoteDbUser' -p'$escapedRemotePass' -h '$remoteDbHost' '$remoteDbName' < '$remoteDumpFile' " || { echobad "Failed to import on source server."; exit 1; }
 
 else
     # PULL: source server -> local

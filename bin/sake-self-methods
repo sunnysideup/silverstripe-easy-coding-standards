@@ -205,6 +205,10 @@ get_my_repos() {
     done
 }
 
+escape_for_single_quotes() {
+    printf "%s" "$1" | sed "s/'/'\\\\''/g"
+}
+
 check_commit_message() {
     local message=$1
 
