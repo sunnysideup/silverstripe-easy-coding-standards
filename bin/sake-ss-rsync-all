@@ -54,7 +54,7 @@ help_and_exit() {
     ECHOHEAD "Example usage:"
     echonice "sake-ss-sync-all my-server:/var/www/website-root"
     echonice "sake-ss-sync-all my-server # default path is /container/application"
-    echonice "sake-ss-sync-all --reverse my-server"
+    echonice "sake-ss-sync-all my-server --reverse # sync from local to server - put reverse last"
     echonice "sake-ss-sync-all my-server --to other-server:/var/www/website-root"
 
     exit

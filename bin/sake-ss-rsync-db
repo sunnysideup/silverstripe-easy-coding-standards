@@ -111,7 +111,7 @@ else
     echonice "  User: $remoteDbUser"
     echonice "  Name: $remoteDbName"
     echonice "  Host: $remoteDbHost"
-    echonice " Password: $remoteDbPass (hidden)"
+    echonice " Password: hidden"
 fi
 
 if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localDbHost" ]]; then
