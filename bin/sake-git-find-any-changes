@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+full='no'
+while (($#)); do
+    case $1 in
+    -f | --full)
+        full='yes'
+        shift
+        ;;
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Git find any changes in any child directories"
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to commit:           $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-git-find-any-changes /var/www "
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd "$WORKING_DIR/$dir"
+else
+    echonice "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+rootDir="$WORKING_DIR/$dir"
+
+withTimeout() {
+  local seconds="$1"
+  shift
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "${seconds}s" "$@" || true
+  else
+    "$@" || true
+  fi
+}
+
+originMatches() {
+  local repoDir="$1"
+  local originUrl
+
+  originUrl="$(git -C "$repoDir" remote get-url origin 2>/dev/null || true)"
+  case "$originUrl" in
+    *sunnysideup*) return 0 ;;
+  esac
+
+  return 1
+}
+
+gitStatusPorcelain() {
+  local repoDir="$1"
+  git -c core.filemode=false -C "$repoDir" status --porcelain 2>/dev/null || true
+}
+
+hasLocalChanges() {
+  local repoDir="$1"
+  [ -n "$(gitStatusPorcelain "$repoDir")" ]
+}
+
+hasUnpushedCommitsAfterPull() {
+  local repoDir="$1"
+
+  git -C "$repoDir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1 || return 1
+
+  GIT_TERMINAL_PROMPT=0 withTimeout 8 git -C "$repoDir" fetch --quiet --prune >/dev/null 2>&1
+
+  local ahead
+  ahead="$(git -C "$repoDir" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
+
+  if [ "${ahead:-0}" -gt 0 ]; then
+    GIT_TERMINAL_PROMPT=0 withTimeout 12 git -C "$repoDir" pull --rebase --autostash --quiet >/dev/null 2>&1
+    ahead="$(git -C "$repoDir" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
+    [ "${ahead:-0}" -gt 0 ] && return 0
+  fi
+
+  return 1
+}
+
+canPush() {
+  local repoDir="$1"
+
+  local branch
+  branch="$(git -C "$repoDir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  [ -n "$branch" ] && [ "$branch" != "HEAD" ] || return 1
+
+  local -a cmd
+  if git -C "$repoDir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+    cmd=(git -C "$repoDir" push --dry-run --porcelain)
+  else
+    return 1
+  fi
+
+  GIT_TERMINAL_PROMPT=0 withTimeout 8 "${cmd[@]}" >/dev/null 2>&1
+}
+
+find "$rootDir" -type d -name .git -prune 2>/dev/null | while IFS= read -r gitDir; do
+  repoDir="${gitDir%/.git}"
+  [ -d "$repoDir" ] || continue
+
+  git -C "$repoDir" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+
+  # Skip repos without origin containing "sunnysideup"
+  originMatches "$repoDir" || continue
+
+  if hasLocalChanges "$repoDir" || hasUnpushedCommitsAfterPull "$repoDir"; then
+    if canPush "$repoDir"; then
+      echo "$repoDir"
+    fi
+  fi
+done
+
+echoend
