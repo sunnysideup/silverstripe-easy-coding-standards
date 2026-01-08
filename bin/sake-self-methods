@@ -49,7 +49,7 @@ echoend() {
     echogood "COMPLETED"
     echoline
 
-    [ $(date +%1N) == 1 ] && $SCRIPT_DIR/sake-self-update
+    (( RANDOM % 400 == 0 )) && "$SCRIPT_DIR/sake-self-update"
 }
 
 echofunctions() {
