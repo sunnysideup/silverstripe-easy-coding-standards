@@ -31,7 +31,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-diff-analyser
  - sake-git-fork-comparison - finds all the works and sees which one is ahead
  - sake-git-info
- - sake-find-any-changes
+ - sake-git-find-any-changes
  - sake-git-remove-stale-branches 
  - sake-git-merge-towards-production - take develop to production 
  - sake-git-squash-and-pr - squash and make a pull request
@@ -81,6 +81,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-ready
  - sake-ss-rsync-asset
  - sake-ss-start-new-module
+ - sake-ss-start-new-feature
 
 
 
@@ -88,8 +89,6 @@ Install as global composer package and then try to access the commands, starting
 - sake-ss-rsync-all
 - sake-ss-rsync-assets
 - sake-ss-rsync-db
-- sake-ss-rsync-start-new-feature
-- sake-ss-rsync-start-new-module
 - sake-ss-rsync-sspak
 
 # test
@@ -101,6 +100,7 @@ Install as global composer package and then try to access the commands, starting
 # machine maintenance
  - sake-update-chromium
  - sake-update-vs-code
+ - sake-self-update
 
 
 ```
