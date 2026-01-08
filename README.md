@@ -69,7 +69,6 @@ Install as global composer package and then try to access the commands, starting
  - sake-npm-update-self
  - sake-npm-publish-on-npmjs-org
 
-
 # silverstripe
  - sake-ss-add-site
  - sake-ss-create-env-file
@@ -82,8 +81,6 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-rsync-asset
  - sake-ss-start-new-module
  - sake-ss-start-new-feature
-
-
 
 # rsync
 - sake-ss-rsync-all

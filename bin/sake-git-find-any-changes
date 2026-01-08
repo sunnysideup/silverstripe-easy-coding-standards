@@ -61,6 +61,7 @@ fi
 
 rootDir="$WORKING_DIR/$dir"
 
+
 withTimeout() {
   local seconds="$1"
   shift
