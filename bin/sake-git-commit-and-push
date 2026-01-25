@@ -135,7 +135,7 @@ fi
 
 
 # quick cleanup
-find ./ -name ".php-cs-fixer.dist.php" -exec rm "{}" \;
+# find ./ -name ".php-cs-fixer.dist.php" -exec rm "{}" \;
 
 
 
