@@ -99,10 +99,6 @@ fi
 
 if test -f "$WORKING_DIR/$also"; then
     $SCRIPT_DIR/rector process "$WORKING_DIR/$also" --config $rectorConfig $verbose $dryRun
-<<<<<<< HEAD
-=======
-
->>>>>>> d174a6e75b13de02ae52764d996c9747cb51928a
 fi
 
 $SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig $verbose $dryRun --debug
