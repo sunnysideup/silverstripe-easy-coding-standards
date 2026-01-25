@@ -134,6 +134,11 @@ else
 fi
 
 
+# quick cleanup
+find ./ -name ".php-cs-fixer.dist.php" -exec rm "{}" \;
+
+
+
 ## do we need to build?
 # uncommitted?
 if ! git diff --quiet -- themes/; then doBuild='no'; fi

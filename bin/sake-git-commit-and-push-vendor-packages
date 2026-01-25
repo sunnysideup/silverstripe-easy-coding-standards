@@ -116,6 +116,10 @@ if [[ "$statusOnly" != "yes" ]]; then
     fi
 fi
 
+# quick cleanup
+find ./ -name ".php-cs-fixer.dist.php" -exec rm "{}" \;
+
+
 ############################################ CODE
 [[ ! -d "$WORKING_DIR" ]] && echobad "Could not change directory to $WORKING_DIR" && help_and_exit
 
