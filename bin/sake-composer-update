@@ -96,7 +96,7 @@ fi
 echonice "Running composer install to get the already installed packages ..."
 git pull origin $(git branch --show-current)
 git push origin $(git branch --show-current)
-composer install
+composer install --prefer-source
 
 # Step: Capture the current package info before the update
 oldPackageInfo=$(composer info --format=json)
@@ -115,9 +115,9 @@ if ([[ "$force" == "yes" ]]); then
 fi
 
 if ([[ "$minimalChangesOnly" == "yes" ]]); then
-    composer update --minimal-changes
+    composer update --minimal-changes --prefer-source
 else
-    composer update --with-all-dependencies
+    composer update --with-all-dependencies --prefer-source
 fi
 
 # Capture the new package info after the update
