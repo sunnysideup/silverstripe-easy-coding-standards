@@ -116,25 +116,18 @@ composer require --dev sunnysideup/easy-coding-standards:dev-master
 1. open your terminal and type
 
 ```shell
+
+# install ...
 composer global config minimum-stability dev
 composer global config prefer-stable true
 composer global require sunnysideup/easy-coding-standards:dev-master
-```
+cat << 'EOF' >> ~/.bashrc
 
-2. then add path to `~/.bashrc` (or otherwise):
-   choose the appropriate one ...
-
-```shell
-PATH=~/.composer/vendor/bin:$PATH
+# Add composer path
 PATH=~/.config/composer/vendor/bin:$PATH
-```
-
-This will make the global composer `vendor/bin` available anywhere (use with care!).
-
-3. To enable it, run:
-
-```shell
+EOF
 source ~/.bashrc
+
 ```
 
 or restart your computer.
