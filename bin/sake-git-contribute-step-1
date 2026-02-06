@@ -47,7 +47,7 @@ help_and_exit() {
     exit
 }
 
-check_for_env_var "GIT_HUB_USER_NAME"
+check_for_env_var "GITHUB_USER_NAME"
 
 ############################################ HELP ONLY
 if [[ "$help" == "yes" ]]; then
