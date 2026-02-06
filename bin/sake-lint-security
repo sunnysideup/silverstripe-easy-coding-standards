@@ -88,10 +88,32 @@ else
 fi
 
 ############################################ 5) Semgrep (OWASP + local rules)
+if command -v semgrep >/dev/null 2>&1; then
+    echogood "Semgrep is installed."
+else
+    echobad "Semgrep is not installed."
+    if ask "Would you like to install Semgrep now? (requires sudo + pipx)" "y"; then
+        sudo apt install -y pipx
+        pipx install semgrep
+        pipx ensurepath
+        echogood "Semgrep installed. You may need to open a new shell for PATH changes."
+    else
+        echobad "Skipping Semgrep (not installed). Tip: sudo apt install -y pipx && pipx install semgrep"
+    fi
+fi
 if command -v semgrep >/dev/null; then
-    run semgrep ci --config p/owasp-top-ten --config .semgrep/ || true
-elif [[ -x "$HOME/.local/bin/semgrep" ]]; then
-    run "$HOME/.local/bin/semgrep" ci --config p/owasp-top-ten --config .semgrep/ || true
+    semgrep scan \
+    --config p/phpcs-security-audit \
+    --config p/security-audit \
+    --config p/owasp-top-ten \
+    --include='*.php' \
+    . || true
+
+    if [[ -d .semgrep ]]; then
+        cmd+=(--config .semgrep)
+    fi
+
+    "${cmd[@]}" || true
 else
     echobad "Skipping Semgrep (not installed). Tip: pipx install semgrep"
 fi
