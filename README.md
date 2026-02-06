@@ -58,6 +58,9 @@ Install as global composer package and then try to access the commands, starting
  - sake-lint-security
  - sake-lint-stan
 
+ # edit with LLM
+ - sake-llm-opencode
+
 # webpack
  - sake-npm-audit
  - sake-npm-install

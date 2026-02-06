@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+WORKING_DIR=$(pwd)
+source $SCRIPT_DIR/sake-self-methods
+
+############################################ DIR
+if [ "$1" != "" ]; then
+    dir=$1
+else
+    dir='app/client/src'
+fi
+
+############################################ DEFAULTS
+DEFAULT_MODEL='openai/gpt-5.1-codex'
+OPEN_CODE_INSTALL_CMD='curl -fsSL https://install.opencode.sh | sh'
+
+############################################ SETTINGS
+help='no'
+promptDefault="$WORKING_DIR/.agents/prompt.txt"
+prompt="$promptDefault"
+opencodePath='opencode'
+dryRun='no'
+filesPattern=''   # e.g. --files=./src/app/Tasks/*.php
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    --prompt=*)
+        prompt="${1#*=}"
+        shift
+        ;;
+    --opencode-path=*)
+        opencodePath="${1#*=}"
+        shift
+        ;;
+    --dry-run)
+        dryRun='yes'
+        shift
+        ;;
+    --files=*)
+        filesPattern="${1#*=}"
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        shift
+        ;;
+    *)
+        shift
+        ;;
+    esac
+done
+
+help_and_exit() {
+
+    ECHOHEAD "OpenCode runner"
+    echonice "Directory is always the first argument (kept for compatibility): $dir"
+    echonice "File selection is via --files=GLOB (supports *), e.g. --files=./src/app/Tasks/*.php"
+
+    ECHOHEAD "Current settings:"
+    echonice "working dir:                 $WORKING_DIR"
+    echonice "dir:                         $dir"
+    echonice "files:                       ${filesPattern:-'(not set)'}"
+    echonice "prompt file:                 ${prompt:-"$promptDefault"}"
+    echonice "opencode path:               $opencodePath"
+    echonice "dry run:                     $dryRun"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                   show help information"
+    echonice "--files=GLOB                 files to include (required)"
+    echonice "--prompt=FILE                prompt file path (default: $promptDefault)"
+    echonice "--opencode-path=PATH         opencode binary/path (default: opencode)"
+    echonice "--dry-run                    print final command, do not run"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-llm-opencode . --files=./src/app/Tasks/*.php"
+    echonice "sake-llm-opencode . --files=./src/**/*.php --dry-run"
+    echonice "sake-llm-opencode . --files=./client/src/js/**/*.js --dry-run"
+
+    echofunctions
+    exit
+}
+
+############################################ HELP ONLY
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR" ]; then
+    cd $WORKING_DIR
+else
+    echobad "Could not change directory to $WORKING_DIR"
+    help_and_exit
+fi
+
+############################################ ENV VARS
+check_for_env_var "LLM_PROVIDER"
+llmProvider="$LLM_PROVIDER"
+
+check_for_env_var "API_KEY"
+apiKey="$API_KEY"
+
+check_for_env_var "MODEL"
+model="$MODEL"
+
+############################################ FUNCTIONS
+
+add_to_git_ignore(){
+    # ensure .gitignore exists
+    touch .gitignore
+
+    # add the ignore line only if it does not already exist (exact match)
+    grep -Fqx '.agents/' .gitignore || printf '%s\n' '.agents/' >> .gitignore
+
+    git add .gitignore
+    git commit -m 'Ignore local agent prompts'
+}
+
+resolve_opencode_path() {
+    local preferred="$1"
+
+    if [[ -n "$preferred" && -f "$preferred" && -x "$preferred" ]]; then
+        printf '%s' "$preferred"
+        return 0
+    fi
+
+    local bin="$preferred"
+    [[ -n "$bin" ]] || bin='opencode'
+
+    local found
+    found="$(command -v "$bin" 2>/dev/null || true)"
+    [[ -n "$found" ]] || return 1
+    printf '%s' "$found"
+}
+
+install_opencode() {
+    sh -c "$OPEN_CODE_INSTALL_CMD"
+}
+
+############################################ INPUT RESOLUTION
+
+prompt="${prompt:-"$SCRIPT_DIR/prompt.txt"}"
+
+if [[ -z "${filesPattern:-}" ]]; then
+    echobad "Error: --files=... is required (supports * globs)."
+    help_and_exit
+fi
+
+if [[ ! -r "$prompt" ]]; then
+    echobad "Error: cannot read prompt file: $prompt"
+    exit 1
+fi
+
+add_to_git_ignore
+
+# Expand the glob safely
+shopt -s nullglob
+matches=( $filesPattern )
+shopt -u nullglob
+
+if (( ${#matches[@]} == 0 )); then
+    echobad "Error: no files matched: $filesPattern"
+    exit 1
+fi
+
+
+opencodeResolved="$(resolve_opencode_path "$opencodePath" 2>/dev/null || true)"
+
+if [[ -z "$opencodeResolved" ]]; then
+    echonice "opencode not found; installing..."
+    if ! install_opencode; then
+        echobad "Error: failed to install opencode via installer script."
+        exit 1
+    fi
+    opencodeResolved="$(resolve_opencode_path "$opencodePath" 2>/dev/null || true)"
+fi
+
+if [[ -z "$opencodeResolved" ]]; then
+    echobad "Error: opencode binary not found or not executable ($opencodePath)."
+    exit 1
+fi
+
+promptText="$(cat "$prompt")"
+
+cmd=( "$opencodeResolved" run -m "$model" )
+for f in "${matches[@]}"; do
+    cmd+=( -f "$f" )
+done
+cmd+=( -- "$promptText" )
+
+if [[ "$dryRun" == "yes" ]]; then
+    printf '%q ' "${cmd[@]}"
+    printf '\n'
+    echoend
+    exit 0
+fi
+
+"${cmd[@]}"
+
+echoend

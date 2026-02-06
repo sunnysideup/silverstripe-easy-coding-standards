@@ -252,11 +252,15 @@ fi
 
 # use a different name for the associative array
 declare -A varsToAdd=(
+    [GITHUB_USER_NAME]=''
     [GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES]=''
     [SCRUTINIZER_API_TOKEN]=''
     [SCRUTINIZER_ORG]=''
     [PACKAGIST_USERNAME]=''
     [PACKAGIST_API_TOKEN]=''
+    [LLM_PROVIDER]=''
+    [LLM_API_KEY]=''
+    [LLM_MODEL]=''
 )
 
 # Create .env file if it doesn't exist
