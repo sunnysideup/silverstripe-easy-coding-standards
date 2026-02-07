@@ -54,9 +54,9 @@ Install as global composer package and then try to access the commands, starting
  - sake-lint-phan
  - sake-lint-psr-4-checker
  - sake-lint-rector
- - sake-lint-remove-origs
- - sake-lint-security
  - sake-lint-stan
+ - sake-lint-security
+ - sake-lint-remove-origs
 
  # edit with LLM
  - sake-llm-opencode
