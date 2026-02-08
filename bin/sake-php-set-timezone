@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
 dir='./'
 
 ############################################ SETTINGS
+timeZone='Pacific/Auckland'
 help='no'
 while (($#)); do
     case $1 in
-    -f | --find)
-        find=$2
+    -t | --timezone)
+        timeZone=$2
         shift
         ;;
-    -h | --help)
-        help='yes'
-        shift
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
         ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1"
-        help='yes'
-        ;;
-    *) dir=$1 ;;
     esac
     shift
 done
+
 
 help_and_exit() {
     ECHOHEAD "Set PHP timezone"
@@ -42,33 +42,13 @@ help_and_exit() {
     echonice "-h, --help                   show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "e.g. sake-php-set-timezone app/src -f 'piece of code'"
+    echonice "e.g. sake-php-set-timezone app/src"
 
     echofunctions
     exit
 }
 
 ############################################ HELP ONLY
-timeZone='Pacific/Auckland'
-help='no'
-while (($#)); do
-    case $1 in
-    -t | --timezone)
-        timeZone=$2
-        shift
-        ;;
-    -h | --help)
-        help='yes'
-        shift
-        ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1"
-        help='yes'
-        ;;
-    *) dir=$1 ;;
-    esac
-    shift
-done
 
 ############################################ CODE
 

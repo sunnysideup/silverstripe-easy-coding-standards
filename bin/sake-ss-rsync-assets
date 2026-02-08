@@ -3,7 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 
@@ -27,8 +27,13 @@ while (($#)); do
         -h|--help) help='yes' ;;
         -r|--reverse) reverse='yes' ;;
         -t|--to) toServer=$2; shift ;;
-        -*) printf 'Unknown option: %q\n\n' "$1"; help='yes' ;;
-         *) server=$1 ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        server=$1
+        ;;
     esac
     shift
 done

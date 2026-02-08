@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
-WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
 dir='./'
@@ -14,15 +13,13 @@ package=''
 help='no'
 while (($#)); do
     case $1 in
-    -h | --help)
-        help='yes'
-        shift
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        package=$1
         ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1"
-        help='yes'
-        ;;
-    *) package=$1 ;;
     esac
     shift
 done
@@ -46,9 +43,7 @@ help_and_exit() {
 }
 
 ############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
+sake_check_help_and_exit
 
 ############################################ CODE
 if [[ "$package" == "" ]]; then

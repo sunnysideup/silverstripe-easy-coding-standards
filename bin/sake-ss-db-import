@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
 localEnvFile="$WORKING_DIR/.env"
@@ -11,6 +11,20 @@ localEnvFile="$WORKING_DIR/.env"
 ############################################ SETTINGS
 help='no'
 dumpFile=$1
+
+while (($#)); do
+    case $1 in
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dumpFile=$1
+        ;;
+    esac
+    shift
+done
+
 
 ############################################ HELP FUNCTION
 help_and_exit() {
@@ -34,9 +48,7 @@ if [[ "$dumpFile" == "-h" || "$dumpFile" == "--help" ]]; then
     help='yes'
 fi
 
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
+sake_check_help_and_exit
 
 ############################################ VALIDATE INPUT
 if [[ -z "$dumpFile" ]]; then

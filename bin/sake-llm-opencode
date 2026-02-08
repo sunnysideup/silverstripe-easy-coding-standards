@@ -70,13 +70,12 @@ while (($#)); do
         apiKeyEnvName="${1#*=}"
         shift
         ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1"
-        help='yes'
-        shift
-        ;;
     *)
-        shift
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
         ;;
     esac
 done
@@ -112,7 +111,7 @@ help_and_exit() {
     ECHOHEAD "Notes:"
     echonice "For any provider, you can run once: opencode auth login  (stores creds in ~/.local/share/opencode/auth.json)"
     echonice "If you set LLM_API_KEY, this script maps it to PROVIDER_API_KEY (or uses --api-env)."
-    
+
     ECHOHEAD "Example usage:"
     echonice "sake-llm-opencode . --files=./src/app/Tasks/*.php"
     echonice "sake-llm-opencode . --files=./src/**/*.php --dry-run"
@@ -122,9 +121,7 @@ help_and_exit() {
 }
 
 ############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
+sake_check_help_and_exit
 
 ############################################ FUNCTIONS
 

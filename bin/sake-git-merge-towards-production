@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/sake-self-methods"
@@ -21,10 +21,7 @@ toProd='no'     # shorthand: set --to production
 
 while (($#)); do
     case $1 in
-    -h | --help)
-        help='yes'
-        shift
-        ;;
+
     -m | --message)
         message=$2
         shift
@@ -53,11 +50,13 @@ while (($#)); do
         toProd='yes'
         shift
         ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1"
-        help_and_exit 1
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
         ;;
-    *) dir=$1 ;;
     esac
     shift
 done

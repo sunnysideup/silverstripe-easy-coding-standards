@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 # : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
 
 ############################################ DIR
@@ -23,15 +23,13 @@ while (($#)); do
         themeDir=$2
         shift
         ;;
-    -h | --help)
-        help='yes'
-        shift
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
         ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1"
-        help='yes'
-        ;;
-    *) dir=$1 ;;
     esac
     shift
 done
@@ -58,9 +56,7 @@ help_and_exit() {
 }
 
 ############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
+sake_check_help_and_exit
 
 ############################################ CODE
 

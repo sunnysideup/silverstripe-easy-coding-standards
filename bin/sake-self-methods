@@ -2,6 +2,39 @@
 
 envFileLocation="$HOME/.config/composer/.env"
 
+############################################ COMMON INITIALIZATION FUNCTIONS
+
+# Standard BASICS section - use at the start of each script:
+# SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+# WORKING_DIR="$(pwd)"
+# source "$SCRIPT_DIR/sake-self-methods"
+
+# Standard help flag handler for argument parsing
+# Returns 0 (success) if the flag was a help or unknown option flag
+# Usage: In your case statement, call: sake_handle_help_flag "$1" && shift && continue
+sake_handle_help_flag() {
+    case "$1" in
+    -h | --help)
+        help='yes'
+        return 0
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1" >&2
+        help='yes'
+        return 0
+        ;;
+    esac
+    return 1
+}
+
+# Check if help was requested and call help_and_exit function
+# Usage: sake_check_help_and_exit (replaces: if [[ "$help" == "yes" ]]; then help_and_exit; fi)
+sake_check_help_and_exit() {
+    if [[ "${help:-no}" == "yes" ]]; then
+        help_and_exit
+    fi
+}
+
 echoplain() {
     echo -e " $1" >&2
 }

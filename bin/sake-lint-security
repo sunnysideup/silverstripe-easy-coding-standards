@@ -10,6 +10,21 @@ WORKING_DIR="$(pwd)"
 [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/sake-self-methods" ]] && source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ HELP
+dir='./'
+help='no'
+while (($#)); do
+    case $1 in
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
 help_and_exit() {
     ECHOHEAD "Security Scan"
     ECHOHEAD "Current settings:"
