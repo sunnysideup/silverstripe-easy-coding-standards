@@ -34,28 +34,59 @@ sake_check_help_and_exit() {
         help_and_exit
     fi
 }
+############################################ COLOURS / LOGGING (stderr)
+# Notes:
+# - Uses printf (predictable) instead of echo -e (inconsistent).
+# - Accepts any number of args (so you can do: echonice "a" "b").
+# - Resets colour every time.
+# - Avoids unquoted variables and accidental option parsing.
+
+_ESC=$'\033'
+_COL_RESET="${_ESC}[0m"
+_COL_NICE="${_ESC}[0;33m"
+_COL_GOOD="${_ESC}[0;32m"
+_COL_HEAD="${_ESC}[95m"
+_COL_BAD_BG="${_ESC}[1;32;44m"
+
+_print_stderr() {
+    # join args with spaces, always end with newline
+    printf ' %s\n' "$*" >&2
+}
+
+_print_col_stderr() {
+    local colour="$1"
+    shift
+    printf ' %b%s%b\n' "$colour" "$*" "$_COL_RESET" >&2
+}
+
+_print_banner() {
+    local colour="$1"
+    local line='----------------------------------------'
+    printf '%b %s %b\n' "$colour" "$line" "$_COL_RESET" >&2
+}
 
 echoplain() {
-    echo -e " $1" >&2
+    _print_stderr "$@"
 }
 
 echonice() {
-    echo -e " \033[0;33m$1 \033[0m" >&2
+    _print_col_stderr "$_COL_NICE" "$@"
 }
 
 echogood() {
-    echo -e " \033[0;32m✅ $1 \033[0m" >&2
+    _print_col_stderr "$_COL_GOOD" "✅ $*"
 }
 
 echobad() {
-    echo -e "\033[1;32;44m ---------------------------------------- \033[0m" >&2
-    echo -e " \033[1;32;44m ❌: $1 \033[0m" >&2
-    echo -e "\033[1;32;44m ---------------------------------------- \033[0m" >&2
+    _print_banner "$_COL_BAD_BG"
+    printf '%b ❌: %s %b\n' "$_COL_BAD_BG" "$*" "$_COL_RESET" >&2
+    _print_banner "$_COL_BAD_BG"
 }
+
 echowarn() {
-    echo -e "\033[1;32;44m ---------------------------------------- \033[0m" >&2
-    echo -e " ⚠️ $1 " >&2
-    echo -e "\033[1;32;44m ---------------------------------------- \033[0m" >&2
+    _print_banner "$_COL_BAD_BG"
+    printf ' ⚠️ %s\n' "$*" >&2
+    _print_banner "$_COL_BAD_BG"
 }
 
 echoline() {
@@ -63,18 +94,20 @@ echoline() {
 }
 
 ECHOHEAD() {
-    string=$1
+    local string="${1-}"
 
-    if [[ $string != \#* ]]; then
+    if [[ -z "$string" ]]; then
+        string='#'
+    elif [[ "$string" != \#* ]]; then
         string="# $string"
     fi
-    echo "" >&2
-    echo "" >&2
-    echo "" >&2
+
+    printf '\n\n\n' >&2
     echoline
-    echo -e "\033[95m $string\033[0m" >&2
+    _print_col_stderr "$_COL_HEAD" "$string"
     echoline
 }
+
 
 echoend() {
     echo "" >&2
@@ -280,6 +313,25 @@ check_commit_message() {
     echonice "Allowed prefixes are: ${PREFIXES[*]}"
     # ONE DENOTES AN ERROR
     return 1
+}
+
+mask_api_key() {
+    local key="${1-}"
+    local keepStart=4
+    local keepEnd=4
+
+    if [[ -z "$key" ]]; then
+        printf '%s' '(not set)'
+        return 0
+    fi
+
+    local len=${#key}
+    if (( len <= keepStart + keepEnd )); then
+        printf '%s' '***'
+        return 0
+    fi
+
+    printf '%s***%s' "${key:0:keepStart}" "${key:len-keepEnd:keepEnd}"
 }
 
 # Check if .env file exists

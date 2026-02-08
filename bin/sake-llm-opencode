@@ -99,7 +99,7 @@ help_and_exit() {
 
     ECHOHEAD "Current settings:"
     echonice "working dir:                  $WORKING_DIR"
-    echonice "dir:                          $dir"
+    echonice "selected dir:                 $WORKING_DIR/$dir"
     echonice "files:                        ${filesPattern:-'(not set)'}"
     echonice "contains filter:              ${containsText:-'(not set)'}"
     echonice "prompt file:                  ${prompt:-"$promptDefault"}"
@@ -107,8 +107,8 @@ help_and_exit() {
     echonice "dry run:                      $dryRun"
     echonice "model (override/env/default): ${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
     echonice "api env override:             ${apiEnvOverride:-'(not set)'}"
-    echonice "$apiKeyEnvName:               ${apiKeyEnvValue:+(set)}${apiKeyEnvValue:-'(not set)'}"
     echonice "api key source env:           $apiKeyEnvName"
+    echonice "key value:                    $(mask_api_key "${apiKeyEnvValue-}")"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                    show help information"
@@ -284,34 +284,38 @@ promptText="$(cat "$prompt")"
 
 cmd=( env )
 if [[ -n "$apiKey" ]]; then
-    cmd+=( "$apiEnv=$apiKey" )
+    if [[ "$dryRun" == "yes" ]]; then
+        cmd+=( "$apiEnv=$(mask_api_key "$apiKey")" )
+    else
+        cmd+=( "$apiEnv=$apiKey" )
+    fi
 fi
 
 cmd+=( "$opencodeResolved" run -m "$model" )
+
+if [[ "$dryRun" == "yes" ]]; then
+
+
+    ECHOHEAD "Command:"
+    echonice "${cmd[@]}"
+
+    ECHOHEAD "Files included (${#selectedFiles[@]}):"
+    for f in "${selectedFiles[@]}"; do
+        echonice "$f"
+    done
+
+    ECHOHEAD "Prompt content:"
+    echonice "$promptText"
+
+    echoend
+    exit 0
+fi
+
+
 for f in "${selectedFiles[@]}"; do
     cmd+=( -f "$f" )
 done
 cmd+=( -- "$promptText" )
-
-if [[ "$dryRun" == "yes" ]]; then
-    echonice "Files included (${#selectedFiles[@]}):"
-    for f in "${selectedFiles[@]}"; do
-        printf '%s\n' "$f"
-    done
-
-    redactedCmd=( "${cmd[@]}" )
-    for i in "${!redactedCmd[@]}"; do
-        if [[ "${redactedCmd[$i]}" == *_API_KEY=* ]]; then
-            redactedCmd[$i]="${redactedCmd[$i]%%=*}=***REDACTED***"
-        fi
-    done
-
-    echonice "Command:"
-    printf '%q ' "${redactedCmd[@]}"
-    printf '\n'
-    echoend
-    exit 0
-fi
 
 "${cmd[@]}"
 echoend
