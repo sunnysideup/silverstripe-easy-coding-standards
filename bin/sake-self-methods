@@ -137,14 +137,19 @@ check_gh_auth() {
 }
 
 check_for_env_var() {
-    envVarName=$1
-    envVarValue="${!envVarName}"
+    local envVarName="${1:-}"
+    if [[ -z "$envVarName" ]]; then
+        echobad "check_for_env_var: missing env var name"
+        return 1
+    fi
 
-    if [ -z "$envVarValue" ]; then
-        echobad "Error: Environment variable $envVarName not set in $envFileLocation file."
-        exit 1
+    local value="${!envVarName-}"   # <-- prevents 'unbound variable' with set -u
+    if [[ -z "$value" ]]; then
+        echobad "Missing required env var: $envVarName"
+        return 1
     fi
 }
+
 
 # USE LIKE THIS: matchingDirs=$(get_my_repos "$WORKING_DIR")
 
