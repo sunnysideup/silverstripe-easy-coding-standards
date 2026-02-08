@@ -2,20 +2,21 @@
 set -euo pipefail
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
-WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/sake-self-methods"
 
-############################################ DIR
-if [ "$1" != "" ]; then
-    dir=$1
-else
-    dir='app/client/src'
+############################################ DIR (first arg, only if not an option)
+dir='app/client/src'
+if [[ $# -gt 0 && "${1:-}" != "" && "${1:0:1}" != "-" ]]; then
+    dir="$1"
+    shift
 fi
 
 ############################################ DEFAULTS
 DEFAULT_MODEL='openai/gpt-5.1-codex'
-OPEN_CODE_INSTALL_CMD='curl -fsSL https://install.opencode.sh | sh'
+OPEN_CODE_INSTALL_CMD='curl -fsSL https://opencode.ai/install | bash'
 
 ############################################ SETTINGS
 help='no'
@@ -24,6 +25,12 @@ prompt="$promptDefault"
 opencodePath='opencode'
 dryRun='no'
 filesPattern=''   # e.g. --files=./src/app/Tasks/*.php
+apiKeyEnvName='LLM_API_KEY' # --api-key-env=NAME (source env var to read key from)
+
+# optional overrides
+modelOverride=''  # --model=provider/model-id
+apiEnvOverride='' # --api-env=OPENAI_API_KEY
+apiKeyOverride='' # --api-key=... (avoid; prefer env)
 
 while (($#)); do
     case $1 in
@@ -45,6 +52,22 @@ while (($#)); do
         ;;
     --files=*)
         filesPattern="${1#*=}"
+        shift
+        ;;
+    --model=*)
+        modelOverride="${1#*=}"
+        shift
+        ;;
+    --api-env=*)
+        apiEnvOverride="${1#*=}"
+        shift
+        ;;
+    --api-key=*)
+        apiKeyOverride="${1#*=}"
+        shift
+        ;;
+    --api-key-env=*)
+        apiKeyEnvName="${1#*=}"
         shift
         ;;
     -*)
@@ -71,19 +94,29 @@ help_and_exit() {
     echonice "prompt file:                 ${prompt:-"$promptDefault"}"
     echonice "opencode path:               $opencodePath"
     echonice "dry run:                     $dryRun"
+    echonice "model (override/env/default): ${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
+    echonice "api env override:            ${apiEnvOverride:-'(not set)'}"
+    echonice "$apiKeyEnvName:              ${LLM_API_KEY:+(set)}${LLM_API_KEY:-'(not set)'}"
+    echonice "api key source env:          $apiKeyEnvName"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                   show help information"
     echonice "--files=GLOB                 files to include (required)"
     echonice "--prompt=FILE                prompt file path (default: $promptDefault)"
     echonice "--opencode-path=PATH         opencode binary/path (default: opencode)"
+    echonice "--model=PROVIDER/MODEL       model to use (default: $DEFAULT_MODEL)"
+    echonice "--api-env=ENVVAR             force which env var to pass the key into"
+    echonice "--api-key-env=ENVVAR         which env var to read the key from (default: LLM_API_KEY)"
     echonice "--dry-run                    print final command, do not run"
 
+    ECHOHEAD "Notes:"
+    echonice "For any provider, you can run once: opencode auth login  (stores creds in ~/.local/share/opencode/auth.json)"
+    echonice "If you set LLM_API_KEY, this script maps it to PROVIDER_API_KEY (or uses --api-env)."
+    
     ECHOHEAD "Example usage:"
     echonice "sake-llm-opencode . --files=./src/app/Tasks/*.php"
     echonice "sake-llm-opencode . --files=./src/**/*.php --dry-run"
     echonice "sake-llm-opencode . --files=./client/src/js/**/*.js --dry-run"
-
     echofunctions
     exit
 }
@@ -93,36 +126,24 @@ if [[ "$help" == "yes" ]]; then
     help_and_exit
 fi
 
-############################################ CODE
-
-if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
-else
-    echobad "Could not change directory to $WORKING_DIR"
-    help_and_exit
-fi
-
-############################################ ENV VARS
-check_for_env_var "LLM_PROVIDER"
-llmProvider="$LLM_PROVIDER"
-
-check_for_env_var "API_KEY"
-apiKey="$API_KEY"
-
-check_for_env_var "MODEL"
-model="$MODEL"
-
 ############################################ FUNCTIONS
 
-add_to_git_ignore(){
-    # ensure .gitignore exists
+add_to_git_ignore() {
+    set +e
+
+    local ignoreLine='.agents/'
+
     touch .gitignore
+    grep -Fqx "$ignoreLine" .gitignore || printf '%s\n' "$ignoreLine" >> .gitignore
 
-    # add the ignore line only if it does not already exist (exact match)
-    grep -Fqx '.agents/' .gitignore || printf '%s\n' '.agents/' >> .gitignore
+    git rm -r --cached "${ignoreLine%/}/" >/dev/null 2>&1 || true
+    git add .gitignore >/dev/null 2>&1 || true
 
-    git add .gitignore
-    git commit -m 'Ignore local agent prompts'
+    if ! git diff --cached --quiet >/dev/null 2>&1; then
+        git commit -m 'FIX: Ignore local agent prompts' >/dev/null 2>&1 || true
+    fi
+
+    return 0
 }
 
 resolve_opencode_path() {
@@ -143,10 +164,26 @@ resolve_opencode_path() {
 }
 
 install_opencode() {
-    sh -c "$OPEN_CODE_INSTALL_CMD"
+    bash -c "$OPEN_CODE_INSTALL_CMD"
+}
+
+provider_to_api_env() {
+    local provider="$1"
+
+    # common/known exceptions
+    case "$provider" in
+        google|gemini) printf '%s' 'GEMINI_API_KEY'; return 0 ;;
+    esac
+
+    # generic convention: PROVIDER_API_KEY
+    local upper
+    upper="$(printf '%s' "$provider" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g')"
+    printf '%s_API_KEY' "$upper"
 }
 
 ############################################ INPUT RESOLUTION
+
+cd "$WORKING_DIR"
 
 prompt="${prompt:-"$SCRIPT_DIR/prompt.txt"}"
 
@@ -160,6 +197,7 @@ if [[ ! -r "$prompt" ]]; then
     exit 1
 fi
 
+echonice "Using prompt file: $prompt"
 add_to_git_ignore
 
 # Expand the glob safely
@@ -172,15 +210,12 @@ if (( ${#matches[@]} == 0 )); then
     exit 1
 fi
 
+############################################ OPENCODE RESOLUTION
 
 opencodeResolved="$(resolve_opencode_path "$opencodePath" 2>/dev/null || true)"
-
 if [[ -z "$opencodeResolved" ]]; then
     echonice "opencode not found; installing..."
-    if ! install_opencode; then
-        echobad "Error: failed to install opencode via installer script."
-        exit 1
-    fi
+    install_opencode || { echobad "Error: failed to install opencode."; exit 1; }
     opencodeResolved="$(resolve_opencode_path "$opencodePath" 2>/dev/null || true)"
 fi
 
@@ -189,21 +224,60 @@ if [[ -z "$opencodeResolved" ]]; then
     exit 1
 fi
 
+############################################ MODEL / PROVIDER / AUTH
+
+model="${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
+
+# Ensure provider/model format (OpenCode expects this format)
+if [[ "$model" != */* ]]; then
+    model="openai/$model"
+fi
+provider="${model%%/*}"
+
+# Determine which env var to populate (optional)
+apiEnv="${apiEnvOverride:-$(provider_to_api_env "$provider")}"
+
+# Pick an API key, if available (optional)
+apiKey=''
+
+# value from chosen source env var (default LLM_API_KEY)
+sourceApiKey="${!apiKeyEnvName:-}"
+
+if [[ -n "${apiKeyOverride:-}" ]]; then
+    apiKey="$apiKeyOverride"
+elif [[ -n "${apiEnvOverride:-}" && -n "${!apiEnvOverride:-}" ]]; then
+    apiKey="${!apiEnvOverride}"
+elif [[ -n "${!apiEnv:-}" ]]; then
+    apiKey="${!apiEnv}"
+elif [[ -n "$sourceApiKey" ]]; then
+    apiKey="$sourceApiKey"
+fi
+
 promptText="$(cat "$prompt")"
 
-cmd=( "$opencodeResolved" run -m "$model" )
+cmd=( env )
+if [[ -n "$apiKey" ]]; then
+    cmd+=( "$apiEnv=$apiKey" )
+fi
+
+cmd+=( "$opencodeResolved" run -m "$model" )
 for f in "${matches[@]}"; do
     cmd+=( -f "$f" )
 done
 cmd+=( -- "$promptText" )
 
 if [[ "$dryRun" == "yes" ]]; then
-    printf '%q ' "${cmd[@]}"
+    redactedCmd=( "${cmd[@]}" )
+    for i in "${!redactedCmd[@]}"; do
+        if [[ "${redactedCmd[$i]}" == *_API_KEY=* ]]; then
+            redactedCmd[$i]="${redactedCmd[$i]%%=*}=***REDACTED***"
+        fi
+    done
+    printf '%q ' "${redactedCmd[@]}"
     printf '\n'
     echoend
     exit 0
 fi
 
 "${cmd[@]}"
-
 echoend
