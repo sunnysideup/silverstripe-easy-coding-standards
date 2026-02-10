@@ -10,7 +10,10 @@ server=''
 toServer=''
 help='no'
 reverse='no'
+envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
 
+
+############################################ ARGUMENTS
 while (($#)); do
     case $1 in
     -h | --help)
@@ -36,17 +39,16 @@ while (($#)); do
     shift
 done
 
-if [[ "$server" != *":/"* ]]; then
-    server="$server:/container/application"
-fi
+############################################ HELPERS
 
 help_and_exit() {
     ECHOHEAD "Sync Database and Assets"
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Working Directory:             $WORKING_DIR"
-    echonice "Server to sync with:           $server"
+    echonice "Server to sync with:           ${server:-"(not set)"}"
     echonice "Do reverse sync:               $reverse"
     echonice "To server (if any):            $toServer"
+    echonice "Fallback from .env key:        $envServerKey"
 
     ECHOHEAD "Available settings:"
     echonice "-r, --reverse                  sync FROM local TO server"
@@ -61,17 +63,24 @@ help_and_exit() {
 
     exit
 }
-
-if [[ "$help" == "yes" || -z "$server" ]]; then
-    help_and_exit
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
 fi
 
-############################################ RUN COMMANDS
 
+if [[ "$server" != *":/"* ]]; then
+    server="$server:/container/application"
+fi
+
+############################################ HELP ONLY
+sake_check_help_and_exit
+
+############################################ RUN COMMANDS
 ECHOHEAD "Starting full sync with server: $server"
 [[ -n "$toServer" ]] && echonice "To server: $toServer"
 
-# Build argument lists dynamically
 dbArgs=("$server")
 assetArgs=("$server")
 

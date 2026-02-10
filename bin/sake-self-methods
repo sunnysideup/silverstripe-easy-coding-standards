@@ -179,6 +179,33 @@ addtoscrutinizer() {
     fi
 }
 
+read_local_dotenv_value() {
+    local key="$1"
+    local envFile="$WORKING_DIR/.env"
+
+
+    [[ -f "$envFile" ]] || return 1
+
+    local value=''
+    value="$(
+        grep -E "^[[:space:]]*(export[[:space:]]+)?${key}=" "$envFile" \
+            | tail -n 1 \
+            | sed -E "s/^[[:space:]]*(export[[:space:]]+)?${key}=//"
+    )"
+
+    # trim whitespace
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+
+    # strip surrounding quotes
+    value="${value%\"}"; value="${value#\"}"
+    value="${value%\'}"; value="${value#\'}"
+
+    [[ -n "$value" ]] || return 1
+    printf '%s' "$value"
+}
+
+
 # Function to check if $package is installed
 installpackage() {
     package=$1
