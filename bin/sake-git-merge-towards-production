@@ -94,9 +94,7 @@ help_and_exit() {
     exit
 }
 
-if [[ "$help" == 'yes' ]]; then
-    help_and_exit
-fi
+sake_check_help_and_exit
 
 ############################################ CODE
 if [ -d "$WORKING_DIR/$dir" ]; then

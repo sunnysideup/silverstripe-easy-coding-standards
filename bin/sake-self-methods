@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 envFileLocation="$HOME/.config/composer/.env"
-DEFAULT_SERVER_APP='/container/application'
+DEFAULT_SERVER_DIR='/container/application'
 
 ############################################ COMMON INITIALIZATION FUNCTIONS
 
@@ -120,11 +120,9 @@ echoend() {
 }
 
 echofunctions() {
-    if ((RANDOM % 3 == 0)); then
-        ECHOHEAD 'Available Functions? Run ...'
-        echogood "sake-help"
-        echoline
-    fi
+    ECHOHEAD 'Available Functions? Run ...'
+    echogood "sake-help"
+    echoline
 }
 
 echolistoffunctions() {
@@ -180,6 +178,25 @@ addtoscrutinizer() {
     fi
 }
 
+cd_or_fail() {
+    local workingDir="$1"
+    local onFailFn="${2:-}"
+
+    if [[ -d "$workingDir" ]]; then
+        cd "$workingDir" || return 1
+        return 0
+    fi
+
+    echobad "Could not change directory to $workingDir"
+
+    if [[ -n "$onFailFn" ]] && declare -F "$onFailFn" >/dev/null 2>&1; then
+        "$onFailFn"
+        return 1
+    fi
+
+    return 1
+}
+
 read_local_dotenv_value() {
     local key="$1"
     local envFile="$WORKING_DIR/.env"
@@ -211,7 +228,7 @@ normalize_server() {
     # in: $1 like "user@host" or "user@host:/path"
     # out: echo "user@host:/path" (ensures a path)
     local raw="$1"
-    [[ "$raw" != *":/"* ]] && raw="$raw:$DEFAULT_APP_PATH"
+    [[ "$raw" != *":/"* ]] && raw="$raw:$DEFAULT_SERVER_DIR"
     echo "$raw"
 }
 

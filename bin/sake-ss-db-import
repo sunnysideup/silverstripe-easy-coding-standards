@@ -43,7 +43,7 @@ help_and_exit() {
     exit
 }
 
-############################################ HELP ONLY
+
 if [[ "$dumpFile" == "-h" || "$dumpFile" == "--help" ]]; then
     help='yes'
 fi

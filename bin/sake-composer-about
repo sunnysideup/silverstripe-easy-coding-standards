@@ -24,6 +24,7 @@ while (($#)); do
     shift
 done
 
+############################################ HELP
 help_and_exit() {
     ECHOHEAD "Composer About a Package"
     echonice "Directory of script:           $SCRIPT_DIR"
@@ -41,9 +42,8 @@ help_and_exit() {
     echofunctions
     exit
 }
-
-############################################ HELP ONLY
 sake_check_help_and_exit
+
 
 ############################################ CODE
 if [[ "$package" == "" ]]; then
@@ -51,12 +51,7 @@ if [[ "$package" == "" ]]; then
     help_and_exit
 fi
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd "$WORKING_DIR/$dir"
-else
-    echonice "Could not change directory to $WORKING_DIR/$dir"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 composer depends $package
 

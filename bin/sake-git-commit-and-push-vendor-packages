@@ -97,8 +97,7 @@ help_and_exit() {
     exit
 }
 
-############################################ HELP ONLY
-[[ "$help" == "yes" ]] && help_and_exit
+sake_check_help_and_exit
 
 if [[ "$statusOnly" != "yes" ]]; then
     # prompt user for message

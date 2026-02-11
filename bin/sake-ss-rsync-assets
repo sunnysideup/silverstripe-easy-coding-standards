@@ -55,15 +55,13 @@ help_and_exit() {
     # Show resolved targets (lazy-resolve so help is informative without side-effects)
     _server_display="${server:-<none>}"
     _to_display="${toServer:-<none>}"
-    [[ -n "$server" && "$server" != *":/"* ]] && _server_display="$server:$DEFAULT_APP_PATH"
-    [[ -n "$toServer" && "$toServer" != *":/"* ]] && _to_display="$toServer:$DEFAULT_APP_PATH"
+
 
     ECHOHEAD 'Rsync SilverStripe assets'
     echonice "Script dir:                    $SCRIPT_DIR"
     echonice "Working dir:                   $WORKING_DIR"
     echonice "Local assets dir:              $LOCAL_ASSETS_DIR"
     echonice "Remote assets subpath:         $REMOTE_ASSETS_SUBPATH"
-    echonice "Default remote app path:       $DEFAULT_APP_PATH"
     echonice "Server (- none if blank):      $_server_display"
     echonice "To server (post-pull push):    $_to_display"
     echonice "Reverse push (-r):             $reverse"
@@ -80,7 +78,9 @@ help_and_exit() {
     echonice "Pull+Push:  sake-ss-rsync-assets user@hostA:/var/www/site --to user@hostB:/var/www/site"
     echonice "Push:       sake-ss-rsync-assets -r user@host:/var/www/site"
     echonice "Note: Use trailing slashes correctly in rsync semantics (src/ vs src)."
-
+    ECHOHEAD "Setting defaults:"
+    echonice "Set default server in .env with key $envServerKey,"
+    echonice " e.g. $envServerKey=my-server:/var/www/website-root"
     echofunctions
     exit 0
 }

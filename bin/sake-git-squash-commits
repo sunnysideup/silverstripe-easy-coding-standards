@@ -56,6 +56,9 @@ while (($#)); do
     shift
 done
 
+
+############################################ HELP
+
 help_and_exit() {
     ECHOHEAD "Merge previous commits"
     echonice "Directory of script:                 $SCRIPT_DIR"
@@ -87,7 +90,7 @@ help_and_exit() {
     exit
 }
 
-############################################ HELP ONLY
+
 sake_check_help_and_exit
 
 ############################################ COMMIT MESSAGE
@@ -219,12 +222,7 @@ fi
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd "$WORKING_DIR/$dir"
-else
-    echonice "Could not change directory to $WORKING_DIR/$dir"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 todaysCount=$(git log --since="4am" --oneline | wc -l)
 

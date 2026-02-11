@@ -30,6 +30,7 @@ while (($#)); do
     shift
 done
 
+############################################ HELP
 help_and_exit() {
 
     ECHOHEAD "Composer Require"
@@ -51,7 +52,7 @@ help_and_exit() {
     exit
 }
 
-############################################ HELP ONLY
+
 sake_check_help_and_exit
 
 ############################################ CODE
@@ -60,12 +61,7 @@ if [[ "$package" == "" ]]; then
     help_and_exit
 fi
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd "$WORKING_DIR/$dir"
-else
-    echonice "Could not change directory to $WORKING_DIR/$dir"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 ECHOHEAD "Consider using:"
 echonice "composer config --global  \"preferred-install.myvendorname/*\" source"

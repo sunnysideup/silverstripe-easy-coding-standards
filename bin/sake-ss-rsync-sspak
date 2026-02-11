@@ -55,11 +55,11 @@ help_and_exit() {
 
     ECHOHEAD "Example usage:"
     echonice "sake-ss-sync-sspak my-server:/var/www/website-root"
-
+    echofunctions
     exit
 }
 
-############################################ HELP ONLY
+
 sake_check_help_and_exit
 
 # Parse the server and optional remote directory

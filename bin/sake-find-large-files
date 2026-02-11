@@ -35,6 +35,9 @@ while (($#)); do
     shift
 done
 
+
+############################################ HELP
+
 help_and_exit() {
 
     ECHOHEAD 'Find Large Files'
@@ -54,7 +57,6 @@ help_and_exit() {
     exit
 }
 
-# Check if help is requested
 sake_check_help_and_exit
 
 # Function to convert human-readable sizes to bytes for comparison

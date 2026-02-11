@@ -89,6 +89,9 @@ while (($#)); do
     esac
 done
 
+
+############################################ HELP
+
 help_and_exit() {
 
     local apiKeyEnvValue="${!apiKeyEnvName-}"
@@ -133,7 +136,7 @@ help_and_exit() {
     exit
 }
 
-############################################ HELP ONLY
+
 sake_check_help_and_exit
 
 ############################################ FUNCTIONS

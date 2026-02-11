@@ -51,17 +51,12 @@ help_and_exit() {
     exit
 }
 
-############################################ HELP ONLY
+
 sake_check_help_and_exit
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
-else
-    echobad "Could not change directory to $WORKING_DIR"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR" help_and_exit
 
 $SCRIPT_DIR/ecs check $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig
 # $SCRIPT_DIR/ecs check-markdown $WORKING_DIR/$dir --fix --clear-cache --config $ecsConfig

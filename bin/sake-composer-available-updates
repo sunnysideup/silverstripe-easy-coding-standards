@@ -24,6 +24,7 @@ while (($#)); do
     shift
 done
 
+############################################ HELP
 help_and_exit() {
 
     ECHOHEAD "Composer Updates Available"
@@ -39,21 +40,12 @@ help_and_exit() {
     echofunctions
     exit
 }
-
-############################################ HELP ONLY
 sake_check_help_and_exit
 
-############################################ HELP ONLY
-sake_check_help_and_exit
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd "$WORKING_DIR/$dir"
-else
-    echonice "Could not change directory to $WORKING_DIR/$dir"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 ECHOHEAD "Easy to update"
 composer show -oD

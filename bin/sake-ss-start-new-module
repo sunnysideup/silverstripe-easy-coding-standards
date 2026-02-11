@@ -100,20 +100,15 @@ show_vars() {
 
     ECHOHEAD "Example usage:"
     echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module' -k 'foo, bar'"
-
+    echofunctions
 }
 
-############################################ HELP ONLY
+
 sake_check_help_and_exit
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
-else
-    echobad "Could not change directory to $WORKING_DIR"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR" help_and_exit
 
 show_vars
 # Create a new repository on GitHub

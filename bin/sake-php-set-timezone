@@ -48,16 +48,11 @@ help_and_exit() {
     exit
 }
 
-############################################ HELP ONLY
+
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd "$WORKING_DIR/$dir"
-else
-    echonice "Could not change directory to $WORKING_DIR/$dir"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 # dev-build
 sudo find /etc/php/ -name php.ini -exec sh -c 'grep -q "date.timezone = '\"'$timeZone'\"'" "$1" || echo "date.timezone = '\''$timeZone'\''" >> "$1"' sh {} \;

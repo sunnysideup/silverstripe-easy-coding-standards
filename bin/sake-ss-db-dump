@@ -46,7 +46,7 @@ help_and_exit() {
     exit
 }
 
-############################################ HELP ONLY
+
 sake_check_help_and_exit
 
 sspak save . "$name.sspak" --db

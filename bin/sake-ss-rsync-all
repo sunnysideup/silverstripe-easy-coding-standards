@@ -62,7 +62,6 @@ help_and_exit() {
     echonice "Server to sync with:           ${server:-"(not set)"}"
     echonice "Do reverse sync:               $reverse"
     echonice "To server (if any):            ${TO_NORMALIZED:-"(not set)"}"
-    echonice "Fallback from .env key:        $envServerKey"
 
     ECHOHEAD "Available settings:"
     echonice "-r, --reverse                  sync FROM local TO server"
@@ -75,13 +74,17 @@ help_and_exit() {
     echonice "sake-ss-sync-all my-server --reverse # sync from local to server - put reverse last"
     echonice "sake-ss-sync-all my-server --to other-server:/var/www/website-root"
 
+    ECHOHEAD "Setting defaults:"
+    echonice "Set default server in .env with key $envServerKey,"
+    echonice " e.g. $envServerKey=my-server:/var/www/website-root"
+    echofunctions
     exit
 }
 sake_check_help_and_exit
 
 
 
-############################################ HELP ONLY
+
 
 ############################################ RUN COMMANDS
 ECHOHEAD "Starting full sync from server: $server"

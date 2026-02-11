@@ -45,12 +45,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 ############################################ ENTER PROJECT ROOT
-if [[ -d "$WORKING_DIR" ]]; then
-    cd "$WORKING_DIR"
-else
-    echobad "Could not change directory to $WORKING_DIR"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR" help_and_exit
 
 status=0
 run() {

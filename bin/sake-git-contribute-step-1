@@ -27,6 +27,9 @@ while (($#)); do
     shift
 done
 
+
+############################################ HELP
+
 help_and_exit() {
 
     ECHOHEAD "Checking Vendor Packages for Changes"
@@ -47,17 +50,12 @@ help_and_exit() {
 
 check_for_env_var "GITHUB_USER_NAME"
 
-############################################ HELP ONLY
+
 sake_check_help_and_exit
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
-else
-    echobad "Could not change directory to $WORKING_DIR"
-    help_and_exit
-fi
+cd_or_fail "$WORKING_DIR" help_and_exit
 
 # Get necessary information from the user
 read -p "Enter the full Git repository URL (e.g., https://github.com/silverstripe/silverstripe-framework.git): " repoUrl

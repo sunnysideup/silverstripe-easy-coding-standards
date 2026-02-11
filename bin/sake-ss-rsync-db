@@ -75,6 +75,11 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     echonice "sake-ss-sync-db my-server            # default path is /container/application"
     echonice "sake-ss-sync-db --reverse my-server"
     echonice "sake-ss-sync-db my-server --to other-server:/var/www/site"
+
+    ECHOHEAD "Setting defaults:"
+    echonice "Set default server in .env with key $envServerKey,"
+    echonice " e.g. $envServerKey=my-server:/var/www/website-root"
+    echofunctions
     exit
 fi
 
