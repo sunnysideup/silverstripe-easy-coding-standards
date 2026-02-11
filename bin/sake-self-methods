@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 envFileLocation="$HOME/.config/composer/.env"
+DEFAULT_SERVER_APP='/container/application'
 
 ############################################ COMMON INITIALIZATION FUNCTIONS
 
@@ -205,6 +206,14 @@ read_local_dotenv_value() {
     printf '%s' "$value"
 }
 
+
+normalize_server() {
+    # in: $1 like "user@host" or "user@host:/path"
+    # out: echo "user@host:/path" (ensures a path)
+    local raw="$1"
+    [[ "$raw" != *":/"* ]] && raw="$raw:$DEFAULT_APP_PATH"
+    echo "$raw"
+}
 
 # Function to check if $package is installed
 installpackage() {

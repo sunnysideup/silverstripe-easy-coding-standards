@@ -10,6 +10,7 @@ localEnvFile="$WORKING_DIR/.env"
 remoteDumpFile="/tmp/db_dump.sql"
 localDumpFile="/tmp/db_dump.sql"
 toRemoteDumpFile="/tmp/db_dump_from_local.sql"
+envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
 
 ############################################ SETTINGS
 server=''
@@ -39,6 +40,17 @@ while (($#)); do
     shift
 done
 
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
+    help_and_exit
+fi
+server="$(normalize_server "$server")"
+
 if [[ -z "$server" || "$help" == "yes" ]]; then
     ECHOHEAD "Sync Database"
     echonice "Directory of script:           $SCRIPT_DIR"
@@ -66,7 +78,8 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     exit
 fi
 
-[[ "$server" != *":/"* ]] && server="$server:/container/application"
+sake_check_help_and_exit
+
 serverClean=$(echo "$server" | cut -d':' -f1)
 REMOTE_DIR=$(echo "$server" | cut -s -d':' -f2)
 REMOTE_DIR=${REMOTE_DIR:-/container/application}

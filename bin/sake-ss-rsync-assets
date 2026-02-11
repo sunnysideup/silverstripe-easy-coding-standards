@@ -8,11 +8,11 @@ WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ CONSTANTS / DEFAULTS
-DEFAULT_APP_PATH='/container/application'
 LOCAL_ASSETS_DIR="$WORKING_DIR/public/assets"
 REMOTE_ASSETS_SUBPATH='public/assets'
 RSYNC_OPTS=(--stats -chavzPr)
 WWW_DATA_DEFAULT='www-data'
+envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
 
 ############################################ SETTINGS (args)
 server=''
@@ -37,6 +37,18 @@ while (($#)); do
     esac
     shift
 done
+
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
+
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
+    help_and_exit
+fi
+server="$(normalize_server "$server")"
 
 ############################################ HELP
 help_and_exit() {
@@ -72,18 +84,12 @@ help_and_exit() {
     echofunctions
     exit 0
 }
-[[ "$help" == 'yes' ]] && help_and_exit
+sake_check_help_and_exit
 
 [[ "$reverse" == 'yes' ]] && echobad 'CAREFUL: you are pushing to the server.'
 
 ############################################ HELPERS
-normalize_server() {
-    # in: $1 like "user@host" or "user@host:/path"
-    # out: echo "user@host:/path" (ensures a path)
-    local raw="$1"
-    [[ "$raw" != *":/"* ]] && raw="$raw:$DEFAULT_APP_PATH"
-    echo "$raw"
-}
+
 server_host() { echo "${1%%:*}"; }
 server_path() { echo "${1#*:}"; }
 
@@ -92,12 +98,7 @@ server_path() { echo "${1#*:}"; }
 sudo mkdir -p "$LOCAL_ASSETS_DIR"
 sudo chown "$USER" "$LOCAL_ASSETS_DIR" -R
 
-# Normalize main server (required)
-if [[ -z "${server:-}" ]]; then
-    echobad 'No server specified.'
-    help_and_exit
-fi
-server="$(normalize_server "$server")"
+
 SERVER_HOST="$(server_host "$server")"
 SERVER_PATH="$(server_path "$server")"
 REMOTE_ASSETS_DIR="$SERVER_PATH/$REMOTE_ASSETS_SUBPATH"

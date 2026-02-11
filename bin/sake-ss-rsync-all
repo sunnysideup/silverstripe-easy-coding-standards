@@ -12,7 +12,6 @@ help='no'
 reverse='no'
 envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
 
-
 ############################################ ARGUMENTS
 while (($#)); do
     case $1 in
@@ -39,6 +38,21 @@ while (($#)); do
     shift
 done
 
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
+
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
+    help_and_exit
+fi
+server="$(normalize_server "$server")"
+TO_NORMALIZED=''
+if [[ -n "${toServer:-}" ]]; then
+    TO_NORMALIZED="$(normalize_server "$toServer")"
+fi
 ############################################ HELPERS
 
 help_and_exit() {
@@ -47,7 +61,7 @@ help_and_exit() {
     echonice "Working Directory:             $WORKING_DIR"
     echonice "Server to sync with:           ${server:-"(not set)"}"
     echonice "Do reverse sync:               $reverse"
-    echonice "To server (if any):            $toServer"
+    echonice "To server (if any):            ${TO_NORMALIZED:-"(not set)"}"
     echonice "Fallback from .env key:        $envServerKey"
 
     ECHOHEAD "Available settings:"
@@ -63,29 +77,21 @@ help_and_exit() {
 
     exit
 }
-############################################ DEFAULT SERVER FROM .env
-if [[ -z "$server" ]]; then
-    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
-fi
-
-
-if [[ "$server" != *":/"* ]]; then
-    server="$server:/container/application"
-fi
-
-############################################ HELP ONLY
 sake_check_help_and_exit
 
+
+
+############################################ HELP ONLY
+
 ############################################ RUN COMMANDS
-ECHOHEAD "Starting full sync with server: $server"
-[[ -n "$toServer" ]] && echonice "To server: $toServer"
+ECHOHEAD "Starting full sync from server: $server"
+[[ -n "$TO_NORMALIZED" ]] && echonice "To server: $TO_NORMALIZED"
 
 dbArgs=("$server")
 assetArgs=("$server")
 
 [[ "$reverse" == "yes" ]] && dbArgs+=("--reverse") && assetArgs+=("--reverse")
-[[ -n "$toServer" && "$reverse" != "yes" ]] && dbArgs+=("--to" "$toServer") && assetArgs+=("--to" "$toServer")
+[[ -n "$TO_NORMALIZED" && "$reverse" != "yes" ]] && dbArgs+=("--to" "$TO_NORMALIZED") && assetArgs+=("--to" "$TO_NORMALIZED")
 
 sake-ss-rsync-db "${dbArgs[@]}"
 sake-ss-rsync-assets "${assetArgs[@]}"

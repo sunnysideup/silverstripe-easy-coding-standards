@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
 
 ############################################ DIR
 
@@ -26,6 +27,23 @@ while (($#)); do
 
     shift
 done
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
+
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
+    help_and_exit
+fi
+server="$(normalize_server "$server")"
+
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
 
 help_and_exit() {
     ECHOHEAD "Sync Database from Server"
@@ -43,11 +61,6 @@ help_and_exit() {
 
 ############################################ HELP ONLY
 sake_check_help_and_exit
-
-if [[ -z "$server" ]]; then
-    echobad "No server specified."
-    help_and_exit
-fi
 
 # Parse the server and optional remote directory
 SERVER_CLEAN=$(echo "$server" | cut -d':' -f1)
