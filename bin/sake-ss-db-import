@@ -62,16 +62,11 @@ if [[ ! -f "$dumpFile" ]]; then
 fi
 
 ############################################ EXTRACT .env VARIABLES
-extract_env_var() {
-    local file=$1
-    local varName=$2
-    grep "^$varName=" "$file" | cut -d '=' -f 2- | tr -d '"'
-}
 
-localDbUser=$(extract_env_var "$localEnvFile" "SS_DATABASE_USERNAME")
-localDbPass=$(extract_env_var "$localEnvFile" "SS_DATABASE_PASSWORD")
-localDbName=$(extract_env_var "$localEnvFile" "SS_DATABASE_NAME")
-localDbHost=$(extract_env_var "$localEnvFile" "SS_DATABASE_SERVER")
+localDbUser=$(read_local_dotenv_value "SS_DATABASE_USERNAME")
+localDbPass=$(read_local_dotenv_value "SS_DATABASE_PASSWORD")
+localDbName=$(read_local_dotenv_value "SS_DATABASE_NAME")
+localDbHost=$(read_local_dotenv_value "SS_DATABASE_SERVER")
 
 if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localDbHost" ]]; then
     echobad "Could not retrieve database credentials from the local .env file."

@@ -95,17 +95,12 @@ if [[ -n "$toServer" ]]; then
 fi
 
 ############################################ EXTRACT .env VARIABLES
-extract_env_var() {
-    local file=$1
-    local varName=$2
-    grep "^$varName=" "$file" | cut -d '=' -f 2- | tr -d '"' | xargs
-}
 
 
-localDbUser=$(extract_env_var "$localEnvFile" "SS_DATABASE_USERNAME")
-localDbPass=$(extract_env_var "$localEnvFile" "SS_DATABASE_PASSWORD")
-localDbName=$(extract_env_var "$localEnvFile" "SS_DATABASE_NAME")
-localDbHost=$(extract_env_var "$localEnvFile" "SS_DATABASE_SERVER")
+localDbUser=$(read_local_dotenv_value "SS_DATABASE_USERNAME")
+localDbPass=$(read_local_dotenv_value "SS_DATABASE_PASSWORD")
+localDbName=$(read_local_dotenv_value "SS_DATABASE_NAME")
+localDbHost=$(read_local_dotenv_value "SS_DATABASE_SERVER")
 
 remoteDbUser=$(ssh "$serverClean" "grep '^SS_DATABASE_USERNAME=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
 remoteDbPass=$(ssh "$serverClean" "grep '^SS_DATABASE_PASSWORD=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
