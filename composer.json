@@ -115,5 +115,11 @@
     "psr-4": {
       "Sunnysideup\\EasyCodingStandards\\": "src/"
     }
-  }
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "git@github.com:sunnysideup/silverstripe-rector.git"
+    }
+  ]
 }
