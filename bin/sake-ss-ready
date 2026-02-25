@@ -13,6 +13,7 @@ dir='./'
 format="json"
 test="SS6"
 help='no'
+check_forks='no'
 while (($#)); do
     case $1 in
     -f | --format)
@@ -22,6 +23,9 @@ while (($#)); do
     -t | --test)
         test=$2
         shift
+        ;;
+    -c | --check-forks)
+        check_forks='yes'
         ;;
     *)
         if sake_handle_help_flag "$1"; then
@@ -43,6 +47,7 @@ help_and_exit() {
     ECHOHEAD "Available settings:"
     echonice "-f, --format                   output format, default: json"
     echonice "-t, --test                     test to perform, default: SS6"
+    echonice "-c, --check-forks              also check forks of the repository"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
@@ -83,29 +88,25 @@ declare -A SS7=(
 )
 
 declare -A BRANCH_RESULTS
-eval "CORE_PKGS=(\"\${!$ACTIVE_RULESET[@]}\")"
 
 
 sake_check_help_and_exit
 
-if [ -z "$1" ]; then
+if [ -z "$dir" ] || [ "$dir" = "./" ]; then
     echobad "Usage: sake-ss-ready <composer-package OR git-url>"
     help_and_exit
 fi
 
-
 # break on errors
 set -e
 
-
-target="$1"
+target="$dir"
 tmpDir="${TMPDIR:-/tmp}/scan_tmp"
 mkdir -p "$tmpDir"
 
 # -------------------------------------
 # Load GitHub token from composer auth
 # -------------------------------------
-
 
 authFile="$HOME/.config/composer/auth.json"
 
@@ -131,9 +132,8 @@ echoline
 # ----------------------------------------------------
 # A repo is READY if ANY rule in the chosen ruleset matches.
 
-
 # Choose which ruleset to apply
-ACTIVE_RULESET="SS6"
+ACTIVE_RULESET="${test:-SS6}"
 eval "ruleset_keys=(\"\${!$ACTIVE_RULESET[@]}\")"
 
 ECHOHEAD "Using ruleset: $ACTIVE_RULESET"
@@ -158,7 +158,7 @@ resolve_repo_from_composer() {
 if [[ "$target" =~ ^https?:// ]]; then
     repoUrl="$target"
 else
-    echobad "Resolving '$target' via Packagist..."
+    echonice "Resolving '$target' via Packagist..."
     repoUrl=$(resolve_repo_from_composer "$target")
 fi
 
@@ -176,64 +176,79 @@ else
     exit 1
 fi
 
-echo "Repository: $owner/$repo"
-echo
+echonice "Repository: $owner/$repo"
+echoline
 
 # ----------------------------------------------------
-# 3. Fetch all forks
+# 3. Optionally fetch forks
 # ----------------------------------------------------
-echo "Fetching forks…"
+forkRepos=()
 
-forksUrl="https://api.github.com/repos/$owner/$repo/forks?per_page=100"
+if [[ "$check_forks" == "yes" ]]; then
+    echonice "Fetching forks…"
 
-apiResponse=$(curl -s \
-    -H "Authorization: token $GITHUB_TOKEN" \
-    -H "Accept: application/vnd.github+json" \
-    "$forksUrl"
-)
+    forksUrl="https://api.github.com/repos/$owner/$repo/forks?per_page=100"
 
-if [[ "$apiResponse" == "" ]] || [[ "$apiResponse" =~ "<" ]]; then
-    echobad "❌ GitHub returned non-JSON output:"
-    echobad "$apiResponse"
-    exit 1
-fi
+    apiResponse=$(curl -s \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "$forksUrl"
+    )
 
-jsonType=$(echo "$apiResponse" | jq -r 'type')
-
-if [ "$jsonType" = "object" ]; then
-    message=$(echo "$apiResponse" | jq -r '.message // empty')
-    if [ -n "$message" ] && [ "$message" != "null" ]; then
-        echobad "❌ GitHub API error: $message"
-        echobad "Full response:"
+    if [[ "$apiResponse" == "" ]] || [[ "$apiResponse" =~ "<" ]]; then
+        echobad "❌ GitHub returned non-JSON output:"
         echobad "$apiResponse"
         exit 1
     fi
 
-    echobad "❌ Unexpected JSON object instead of array:"
-    echobad "$apiResponse"
-    exit 1
-fi
+    jsonType=$(echo "$apiResponse" | jq -r 'type')
 
-if [ "$jsonType" != "array" ]; then
-    echobad "❌ Unexpected JSON type: $jsonType"
-    echobad "$apiResponse"
-    exit 1
-fi
+    if [ "$jsonType" = "object" ]; then
+        message=$(echo "$apiResponse" | jq -r '.message // empty')
+        if [ -n "$message" ] && [ "$message" != "null" ]; then
+            echobad "❌ GitHub API error: $message"
+            echobad "Full response:"
+            echobad "$apiResponse"
+            exit 1
+        fi
+        echobad "❌ Unexpected JSON object instead of array:"
+        echobad "$apiResponse"
+        exit 1
+    fi
 
-forks=$(echo "$apiResponse" | jq -r '.[].full_name')
+    if [ "$jsonType" != "array" ]; then
+        echobad "❌ Unexpected JSON type: $jsonType"
+        echobad "$apiResponse"
+        exit 1
+    fi
 
-# Build list of all repos (original + forks)
-allRepos=("$owner/$repo")
+    forks=$(echo "$apiResponse" | jq -r '.[].full_name')
+    if [ -n "$forks" ]; then
+        while read -r f; do
+            forkRepos+=("$f")
+        done <<< "$forks"
+    fi
 
-if [ -n "$forks" ]; then
-    while read -r f; do
-        allRepos+=("$f")
-    done <<< "$forks"
+    echonice "Found ${#forkRepos[@]} fork(s)"
+    echoline
 fi
 
 # ----------------------------------------------------
 # 4. Branch + composer checks
 # ----------------------------------------------------
+
+# Key/value use ||| as separator to avoid IFS single-char split issues
+add_json_record() {
+    local full="$1"
+    local branch="$2"
+    local path="$3"
+    local matched="$4"
+    local deps_present="$5"
+
+    local key="${full}|||${branch}|||${path}"
+    BRANCH_RESULTS["$key"]="${matched}|||${deps_present}"
+}
+
 check_branch() {
     local full="$1"
     local branch="$2"
@@ -275,31 +290,41 @@ check_branch() {
             have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
             major=${need#"^"}
 
-            # track core dependencies
-            if printf '%s\n' "${CORE_PKGS[@]}" | grep -q "^$pkg$"; then
+            if printf '%s\n' "${ruleset_keys[@]}" | grep -q "^$pkg$"; then
                 if [[ -n "$have" ]]; then
                     found_any_ss_pkg="yes"
                 fi
             fi
 
-            # SS6 match
-            if [[ -n "$have" && ( "$have" == "$need"* || "$have" == "$major"* ) ]]; then
-                matched_pkgs["$pkg"]="$have"
+            # Version match — handle "||" compound constraints e.g. "^4.0 || ^5.0"
+            if [[ -n "$have" ]]; then
+                match_found="no"
+                # Split on || and check each part
+                IFS='|' read -ra parts <<< "$have"
+                for part in "${parts[@]}"; do
+                    # Strip whitespace and stray pipe chars
+                    part="${part// /}"
+                    part="${part//|/}"
+                    if [[ "$part" == "$need"* || "$part" == "$major"* || "$part" == "^${major}."* ]]; then
+                        match_found="yes"
+                        break
+                    fi
+                done
+                if [[ "$match_found" == "yes" ]]; then
+                    matched_pkgs["$pkg"]="$have"
+                fi
             fi
         done
 
-        # EARLY EXIT RULE: no SS dependencies → automatically ready
         if [[ "$found_any_ss_pkg" == "no" ]]; then
             add_json_record "$full" "$branch" "$path" "NOT_A_SILVERSTRIPE_DEPENDENCY" "false"
         else
-            # Record normal matches
             if (( ${#matched_pkgs[@]} > 0 )); then
                 local match_list=""
                 for k in "${!matched_pkgs[@]}"; do
                     match_list+="\"$k\": \"${matched_pkgs[$k]}\","
                 done
                 match_list="${match_list%,}"
-
                 add_json_record "$full" "$branch" "$path" "{$match_list}" "true"
             else
                 add_json_record "$full" "$branch" "$path" "NONE" "true"
@@ -313,7 +338,7 @@ check_branch() {
 
 
 check_repo() {
-    full="$1"
+    local full="$1"
     ECHOHEAD "Checking $full"
 
     branches=$(curl -s \
@@ -329,70 +354,60 @@ check_repo() {
     fi
 
     for branch in $branches; do
-        check_branch "$full" "$branch" && {
-            echonice "  ✔ READY (via branch: $branch)"
-            echoline
-            return
-        }
+        check_branch "$full" "$branch"
     done
 
-    echo "  ✗ no SS6-ready branch found"
     echoline
 }
 
 # ----------------------------------------------------
-# 5. Process all repos
+# 5. Process repos
 # ----------------------------------------------------
 rm -f "$tmpDir/ready.txt"
 
-for r in "${allRepos[@]}"; do
-    check_repo "$r"
-done
+# Always check the original repo
+check_repo "$owner/$repo"
 
-ECHOHEAD "READY repos for ruleset $ACTIVE_RULESET:"
-if [ -f "$tmpDir/ready.txt" ]; then
-    cat "$tmpDir/ready.txt"
-else
-    echonice "(none)"
+# Only check forks if explicitly requested with -c / --check-forks
+if [[ "$check_forks" == "yes" ]] && [[ ${#forkRepos[@]} -gt 0 ]]; then
+    echonice "Checking forks…"
+    echoline
+    for r in "${forkRepos[@]}"; do
+        check_repo "$r"
+    done
 fi
-echoline
 
-ECHOHEAD "Creating JSON output…"
+# ----------------------------------------------------
+# 6. Output results
+# ----------------------------------------------------
+ECHOHEAD "Results: branches ready for $ACTIVE_RULESET"
 
-output="{"
-output+="\"repository\": \"$owner/$repo\","
-output+="\"branches\": {"
-
-branch_json=""
+found_any=0
 
 for key in "${!BRANCH_RESULTS[@]}"; do
-    IFS="::" read -r full branch path <<< "$key"
-    IFS="|" read -r matched deps_present <<< "${BRANCH_RESULTS[$key]}"
+    full="${key%%|||*}"
+    rest="${key#*|||}"
+    branch="${rest%%|||*}"
 
-    branch_json+=$(cat <<EOF
-"$branch-$path": {
-    "path": "$path",
-    "matches": $(
-        if [[ "$matched" == "NOT_A_SILVERSTRIPE_DEPENDENCY" ]]; then
-            echo "\"NOT_A_SILVERSTRIPE_DEPENDENCY\""
-        elif [[ "$matched" == "NONE" ]]; then
-            echo "[]"
-        else
-            echo "{ $matched }"
-        fi
-    ),
-    "coreDependenciesPresent": $deps_present
-},
-EOF
-)
+    value="${BRANCH_RESULTS[$key]}"
+    matched="${value%%|||*}"
+
+    if [[ "$matched" == "NOT_A_SILVERSTRIPE_DEPENDENCY" ]] || [[ "$matched" == "NONE" ]]; then
+        continue
+    fi
+
+    found_any=1
+
+    if [[ "$full" == "$owner/$repo" ]]; then
+        echonice "  ✔ $full:$branch"
+    else
+        echonice "  ✔ $full:$branch  (fork of $owner/$repo)"
+    fi
 done
 
-branch_json="${branch_json%,}"  # strip trailing comma
+if [[ $found_any -eq 0 ]]; then
+    echobad "  ✗ No branches found ready for $ACTIVE_RULESET"
+fi
 
-output+="$branch_json"
-output+="}}"
-
-echo "$output" | jq .
-
-
+echoline
 echoend

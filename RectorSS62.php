@@ -16,6 +16,6 @@ return static function (RectorConfig $rectorConfig): void {
         SetList::CODING_STYLE,
         //silverstripe rector
         SilverstripeSetList::CODE_STYLE,
-        SilverstripeLevelSetList::UP_TO_SS_6_0
+        SilverstripeLevelSetList::UP_TO_SS_6_2
     ]);
 };
