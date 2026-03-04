@@ -215,7 +215,7 @@ add_to_git_ignore
 
 # Expand the glob safely (supports ** via globstar)
 shopt -s nullglob globstar
-mapfile -t matches < <(compgen -G "$filesPattern" || true)
+matches=( $filesPattern )
 shopt -u nullglob globstar
 
 if (( ${#matches[@]} == 0 )); then
@@ -294,7 +294,7 @@ if [[ -n "$apiKey" ]]; then
     fi
 fi
 
-cmd+=( "$opencodeResolved" run -m "$model" )
+cmd+=( "$opencodeResolved" run --agent build -m "$model" )
 
 if [[ "$dryRun" == "yes" ]]; then
 
@@ -314,11 +314,20 @@ if [[ "$dryRun" == "yes" ]]; then
     exit 0
 fi
 
+ECHOHEAD "Command:"
+printf '%q ' "${cmd[@]}"
+echo "" # Add a newline at the end
 
+ECHOHEAD "Files included (${#selectedFiles[@]}):"
 for f in "${selectedFiles[@]}"; do
     cmd+=( -f "$f" )
+    echonice "$f"
 done
-cmd+=( -- "$promptText" )
 
+# 1. Print the command safely (with properly escaped spaces/special characters)
+ECHOHEAD "Prompt content"
+echonice "$promptText"
+
+cmd+=( -- "$promptText" )
 "${cmd[@]}"
 echoend
