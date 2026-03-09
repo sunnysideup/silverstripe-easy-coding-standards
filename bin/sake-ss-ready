@@ -252,29 +252,29 @@ add_json_record() {
 check_branch() {
     local full="$1"
     local branch="$2"
-
-    echonice "  Checking branch: $branch"
+    local encoded_branch
+    encoded_branch=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$branch', safe=''))")
 
     tree=$(curl -s \
         -H "Authorization: token $GITHUB_TOKEN" \
-        "https://api.github.com/repos/$full/git/trees/$branch?recursive=1"
+        "https://api.github.com/repos/$full/git/trees/$encoded_branch?recursive=1"
     )
 
     if [[ -z "$tree" ]] || [[ "$tree" =~ "<" ]]; then
-        return 1
+        return 0
     fi
 
     paths=$(echo "$tree" | jq -r '.tree[] | select(.path | endswith("composer.json")) | .path')
 
     if [ -z "$paths" ]; then
-        return 1
+        return 0
     fi
 
     while read -r path; do
 
         comp=$(curl -s -L \
             -H "Authorization: token $GITHUB_TOKEN" \
-            "https://raw.githubusercontent.com/$full/$branch/$path"
+            "https://raw.githubusercontent.com/$full/$encoded_branch/$path"
         )
 
         if ! echo "$comp" | jq '.' >/dev/null 2>&1; then
@@ -315,7 +315,10 @@ check_branch() {
                 fi
             fi
         done
-
+        for pkg in "${ruleset_keys[@]}"; do
+            have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
+            need=$(get_rule_value "$pkg")
+        done
         if [[ "$found_any_ss_pkg" == "no" ]]; then
             add_json_record "$full" "$branch" "$path" "NOT_A_SILVERSTRIPE_DEPENDENCY" "false"
         else
@@ -383,11 +386,11 @@ fi
 ECHOHEAD "Results: branches ready for $ACTIVE_RULESET"
 
 found_any=0
-
 for key in "${!BRANCH_RESULTS[@]}"; do
     full="${key%%|||*}"
     rest="${key#*|||}"
     branch="${rest%%|||*}"
+    path="${rest##*|||}"          # ← was missing
 
     value="${BRANCH_RESULTS[$key]}"
     matched="${value%%|||*}"
@@ -400,8 +403,12 @@ for key in "${!BRANCH_RESULTS[@]}"; do
 
     if [[ "$full" == "$owner/$repo" ]]; then
         echonice "  ✔ $full:$branch"
+        echonice "    [$path]"
+        echonice "    matched: $matched"
     else
         echonice "  ✔ $full:$branch  (fork of $owner/$repo)"
+        echonice "    [$path]"
+        echonice "    matched: $matched"
     fi
 done
 
