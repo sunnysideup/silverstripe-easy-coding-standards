@@ -105,7 +105,8 @@ fi
 localDbUser=$(read_local_dotenv_value "SS_DATABASE_USERNAME")
 localDbPass=$(read_local_dotenv_value "SS_DATABASE_PASSWORD")
 localDbName=$(read_local_dotenv_value "SS_DATABASE_NAME")
-localDbHost=$(read_local_dotenv_value "SS_DATABASE_SERVER")
+localDbHost="$(read_local_dotenv_value 'SS_DATABASE_SERVER' || true)"
+localDbHost="${localDbHost:-localhost}"
 
 remoteDbUser=$(ssh "$serverClean" "grep '^SS_DATABASE_USERNAME=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
 remoteDbPass=$(ssh "$serverClean" "grep '^SS_DATABASE_PASSWORD=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
