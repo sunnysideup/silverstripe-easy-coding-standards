@@ -78,6 +78,8 @@ echogood() {
     _print_col_stderr "$_COL_GOOD" "✅ $*"
 }
 
+
+
 echobad() {
     _print_banner "$_COL_BAD_BG"
     printf '%b ❌: %s %b\n' "$_COL_BAD_BG" "$*" "$_COL_RESET" >&2

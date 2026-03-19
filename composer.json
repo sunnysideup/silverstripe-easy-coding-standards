@@ -48,6 +48,7 @@
     "bin/sake-composer-require",
     "bin/sake-find-in-files",
     "bin/sake-find-large-files",
+    "bin/sake-find-large-folders",
     "bin/sake-git-commit-and-push",
     "bin/sake-git-commit-and-push-vendor-packages",
     "bin/sake-git-diff-analyser",

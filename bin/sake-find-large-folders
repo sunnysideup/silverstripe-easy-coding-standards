@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+sudoCmd='sudo'  # default to using sudo
+
+# ============================================================
+#  analyze_folders.sh  —  Folder size analyser
+# ============================================================
+
+set -euo pipefail
+
+# ── Defaults ─────────────────────────────────────────────────
+dir="."
+MAX_DEPTH=1
+TOP_N=20
+SORT_FLAG="-rh"
+UNIT_FLAG="-h"
+EXCLUDES=()
+
+# ── Help ─────────────────────────────────────────────────────
+help_and_exit() {
+    ECHOHEAD 'Folder Size Analyser'
+    echonice "Target:                        $dir"
+    echonice "Depth:                         $MAX_DEPTH"
+    echonice "Top:                           $TOP_N results"
+
+    if [[ ${#EXCLUDES[@]} -gt 0 ]]; then
+        echonice "Exclude:                       ${EXCLUDES[*]}"
+    fi
+
+    ECHOHEAD 'Available settings:'
+    echonice '-h, --help                     show help information'
+    echonice '-d, --depth <N>                max depth to scan (default: 1)'
+    echonice '-n, --top <N>                  number of results to show (default: 20)'
+    echonice '-u, --unit <K|M|G|H>           display unit (default: H for human-readable)'
+    echonice '-s, --sort                     sort ascending (default: descending)'
+    echonice '-x, --exclude <pattern>        exclude folders/files (can be used multiple times)'
+
+    ECHOHEAD 'Example usage:'
+    echonice 'sake-find-large-folders -d 2 -n 10 -u M ./'
+
+    echofunctions
+    exit 0
+}
+
+# ── Parse args ───────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case $1 in
+    -h|--help)
+        help_and_exit
+        ;;
+    -d|--depth)
+        MAX_DEPTH=$2
+        shift 2
+        ;;
+    -n|--top)
+        TOP_N=$2
+        shift 2
+        ;;
+    -u|--unit)
+        case "${2^^}" in
+            K) UNIT_FLAG='-BK' ;;
+            M) UNIT_FLAG='-BM' ;;
+            G) UNIT_FLAG='-BG' ;;
+            H) UNIT_FLAG='-h'  ;;
+            *) echobad "Unknown unit '$2'. Use K, M, G, or H."; exit 1 ;;
+        esac
+        shift 2
+        ;;
+    -s|--sort)
+        SORT_FLAG='-h'
+        shift 1
+        ;;
+    -x|--exclude)
+        EXCLUDES+=("$2")
+        shift 2
+        ;;
+    -*)
+        # Check if the sourced sake-self-methods handles this flag
+        if sake_handle_help_flag "$1"; then
+            shift 1
+            continue
+        fi
+        echobad "Unknown option '$1'"
+        exit 1
+        ;;
+    *)
+        dir=$1
+        shift 1
+        ;;
+    esac
+done
+
+# ── Validate ─────────────────────────────────────────────────
+if [[ ! -d "$dir" ]]; then
+  echobad "'$dir' is not a directory."
+  exit 1
+fi
+
+dir="$(realpath "$dir")"
+
+# ── Build exclude args ───────────────────────────────────────
+EXCLUDE_ARGS=()
+for pat in "${EXCLUDES[@]}"; do
+  EXCLUDE_ARGS+=(--exclude="$pat")
+done
+
+# ── Total size ───────────────────────────────────────────────
+TOTAL=$(du -s $UNIT_FLAG "${EXCLUDE_ARGS[@]}" "$dir" 2>/dev/null | awk '{print $1}')
+ECHOHEAD "Total size of '$dir'"
+echogood "$TOTAL"
+
+# ── Gather folder sizes ──────────────────────────────────────
+ECHOHEAD "Top $TOP_N folders by size (depth ≤ $MAX_DEPTH)"
+echoplain "$(printf '%-10s  %s' 'SIZE' 'PATH')"
+echoline
+
+du $UNIT_FLAG --max-depth="$MAX_DEPTH" "${EXCLUDE_ARGS[@]}" "$dir" 2>/dev/null \
+  | sort $SORT_FLAG \
+  | head -n "$TOP_N" \
+  | while IFS=$'\t' read -r size path; do
+      # Colour-code by rough size tier using your custom palette
+      if [[ "$size" =~ ^[0-9.]+G ]]; then
+        colour="$_COL_BAD_BG"
+      elif [[ "$size" =~ ^[0-9.]+M ]] && \
+           awk -v s="${size%M}" 'BEGIN{exit !(s+0 >= 500)}'; then
+        colour="$_COL_NICE"
+      else
+        colour="$_COL_RESET"
+      fi
+      # Print directly to stderr (>&2) with leading space to match your framework
+      printf ' %b%-10s%b  %s\n' "$colour" "$size" "$_COL_RESET" "$path" >&2
+    done
+
+echoline
+
+# ── Per-type breakdown at depth 1 ────────────────────────────
+ECHOHEAD "Breakdown by entry type in '$dir'"
+
+dir_count=$(find "$dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+file_count=$(find "$dir" -mindepth 1 -maxdepth 1 -type f 2>/dev/null | wc -l)
+link_count=$(find "$dir" -mindepth 1 -maxdepth 1 -type l 2>/dev/null | wc -l)
+
+echoplain "$(printf '%-20s %s' 'Subdirectories:' "$dir_count")"
+echoplain "$(printf '%-20s %s' 'Files:' "$file_count")"
+echoplain "$(printf '%-20s %s' 'Symlinks:' "$link_count")"
+echoline
+
+echoend

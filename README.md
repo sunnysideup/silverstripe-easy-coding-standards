@@ -23,6 +23,7 @@ Install as global composer package and then try to access the commands, starting
 # find
  - sake-find-in-files
  - sake-find-large-files
+ - sake-find-large-folders
 
 # git
  - sake-git-quick
@@ -135,7 +136,7 @@ source ~/.bashrc
 
 or restart your computer.
 
-4. Now you should be able to run it from anywhere like this:
+1. Now you should be able to run it from anywhere like this:
 
 ```shell
 sake-lint-ecs [dir]
