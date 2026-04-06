@@ -571,7 +571,12 @@ sake_determine_ss_version() {
     if [[ ${#found_versions[@]} -eq 0 ]]; then
         echo "none"
     elif [[ ${#found_versions[@]} -gt 1 ]]; then
-        echo "inconsistent: ${found_versions[*]}"
+        # Take the highest version (transitional constraints like "^4 || ^5" are fine)
+        local highest=0
+        for v in "${found_versions[@]}"; do
+            (( v > highest )) && highest=$v
+        done
+        echo "$highest"
     else
         echo "${found_versions[0]}"
     fi

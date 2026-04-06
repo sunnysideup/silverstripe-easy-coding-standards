@@ -70,6 +70,8 @@ update_org_deps() {
 
 if [[ "$dry_run" == "yes" ]]; then
     echowarn "RUNNING IN DRY-RUN MODE. NO PUSHES WILL BE MADE."
+else
+    echowarn "Running in real mode. Changes will be pushed to GitHub. Add --dry-run to test without pushing."
 fi
 
 if ! gh auth status &>/dev/null; then
@@ -119,7 +121,7 @@ while read -r repo; do
     repo_dir="$TMP_DIR/$repo"
 
     echonice "Cloning $org_repo..."
-    gh repo clone "$org_repo" "$repo_dir" -- -q
+    git clone git@github.com:"$org_repo".git "$repo_dir" -q || { echobad "Failed to clone $org_repo"; cd "$TMP_DIR"; continue; }
     cd "$repo_dir" || { echobad "Failed to cd into $repo_dir"; continue; }
 
     default_branch=$(gh repo view "$org_repo" --json defaultBranchRef -q '.defaultBranchRef.name')
