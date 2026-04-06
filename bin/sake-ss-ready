@@ -28,7 +28,7 @@ while (($#)); do
         check_forks='yes'
         ;;
     *)
-        if sake_handle_help_flag "$1"; then
+        if sake_handle_common_flags "$1"; then
             shift
             continue
         fi
@@ -57,35 +57,6 @@ help_and_exit() {
     echofunctions
     exit 1
 }
-
-declare -A SS4=(
-    ["silverstripe/framework"]="^4"
-    ["silverstripe/recipe-cms"]="^4"
-    ["silverstripe/recipe-core"]="^4"
-    ["silverstripe/cms"]="^4"
-    ["silverstripe/admin"]="^1"
-)
-declare -A SS5=(
-    ["silverstripe/framework"]="^5"
-    ["silverstripe/recipe-cms"]="^5"
-    ["silverstripe/recipe-core"]="^5"
-    ["silverstripe/cms"]="^5"
-    ["silverstripe/admin"]="^2"
-)
-declare -A SS6=(
-    ["silverstripe/framework"]="^6"
-    ["silverstripe/recipe-cms"]="^6"
-    ["silverstripe/recipe-core"]="^6"
-    ["silverstripe/cms"]="^6"
-    ["silverstripe/admin"]="^3"
-)
-declare -A SS7=(
-    ["silverstripe/framework"]="^7"
-    ["silverstripe/recipe-cms"]="^7"
-    ["silverstripe/recipe-core"]="^7"
-    ["silverstripe/cms"]="^7"
-    ["silverstripe/admin"]="^4"
-)
 
 declare -A BRANCH_RESULTS
 
@@ -128,12 +99,12 @@ echonice "✔ Loaded GitHub token from composer auth.json"
 echoline
 
 # ----------------------------------------------------
-# 1. VERSION RULE SETS (edit here)
+# 1. VERSION RULE SETS
 # ----------------------------------------------------
 # A repo is READY if ANY rule in the chosen ruleset matches.
 
-# Choose which ruleset to apply
-ACTIVE_RULESET="${test:-SS6}"
+# Choose which ruleset to apply (using the centralized matrices)
+ACTIVE_RULESET="SAKE_CORE_PACKAGES_${test:-SS6}"
 eval "ruleset_keys=(\"\${!$ACTIVE_RULESET[@]}\")"
 
 ECHOHEAD "Using ruleset: $ACTIVE_RULESET"
@@ -288,7 +259,7 @@ check_branch() {
         for pkg in "${ruleset_keys[@]}"; do
             need=$(get_rule_value "$pkg")
             have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
-            major=${need#"^"}
+            major=${need#"^"} # sake_check_major_version_match expects pure integer
 
             if printf '%s\n' "${ruleset_keys[@]}" | grep -q "^$pkg$"; then
                 if [[ -n "$have" ]]; then
@@ -296,29 +267,14 @@ check_branch() {
                 fi
             fi
 
-            # Version match — handle "||" compound constraints e.g. "^4.0 || ^5.0"
+            # Version match — centralized helper function
             if [[ -n "$have" ]]; then
-                match_found="no"
-                # Split on || and check each part
-                IFS='|' read -ra parts <<< "$have"
-                for part in "${parts[@]}"; do
-                    # Strip whitespace and stray pipe chars
-                    part="${part// /}"
-                    part="${part//|/}"
-                    if [[ "$part" == "$need"* || "$part" == "$major"* || "$part" == "^${major}."* ]]; then
-                        match_found="yes"
-                        break
-                    fi
-                done
-                if [[ "$match_found" == "yes" ]]; then
+                if sake_check_major_version_match "$have" "$major"; then
                     matched_pkgs["$pkg"]="$have"
                 fi
             fi
         done
-        for pkg in "${ruleset_keys[@]}"; do
-            have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
-            need=$(get_rule_value "$pkg")
-        done
+
         if [[ "$found_any_ss_pkg" == "no" ]]; then
             add_json_record "$full" "$branch" "$path" "NOT_A_SILVERSTRIPE_DEPENDENCY" "false"
         else

@@ -89,6 +89,7 @@
     "bin/sake-self-update",
     "bin/sake-self-methods",
     "bin/sake-ss-add-site",
+    "bin/sake-ss-align-versions",
     "bin/sake-ss-create-env-file",
     "bin/sake-ss-db-dump",
     "bin/sake-ss-db-import",

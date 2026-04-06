@@ -75,6 +75,7 @@ Install as global composer package and then try to access the commands, starting
 
 # silverstripe
  - sake-ss-add-site
+ - sake-ss-align-versions
  - sake-ss-create-env-file
  - sake-ss-db-dump
  - sake-ss-db-import

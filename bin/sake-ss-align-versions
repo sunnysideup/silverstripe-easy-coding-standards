@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+
+# Exit on undefined variables and pipe failures
+set -uo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ SETTINGS
+dry_run="no"
+
+while (($#)); do
+    case $1 in
+    -d | --dry-run)
+        dry_run="yes"
+        ;;
+    *)
+        if sake_handle_common_flags "$1"; then
+            shift
+            continue
+        fi
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Sync Silverstripe branches for GitHub Organization"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Working directory:             $WORKING_DIR"
+
+    ECHOHEAD "Available settings:"
+    echonice "-d, --dry-run                  run without pushing any changes"
+    echonice "-h, --help                     show help information"
+    echonice "-q, --quiet                    suppress visual output"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-align-versions --dry-run"
+    echonice "... run test without pushing changes"
+
+    ECHOHEAD "Environment Variables Required:"
+    echonice "GITHUB_USER_NAME               Define this in ~/.config/composer/.env"
+
+    echofunctions
+    exit 1
+}
+
+sake_check_help_and_exit
+
+check_for_env_var "GITHUB_USER_NAME" || exit 1
+GITHUB_ORG="$GITHUB_USER_NAME"
+
+############################################ UTILITY FUNCTIONS
+
+# Updates any $GITHUB_ORG/* packages in require and require-dev to align with x-dev branch
+update_org_deps() {
+    local file="composer.json"
+    local ver="$1"
+    local constraint="$ver.x-dev"
+
+    jq --arg constraint "$constraint" --arg org "$GITHUB_ORG/" '
+        (if has("require") then .require |= with_entries(if .key | startswith($org) then .value = $constraint else . end) else . end) |
+        (if has("require-dev") then ."require-dev" |= with_entries(if .key | startswith($org) then .value = $constraint else . end) else . end)
+    ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+}
+
+############################################ MAIN SCRIPT
+
+if [[ "$dry_run" == "yes" ]]; then
+    echowarn "RUNNING IN DRY-RUN MODE. NO PUSHES WILL BE MADE."
+fi
+
+if ! gh auth status &>/dev/null; then
+    echobad "You are not logged in to GitHub CLI. Please run: gh auth login"
+    exit 1
+fi
+
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+successful_syncs=0
+
+ECHOHEAD "Fetching repositories for $GITHUB_ORG..."
+
+while read -r repo; do
+    [[ -z "$repo" ]] && continue
+
+    org_repo="$GITHUB_ORG/$repo"
+    echoline
+    echonice "Analyzing: $org_repo"
+
+    composer_json=$(gh api "repos/$org_repo/contents/composer.json" -H "Accept: application/vnd.github.v3.raw" 2>/dev/null || true)
+
+    if [[ -z "$composer_json" ]]; then
+        echowarn "Skipping: No composer.json found."
+        continue
+    fi
+
+    # Using the new centralized method
+    version=$(sake_determine_ss_version "$composer_json")
+
+    if [[ "$version" == "none" ]]; then
+        echonice "Skipping: Not classified as SS4, SS5, SS6, or SS7."
+        continue
+    fi
+
+    if [[ "$version" == inconsistent* ]]; then
+        echobad "Skipping: Module has inconsistent dependencies ($version)"
+        continue
+    fi
+
+    echogood "Detected compatibility: Silverstripe $version"
+
+    # ----------------------------------------------------
+    # REPOSITORY CLONE & BRANCH SETUP
+    # ----------------------------------------------------
+    repo_dir="$TMP_DIR/$repo"
+
+    echonice "Cloning $org_repo..."
+    gh repo clone "$org_repo" "$repo_dir" -- -q
+    cd "$repo_dir" || { echobad "Failed to cd into $repo_dir"; continue; }
+
+    default_branch=$(gh repo view "$org_repo" --json defaultBranchRef -q '.defaultBranchRef.name')
+    original_default_branch="$default_branch"
+    target_branch="$version"
+
+    # 1. Prepare Default Branch
+    git checkout "$default_branch" -q
+    git pull origin "$default_branch" -q
+
+    # 2. Prepare Target Branch
+    if git ls-remote --heads origin "$target_branch" | grep -q "refs/heads/$target_branch"; then
+        echonice "Branch '$target_branch' exists. Fetching..."
+        git fetch origin "$target_branch" -q
+        git checkout "$target_branch" -q
+        git pull origin "$target_branch" -q
+    else
+        echonice "Branch '$target_branch' does not exist. Creating..."
+        git checkout -b "$target_branch" -q
+    fi
+
+    # 3. Update org dependencies on all known version branches
+    extra_branches_to_push=()
+
+    for check_branch in 4 5 6 7; do
+        branch_exists_locally=0
+
+        if [[ "$check_branch" == "$target_branch" ]]; then
+            git checkout "$check_branch" -q
+            branch_exists_locally=1
+        else
+            if git ls-remote --heads origin "$check_branch" | grep -q "refs/heads/$check_branch"; then
+                echonice "Branch '$check_branch' exists. Fetching to align dependencies..."
+                git fetch origin "$check_branch" -q
+                git checkout "$check_branch" -q
+                git pull origin "$check_branch" -q
+                branch_exists_locally=1
+            fi
+        fi
+
+        if [[ $branch_exists_locally -eq 1 ]]; then
+            if [[ -f "composer.json" ]]; then
+                update_org_deps "$check_branch"
+                if ! git diff --quiet composer.json; then
+                    echonice "Updating $GITHUB_ORG dependencies to $check_branch.x-dev on branch $check_branch..."
+                    git add composer.json
+                    git commit -m "MNT Align $GITHUB_ORG dependencies with SS$check_branch" -q
+
+                    if [[ "$check_branch" != "$target_branch" ]]; then
+                        extra_branches_to_push+=("$check_branch")
+                    fi
+                fi
+            fi
+        fi
+    done
+
+    # ----------------------------------------------------
+    # TWO-WAY MERGE (LOCALLY FIRST)
+    # ----------------------------------------------------
+    if [[ "$default_branch" != "$target_branch" ]]; then
+        echonice "Merging branches locally..."
+
+        git checkout "$default_branch" -q
+        pre_merge_default_sha=$(git rev-parse HEAD)
+
+        # Merge Target -> Default
+        if ! git merge "$target_branch" --no-edit -m "MNT Merge branch '$target_branch' into $default_branch"; then
+            git merge --abort
+            echobad "Conflict merging $target_branch into $default_branch. Skipping."
+            cd "$TMP_DIR"
+            continue
+        fi
+
+        # Merge Default -> Target
+        git checkout "$target_branch" -q
+        if ! git merge "$default_branch" --no-edit -m "MNT Merge branch '$default_branch' into $target_branch"; then
+            git merge --abort
+            git checkout "$default_branch" -q
+            git reset --hard "$pre_merge_default_sha" >/dev/null 2>&1
+            echobad "Conflict merging $default_branch into $target_branch. Skipping."
+            cd "$TMP_DIR"
+            continue
+        fi
+    else
+        echonice "Default branch is identical to target branch ($target_branch). Skipping merges."
+    fi
+
+    # ----------------------------------------------------
+    # PUSH UPDATES AND HANDLE MASTER -> MAIN MIGRATION
+    # ----------------------------------------------------
+    if [[ "$dry_run" == "yes" ]]; then
+        echogood "DRY RUN: Success. Skipping pushes for $org_repo."
+    else
+        echonice "Merges successful. Preparing to push..."
+
+        # Master -> Main Migration check happens BEFORE we push the default branch.
+        # This prevents us from pushing merges to remote 'master'.
+        if [[ "$original_default_branch" == "master" ]]; then
+            echonice "Migrating 'master' to 'main'..."
+            git checkout master -q
+            git checkout -b main -q
+
+            # Push the new main branch (with the merges) to remote
+            git push -u origin main -q
+
+            # Tell GitHub to switch the default branch pointer
+            gh repo edit "$org_repo" --default-branch main
+
+            new_default=$(gh repo view "$org_repo" --json defaultBranchRef -q '.defaultBranchRef.name')
+            if [[ "$new_default" == "main" ]]; then
+                if ! git push origin --delete master -q 2>/dev/null; then
+                    echowarn "NOTICE: 'main' is default, but failed to delete remote 'master'. You may need to clean it up manually."
+                fi
+                git branch -d master -q || true
+                echogood "Migrated master → main."
+            else
+                echobad "Failed to confirm 'main' is default via API. Did not delete master."
+            fi
+
+            # Update variable so rest of script logic flows cleanly
+            default_branch="main"
+        else
+            # Not migrating, push default normally
+            git push origin "$default_branch" -q
+        fi
+
+        # Only push target branch if it's different from default
+        if [[ "$default_branch" != "$target_branch" ]]; then
+            git push origin "$target_branch" -q
+        fi
+
+        # Push any extra branches (4, 5, 6, 7) that had their composer.json updated
+        if (( ${#extra_branches_to_push[@]} > 0 )); then
+            for ex_branch in "${extra_branches_to_push[@]}"; do
+                git push origin "$ex_branch" -q
+            done
+        fi
+
+        echogood "Successfully synced $org_repo"
+        successful_syncs=$((successful_syncs + 1))
+    fi
+
+    cd "$TMP_DIR"
+
+done < <(gh repo list "$GITHUB_ORG" --limit 1000 --json name --jq '.[].name')
+
+ECHOHEAD "All Repositories Processed."
+if [[ "$dry_run" == "no" ]]; then
+    echogood "Successfully synchronized $successful_syncs repositories."
+fi

@@ -1,7 +1,40 @@
 #!/usr/bin/env bash
 
+############################################ ENVIRONMENT SETUP
+
 envFileLocation="$HOME/.config/composer/.env"
 DEFAULT_SERVER_DIR='/container/application'
+# Create .env file if it doesn't exist
+touch "$envFileLocation"
+
+if [ ! -f "$envFileLocation" ]; then
+    echobad ".env file not found here: $envFileLocation"
+    exit 1
+fi
+
+declare -A varsToAdd=(
+    [GITHUB_USER_NAME]=''
+    [GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES]=''
+    [SCRUTINIZER_API_TOKEN]=''
+    [SCRUTINIZER_ORG]=''
+    [PACKAGIST_USERNAME]=''
+    [PACKAGIST_API_TOKEN]=''
+    [LLM_PROVIDER]=''
+    [LLM_API_KEY]=''
+    [LLM_MODEL]=''
+)
+
+
+# Loop through vars and add them if missing
+for key in "${!varsToAdd[@]}"; do
+    if ! grep -q "^$key=" "$envFileLocation"; then
+        echo "$key=${varsToAdd[$key]}" >>"$envFileLocation"
+    fi
+done
+
+# Load the .env file
+source "$envFileLocation"
+
 
 ############################################ COMMON INITIALIZATION FUNCTIONS
 
@@ -10,37 +43,42 @@ DEFAULT_SERVER_DIR='/container/application'
 # WORKING_DIR="$(pwd)"
 # source "$SCRIPT_DIR/sake-self-methods"
 
-# Standard help flag handler for argument parsing
-# Returns 0 (success) if the flag was a help or unknown option flag
-# Usage: In your case statement, call: sake_handle_help_flag "$1" && shift && continue
-sake_handle_help_flag() {
+# Standard flag handler for argument parsing (Handles Help and Quiet modes)
+# Returns 0 (success) if the flag was handled here, 1 if the parent script needs to handle it.
+# Usage: In your script's case statement, call: sake_handle_common_flags "$1" && shift && continue
+sake_handle_common_flags() {
     case "$1" in
     -h | --help)
         help='yes'
         return 0
         ;;
-    -*)
-        printf 'Unknown option: %q\n\n' "$1" >&2
-        help='yes'
+    -q | --quiet)
+        # Magic happens here: Redirect all stderr (logs/UI) to the void for the entire script
+        exec 2>/dev/null
         return 0
+        ;;
+    -*)
+        # If it's a flag we don't recognize in the shared library, let the parent script handle it.
+        # If the parent script also doesn't recognize it, the parent script should throw the error.
+        return 1
         ;;
     esac
     return 1
 }
 
 # Check if help was requested and call help_and_exit function
-# Usage: sake_check_help_and_exit (replaces: if [[ "$help" == "yes" ]]; then help_and_exit; fi)
+# Usage: sake_check_help_and_exit
 sake_check_help_and_exit() {
     if [[ "${help:-no}" == "yes" ]]; then
         help_and_exit
     fi
 }
+
 ############################################ COLOURS / LOGGING (stderr)
 # Notes:
 # - Uses printf (predictable) instead of echo -e (inconsistent).
-# - Accepts any number of args (so you can do: echonice "a" "b").
+# - All visual output is forced to >&2 so stdout remains pure for data pipelines.
 # - Resets colour every time.
-# - Avoids unquoted variables and accidental option parsing.
 
 _ESC=$'\033'
 _COL_RESET="${_ESC}[0m"
@@ -50,7 +88,6 @@ _COL_HEAD="${_ESC}[95m"
 _COL_BAD_BG="${_ESC}[1;32;44m"
 
 _print_stderr() {
-    # join args with spaces, always end with newline
     printf ' %s\n' "$*" >&2
 }
 
@@ -77,8 +114,6 @@ echonice() {
 echogood() {
     _print_col_stderr "$_COL_GOOD" "✅ $*"
 }
-
-
 
 echobad() {
     _print_banner "$_COL_BAD_BG"
@@ -111,7 +146,6 @@ ECHOHEAD() {
     echoline
 }
 
-
 echoend() {
     echo "" >&2
     echoline
@@ -127,19 +161,72 @@ echofunctions() {
     echoline
 }
 
+
+############################################ HELP
+
+
+
 echolistoffunctions() {
     ECHOHEAD 'List of Available Functions'
-    for entry in $(ls $SCRIPT_DIR); do
-        echonice " -  $entry"
+
+    local categorized_scripts=()
+
+    for entry in "$SCRIPT_DIR"/*; do
+        if [[ -f "$entry" && -x "$entry" ]]; then
+            local script
+            script="$(basename "$entry")"
+            local category label
+
+            if [[ "$script" == sake-*-* ]]; then
+                local without_sake="${script#sake-}"
+                category="${without_sake%%-*}"
+                category="${category^^}"
+                # Everything after "sake-category-"
+                label="${without_sake#*-}"
+            else
+                category="GENERAL"
+                label="${script#sake-}"
+                [[ "$label" == "$script" ]] && label="$script"
+            fi
+
+            categorized_scripts+=("$category:$label:$script")
+        fi
     done
+
+    if (( ${#categorized_scripts[@]} > 0 )); then
+        local sorted_scripts=()
+        while IFS= read -r line; do
+            sorted_scripts+=("$line")
+        done < <(printf "%s\n" "${categorized_scripts[@]}" | sort)
+
+        local current_category=""
+
+        for item in "${sorted_scripts[@]}"; do
+            local category="${item%%:*}"
+            local rest="${item#*:}"
+            local label="${rest%%:*}"
+            local script="${rest#*:}"
+
+            if [[ "$category" != "$current_category" ]]; then
+                echo "" >&2
+                _print_col_stderr "$_COL_HEAD" "# $category"
+                current_category="$category"
+            fi
+
+            printf '  - %-24s %s\n' "$label:" "$script" >&2
+        done
+    fi
+
+    echo "" >&2
     echonice "To show the options for a specific command, run:"
     echo "[command] -h" >&2
     echonice "e.g. sake-lint-all -h"
 }
 
+############################################ UTILITY FUNCTIONS
+
 addtoscrutinizer() {
     packageWithSilverstripe=$1
-    # add to scrutinizer
     if [ -z "$SCRUTINIZER_API_TOKEN" ]; then
         echobad "Scrutinizer credentials (SCRUTINIZER_API_TOKEN) not set in $envFileLocation file."
         exit 1
@@ -148,33 +235,20 @@ addtoscrutinizer() {
         echobad "Package to be added (packageWithSilverstripe) not provided."
         exit 1
     fi
-    # # Submit the GitHub repository to Scrutinizer
-    # response=$(curl -X POST "https://scrutinizer-ci.com/api/repositories/g" \
-    #     -H "Authorization: token $SCRUTINIZER_API_TOKEN" \
-    #     -H "Content-Type: application/json" \
-    #     -d "{\"name\":\"$packageWithSilverstripe\"}")
-    # # Check response or log it
-    # ECHOHEAD $response
 
     scrutinizerApiPath="https://scrutinizer-ci.com/api"
     endPoint="repositories/g?access_token=${SCRUTINIZER_API_TOKEN}"
     url="${scrutinizerApiPath}/${endPoint}"
 
-    # Create the POST fields
     postFields="{\"name\": \"${packageWithSilverstripe}\"}"
 
-    # Make the curl request
     curlResult=$(curl -L -s -o /dev/null -w "%{http_code}" -X POST -d "$postFields" -H "Content-Type: application/json" "$url")
 
-    # Check the result
     if [ "$curlResult" != "200" ] && [ "$curlResult" != "201" ]; then
         echobad "Could not add ${packageWithSilverstripe} to Scrutinizer (HTTP code: $curlResult)"
-        # Make the curl request and show all details
-        curlResult=$(curl -L -X POST -d "$postFields" -H "Content-Type: application/json" "$url")
-
-        # Output the result
-        echobad "$curlResult"
-        return
+        curlResultDetail=$(curl -L -s -X POST -d "$postFields" -H "Content-Type: application/json" "$url")
+        echobad "$curlResultDetail"
+        return 1
     else
         echonice "${packageWithSilverstripe} added to Scrutinizer successfully."
     fi
@@ -199,10 +273,10 @@ cd_or_fail() {
     return 1
 }
 
+# Extracts a value and outputs to stdout
 read_local_dotenv_value() {
     local key="$1"
     local envFile="$WORKING_DIR/.env"
-
 
     [[ -f "$envFile" ]] || return 1
 
@@ -213,40 +287,37 @@ read_local_dotenv_value() {
             | sed -E "s/^[[:space:]]*(export[[:space:]]+)?${key}=//"
     )"
 
-    # trim whitespace
     value="${value#"${value%%[![:space:]]*}"}"
     value="${value%"${value##*[![:space:]]}"}"
-
-    # strip surrounding quotes
     value="${value%\"}"; value="${value#\"}"
     value="${value%\'}"; value="${value#\'}"
 
     [[ -n "$value" ]] || return 1
+
+    # Pure data output
     printf '%s' "$value"
 }
 
-
+# Formats a server string and outputs to stdout
 normalize_server() {
-    # in: $1 like "user@host" or "user@host:/path"
-    # out: echo "user@host:/path" (ensures a path)
     local raw="$1"
     [[ "$raw" != *":/"* ]] && raw="$raw:$DEFAULT_SERVER_DIR"
+
+    # Pure data output
     echo "$raw"
 }
 
-# Function to check if $package is installed
 installpackage() {
     package=$1
-    if ! command -v $package &>/dev/null; then
+    if ! command -v "$package" &>/dev/null; then
         echobad "$package is not installed. Installing now..."
-        sudo apt-get update && sudo apt-get install $package
-        sudo snap install $package
+        sudo apt-get update && sudo apt-get install -y "$package"
+        sudo snap install "$package"
     else
         echonice "$package is installed."
     fi
 }
 
-# check if gh is authenticated
 check_gh_auth() {
     if ! gh auth status &>/dev/null; then
         echobad "You are not logged in to GitHub CLI."
@@ -264,36 +335,34 @@ check_for_env_var() {
         return 1
     fi
 
-    local value="${!envVarName-}"   # <-- prevents 'unbound variable' with set -u
+    local value="${!envVarName-}"
     if [[ -z "$value" ]]; then
         echobad "Missing required env var: $envVarName"
         return 1
     fi
 }
 
-
-# USE LIKE THIS: matchingDirs=$(get_my_repos "$WORKING_DIR")
-
+# Outputs an array of matching directories to stdout
 get_my_repos() {
-    check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"
-    WORKING_DIR=$1
+    check_for_env_var "GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES" || return 1
+    local WORKING_DIR=$1
 
-    # Initialize an array for package directories
     declare -a packageDirs
     declare -a found_dirs
 
-    # Step 1: First check composer.lock packages (original approach)
-    composerLock="$WORKING_DIR/composer.lock"
-    vendorDir="$WORKING_DIR/vendor"
+    # Step 1: Check composer.lock
+    local composerLock="$WORKING_DIR/composer.lock"
+    local vendorDir="$WORKING_DIR/vendor"
 
     if [[ -f "$composerLock" ]]; then
-        # Extract package names and source URLs from composer.lock
-        packages=$(jq -r '.packages[] | "\(.name) \(.source.url)"' "$composerLock" 2>/dev/null)
+        local packages
+        packages=$(jq -r '.packages[]? | "\(.name) \(.source.url)"' "$composerLock" 2>/dev/null)
 
         while read -r packageName packageUrl; do
             if [[ -n "$packageName" ]]; then
-                packageDir="$vendorDir/$packageName"
+                local packageDir="$vendorDir/$packageName"
                 if [ -d "$packageDir/.git" ]; then
+                    local remoteUrl
                     remoteUrl=$(git -C "$packageDir" config --get remote.origin.url 2>/dev/null)
                     if [[ "$remoteUrl" == *"$GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES"* ]]; then
                         packageDirs+=("$packageDir")
@@ -304,12 +373,12 @@ get_my_repos() {
         done <<<"$packages"
     fi
 
-    # Step 2: Find all git repositories and check their config files for the pattern
+    # Step 2: Find all git repositories and check config
     while IFS= read -r gitDir; do
+        local repoDir
         repoDir=$(dirname "$gitDir")
 
-        # Skip if we've already found this directory through composer.lock
-        already_found=0
+        local already_found=0
         for dir in "${found_dirs[@]}"; do
             if [[ "$dir" == "$repoDir" ]]; then
                 already_found=1
@@ -318,30 +387,34 @@ get_my_repos() {
         done
 
         if [[ $already_found -eq 0 ]]; then
-            # Check if this git repo's config contains the match pattern
             if grep -q "$GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES" "$gitDir/config" 2>/dev/null; then
                 packageDirs+=("$repoDir")
                 found_dirs+=("$repoDir")
             fi
         fi
-    done < <(find "$WORKING_DIR" -path "*/\.*" -prune -o -name ".git" -type d -print)
+    done < <(find "$WORKING_DIR" -path "*/\.*" -prune -o -name ".git" -type d -print 2>/dev/null)
 
-    # Output all found directories
+    # Pure data output
     for dir in "${packageDirs[@]}"; do
         echo "$dir"
     done
 }
 
+# Outputs escaped string to stdout
 escape_for_single_quotes() {
     printf "%s" "$1" | sed "s/'/'\\\\''/g"
 }
 
+# Validates and outputs commit message to stdout
 check_commit_message() {
     local message=$1
 
     if [[ -z "$message" ]]; then
-        read -p "Commit message: " message
+        # Read from stderr prompt to avoid corrupting stdout
+        read -r -p "Commit message: " message < /dev/tty
     fi
+
+    local PREFIXES=("API" "NEW" "ENH" "FIX" "DOC" "DEP" "TLN" "MNT" "Merge")
 
     if [[ -z "$message" ]]; then
         echobad "Please provide a commit message."
@@ -349,27 +422,23 @@ check_commit_message() {
         return 1
     fi
 
-    # List of allowed prefixes
-    PREFIXES=("API" "NEW" "ENH" "FIX" "DOC" "DEP" "TLN" "MNT" "Merge")
-
-    # Extract the first line of the commit message
+    local firstLine
     firstLine=$(echo "$message" | head -n 1)
 
-    # Check if the commit message starts with an allowed prefix
     for prefix in "${PREFIXES[@]}"; do
         if [[ "$firstLine" == "$prefix"* ]]; then
+            # Pure data output
             echo "$message"
-            # ZERO DENOTES NO ERROR
             return 0
         fi
     done
 
     echobad "Commit message ($message) does not start with an allowed prefix."
     echonice "Allowed prefixes are: ${PREFIXES[*]}"
-    # ONE DENOTES AN ERROR
     return 1
 }
 
+# Outputs masked key to stdout
 mask_api_key() {
     local key="${1-}"
     local keepStart=4
@@ -386,37 +455,124 @@ mask_api_key() {
         return 0
     fi
 
+    # Pure data output
     printf '%s***%s' "${key:0:keepStart}" "${key:len-keepEnd:keepEnd}"
 }
 
-# Check if .env file exists
-if [ ! -f "$envFileLocation" ]; then
-    echobad ".env file not found here: $envFileLocation"
-    exit 1
-fi
 
-# use a different name for the associative array
-declare -A varsToAdd=(
-    [GITHUB_USER_NAME]=''
-    [GITHUB_MATCH_URL_FOR_VENDOR_PACKAGES]=''
-    [SCRUTINIZER_API_TOKEN]=''
-    [SCRUTINIZER_ORG]=''
-    [PACKAGIST_USERNAME]=''
-    [PACKAGIST_API_TOKEN]=''
-    [LLM_PROVIDER]=''
-    [LLM_API_KEY]=''
-    [LLM_MODEL]=''
+
+
+
+############################################ SILVERSTRIPE VERSION DETECTION
+
+declare -A SAKE_CORE_PACKAGES_SS4=(
+    ["silverstripe/framework"]="^4"
+    ["silverstripe/recipe-cms"]="^4"
+    ["silverstripe/recipe-core"]="^4"
+    ["silverstripe/cms"]="^4"
+    ["silverstripe/admin"]="^1"
+)
+declare -A SAKE_CORE_PACKAGES_SS5=(
+    ["silverstripe/framework"]="^5"
+    ["silverstripe/recipe-cms"]="^5"
+    ["silverstripe/recipe-core"]="^5"
+    ["silverstripe/cms"]="^5"
+    ["silverstripe/admin"]="^2"
+)
+declare -A SAKE_CORE_PACKAGES_SS6=(
+    ["silverstripe/framework"]="^6"
+    ["silverstripe/recipe-cms"]="^6"
+    ["silverstripe/recipe-core"]="^6"
+    ["silverstripe/cms"]="^6"
+    ["silverstripe/admin"]="^3"
+)
+declare -A SAKE_CORE_PACKAGES_SS7=(
+    ["silverstripe/framework"]="^7"
+    ["silverstripe/recipe-cms"]="^7"
+    ["silverstripe/recipe-core"]="^7"
+    ["silverstripe/cms"]="^7"
+    ["silverstripe/admin"]="^4"
 )
 
-# Create .env file if it doesn't exist
-touch "$envFileLocation"
+# Helper: Safely parses complex composer constraints
+# Supports: "^5", "~5.0", "^4 || ^5", "5.x-dev", "^5.0.2", "v5.0", ">=^5"
+sake_check_major_version_match() {
+    local req_string="$1"
+    local expected_major="$2"
 
-# Loop through vars and add them if missing
-for key in "${!varsToAdd[@]}"; do
-    if ! grep -q "^$key=" "$envFileLocation"; then
-        echo "$key=${varsToAdd[$key]}" >>"$envFileLocation"
+    # Replace '||' with a single pipe, then strip all whitespace
+    local clean_string="${req_string//||/|}"
+    clean_string="${clean_string// /}"
+
+    IFS='|' read -ra parts <<< "$clean_string"
+    for part in "${parts[@]}"; do
+        # Extract the first sequence of digits (ignores all prefixes like ^, ~, >=, v)
+        if [[ "$part" =~ ([0-9]+) ]]; then
+            local major="${BASH_REMATCH[1]}"
+            if [[ "$major" == "$expected_major" ]]; then
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+# Extracts the SS version from composer.json.
+# Returns: 4, 5, 6, 7, "none", or "inconsistent: X Y"
+sake_determine_ss_version() {
+    local json="$1"
+    local found_versions=()
+
+    # Note: Packages with transitional constraints like "^5 || ^6"
+    # will match multiple matrices and return e.g. "inconsistent: 6 5".
+    # This is correct behavior, as it requires manual review for strict alignment.
+    for ver_key in "SS7" "SS6" "SS5" "SS4"; do
+
+        # Defensive guard against injection if this loop is ever made dynamic
+        [[ "$ver_key" =~ ^SS[0-9]+$ ]] || continue
+
+        local expected_major="${ver_key#SS}"
+        local matrix_name="SAKE_CORE_PACKAGES_$ver_key"
+        local keys
+        eval "keys=(\"\${!$matrix_name[@]}\")"
+
+        for pkg in "${keys[@]}"; do
+            local req
+            req=$(echo "$json" | jq -r ".require[\"$pkg\"] // empty" 2>/dev/null)
+
+            if [[ -n "$req" ]]; then
+                local expected_constraint
+                eval "expected_constraint=\${$matrix_name[$pkg]}"
+
+                # We also need to extract the major version from our expected constraint matrix
+                local pkg_expected_major=""
+                if [[ "$expected_constraint" =~ ([0-9]+) ]]; then
+                    pkg_expected_major="${BASH_REMATCH[1]}"
+                fi
+
+                if [[ -n "$pkg_expected_major" ]] && sake_check_major_version_match "$req" "$pkg_expected_major"; then
+                    # Check if version is already in our array using a safe loop
+                    local already_found=0
+                    for v in "${found_versions[@]:-}"; do
+                        if [[ "$v" == "$expected_major" ]]; then
+                            already_found=1
+                            break
+                        fi
+                    done
+
+                    if [[ $already_found -eq 0 ]]; then
+                        found_versions+=("$expected_major")
+                    fi
+                fi
+            fi
+        done
+    done
+
+    if [[ ${#found_versions[@]} -eq 0 ]]; then
+        echo "none"
+    elif [[ ${#found_versions[@]} -gt 1 ]]; then
+        echo "inconsistent: ${found_versions[*]}"
+    else
+        echo "${found_versions[0]}"
     fi
-done
-
-# Load the .env file
-source "$envFileLocation"
+}
