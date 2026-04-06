@@ -418,6 +418,50 @@ for step in "${steps[@]}"; do
     echonice "✓ Completed $fromBranch ↔ $toBranch"
 done
 
+
+echonice ''
+ECHOHEAD 'Branch status after merges'
+
+git fetch origin >/dev/null 2>&1 || true
+
+# ---- Adjacent branch comparison
+printf '  %-20s  %-10s  %-10s\n' 'COMPARISON' 'AHEAD' 'BEHIND'
+printf '  %-20s  %-10s  %-10s\n' '────────────────────' '──────────' '──────────'
+
+for (( i=0; i<${#FLOW_ACTUAL[@]}-1; i++ )); do
+    left="${FLOW_ACTUAL[$i]}"
+    right="${FLOW_ACTUAL[$((i+1))]}"
+
+    counts=$(git rev-list --left-right --count "origin/${left}...origin/${right}" 2>/dev/null)
+    if [[ $? -eq 0 && -n "$counts" ]]; then
+        ahead=$(echo "$counts" | awk '{print $1}')
+        behind=$(echo "$counts" | awk '{print $2}')
+        printf '  %-20s  %-10s  %-10s\n' "${left} → ${right}" "$ahead" "$behind"
+    else
+        printf '  %-20s  %-10s  %-10s\n' "${left} → ${right}" '?' '?'
+    fi
+done
+
+# ---- Local vs origin
+echonice ''
+printf '  %-20s  %-10s  %-10s\n' 'BRANCH' 'LOCAL +' 'LOCAL −'
+printf '  %-20s  %-10s  %-10s\n' '────────────────────' '──────────' '──────────'
+
+for b in "${FLOW_ACTUAL[@]}"; do
+    if git show-ref --verify --quiet "refs/heads/${b}" && branch_exists_remote "$b"; then
+        counts=$(git rev-list --left-right --count "${b}...origin/${b}" 2>/dev/null)
+        if [[ $? -eq 0 && -n "$counts" ]]; then
+            ahead=$(echo "$counts" | awk '{print $1}')
+            behind=$(echo "$counts" | awk '{print $2}')
+            printf '  %-20s  %-10s  %-10s\n' "$b" "$ahead" "$behind"
+        else
+            printf '  %-20s  %-10s  %-10s\n' "$b" '?' '?'
+        fi
+    fi
+done
+
+echonice ''
+
 # Always end on develop (if it exists)
 if git show-ref --verify --quiet 'refs/heads/develop' || git show-ref --verify --quiet 'refs/remotes/origin/develop'; then
     ensure_local_branch 'develop' >/dev/null 2>&1 || true
