@@ -225,6 +225,7 @@ fi
 
 ############################################ 4) PHPCS (security ruleset)
 if should_run phpcs; then
+    check_for_env_var "PACKAGIST_USERNAME"
     ECHOHEAD "PHPCS Security"
 
     if command -v phpcs >/dev/null 2>&1; then
@@ -247,7 +248,7 @@ if should_run phpcs; then
             --standard=Security \
             --severity=6 \
             --ignore='*/node_modules/*' \
-            vendor/sunnysideup
+            "vendor/$PACKAGIST_USERNAME"
     fi
 fi
 
