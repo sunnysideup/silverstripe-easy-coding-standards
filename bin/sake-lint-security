@@ -395,7 +395,7 @@ if should_run gitleaks; then
     fi
 
     if command -v gitleaks >/dev/null 2>&1; then
-        gitleaks_args=(gitleaks detect --source . -v)
+        gitleaks_args=(gitleaks detect --source . -v --log-opts=""-1"")
         if [[ -f .gitleaks.toml ]]; then
             gitleaks_args+=(--config .gitleaks.toml)
         fi
