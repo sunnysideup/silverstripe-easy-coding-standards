@@ -399,7 +399,7 @@ fi
 
 ############################################ 10) Gitleaks (secret scanning)
 if should_run gitleaks; then
-    ECHOHEAD "Gitleaks (Secret Scanning)"
+    ECHOHEAD "Gitleaks (Secret Scanning) - consider using .gitleaksignore for exceptions OR .gitleaks.toml for custom config OR BFG Repo-Cleaner for history cleanup"
     if ! command -v gitleaks >/dev/null 2>&1; then
         echobad "Gitleaks not installed."
         if ask "Install gitleaks? (requires Go or download binary)" "n"; then
@@ -413,7 +413,7 @@ if should_run gitleaks; then
     fi
 
     if command -v gitleaks >/dev/null 2>&1; then
-        gitleaks_args=(gitleaks detect --source . -v --log-opts=""-1"")
+        gitleaks_args=(gitleaks detect --source . -v --log-opts=""--since=6months"")
         if [[ -f .gitleaks.toml ]]; then
             gitleaks_args+=(--config .gitleaks.toml)
         fi
