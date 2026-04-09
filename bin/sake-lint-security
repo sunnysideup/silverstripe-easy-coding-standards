@@ -272,7 +272,7 @@ if should_run semgrep; then
         fi
         run "${local_cmd[@]}" .
     else
-        echobad "Skipping Semgrep (not installed). Tip: pipx install semgrep"
+        echobad "Skipping Semgrep (not installed). Try: pipx install semgrep"
     fi
 fi
 
