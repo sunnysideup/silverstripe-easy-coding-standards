@@ -46,7 +46,7 @@ source "$envFileLocation"
 # Standard flag handler for argument parsing (Handles Help and Quiet modes)
 # Returns 0 (success) if the flag was handled here, 1 if the parent script needs to handle it.
 # Usage: In your script's case statement, call: sake_handle_common_flags "$1" && shift && continue
-sake_handle_common_flags() {
+sake_handle_help_flag() {
     case "$1" in
     -h | --help)
         help='yes'
