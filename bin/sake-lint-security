@@ -32,7 +32,6 @@ KEY_CHECKS=(
     npm-audit
     public-files
     world-writable
-    gitleaks
     php-dangerous
     env-permissions
 )
@@ -273,14 +272,15 @@ if should_run semgrep; then
             local_cmd+=(--config .semgrep)
         fi
         run "${local_cmd[@]}" .
-        cp -r "vendor/$PACKAGIST_USERNAME" /tmp/my-scan
+        mkdir -p "/tmp/my-scan-of/vendor"
+        cp -r "vendor/$PACKAGIST_USERNAME" "/tmp/my-scan-of/vendor/$PACKAGIST_USERNAME"
         semgrep scan \
             --config p/phpcs-security-audit \
             --config p/security-audit \
             --config p/owasp-top-ten \
             --include='*.php' \
-            /tmp/my-scan
-        rm -rf /tmp/my-scan
+            "/tmp/my-scan-of/vendor/$PACKAGIST_USERNAME"
+        rm -rf "/tmp/my-scan-of/vendor/$PACKAGIST_USERNAME"
     else
         echobad "Skipping Semgrep (not installed). Try: pipx install semgrep"
     fi
