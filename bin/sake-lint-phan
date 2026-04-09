@@ -1,79 +1,51 @@
 #!/usr/bin/env bash
-
 ############################################ BASICS
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 
-############################################ DIR
-# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
-if [ "$1" != "" ]; then
-    dir=$1
-else
-    dir='app/src'
-fi
-
 ############################################ SETTINGS
-also='app/_config.php'
 phanConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/.phan/config.php"
 phpVersion="8.0"
-help='no'
+
 while (($#)); do
     case $1 in
-    -l | --level)
-        level=$2
-        shift
-        ;;
-    -s | --phan-config)
-        phanConfig=$2
-        shift
-        ;;
-    -p | --php-version)
-        phpVersion=$2
-        shift
-        ;;
-    *)
-        if sake_handle_help_flag "$1"; then
-            shift
-            continue
-        fi
-        dir=$1
-        ;;
+        -s|--phan-config)  phanConfig=$2; shift ;;
+        -p|--php-version)  phpVersion=$2; shift ;;
+        *)
+            if sake_handle_help_flag "$1"; then shift; continue; fi
+            ;;
     esac
     shift
 done
 
-
 ############################################ HELP
-
 help_and_exit() {
 
     ECHOHEAD "PHP PHAN"
-    echonice "Directory of script:              $SCRIPT_DIR"
-    echonice "Directory to analyse:             $WORKING_DIR/$dir"
+    echonice "Directory to analyse:             $WORKING_DIR"
 
     ECHOHEAD "Current settings:"
     echonice "phan config file (-s):            $phanConfig"
     echonice "php version (-p):                 $phpVersion"
 
-    ECHOHEAD "Available settings:"
-    echonice "-s, --phan-config                 stan config file locaton e.g. ../phpstan.neon"
-    echonice "-h, --help                        show help information"
-
     ECHOHEAD "Example usage:"
-    echonice "sake-lint-phan   -l 2 -a app_more/_config.php -s ../.phan/config.php   foo/bar "
-
+    echonice "sake-lint-phan -s ../.phan/config.php -p 8.2"
     echofunctions
     exit
 }
-
-
 sake_check_help_and_exit
 
 ############################################ CODE
-
 cd_or_fail "$WORKING_DIR" help_and_exit
 
-$SCRIPT_DIR/phan --directory $WORKING_DIR --project-root-directory $WORKING_DIR/$dir --minimum-target-php-version $phpVersion
+# Build directory args from shared config
+read -ra phan_args <<< "$(scan_get_phan_directory_args)"
+
+"$SCRIPT_DIR/phan" \
+    --project-root-directory "$WORKING_DIR" \
+    "${phan_args[@]}" \
+    --minimum-target-php-version "$phpVersion" \
+    --config-file "$phanConfig"
 
 echoend

@@ -581,3 +581,130 @@ sake_determine_ss_version() {
         echo "${found_versions[0]}"
     fi
 }
+
+
+######################################## SCAN
+
+# sake-lint-scan-config.sh
+# Shared paths/excludes for static analysis tools (PHPStan, Phan, etc.)
+# Source this file from any script that needs these values.
+
+# Directories to analyse (only those that exist will be used)
+SCAN_CANDIDATE_PATHS=(
+    app/src
+    app
+    src
+    themes
+)
+
+# Always include these files if they exist
+SCAN_EXTRA_FILES=(
+    app/_config.php
+)
+
+# Directories to exclude
+SCAN_EXCLUDE_PATHS=(
+    vendor
+    node_modules
+    .git
+    .graphql
+    _upgrade
+    _dev
+    patches
+    bin
+    public/assets
+    datauploadfolder
+)
+
+# PHPStan-specific ignore patterns
+PHPSTAN_IGNORE_ERRORS=(
+    '#Call to an undefined method [a-zA-Z0-9\\_]+::get\(\)#'
+    '#Call to an undefined method [a-zA-Z0-9\\_]+::filter\(\)#'
+)
+
+# Filter SCAN_CANDIDATE_PATHS to only those that exist in $PWD
+scan_get_existing_paths() {
+    local result=()
+    for p in "${SCAN_CANDIDATE_PATHS[@]}"; do
+        [[ -d "$p" ]] && result+=("$p")
+    done
+    # Deduplicate (e.g. if app/src exists, drop app to avoid scanning twice)
+    # Keep the most specific path
+    local filtered=()
+    for p in "${result[@]}"; do
+        local is_parent=0
+        for q in "${result[@]}"; do
+            if [[ "$p" != "$q" && "$q" == "$p/"* ]]; then
+                is_parent=1
+                break
+            fi
+        done
+        [[ $is_parent -eq 0 ]] && filtered+=("$p")
+    done
+    echo "${filtered[@]}"
+}
+
+scan_get_existing_extra_files() {
+    local result=()
+    for f in "${SCAN_EXTRA_FILES[@]}"; do
+        [[ -f "$f" ]] && result+=("$f")
+    done
+    echo "${result[@]}"
+}
+
+# Generate a phpstan.neon from the shared config
+scan_generate_phpstan_neon() {
+    local paths
+    read -ra paths <<< "$(scan_get_existing_paths)"
+    local extra_files
+    read -ra extra_files <<< "$(scan_get_existing_extra_files)"
+
+    if [[ ${#paths[@]} -eq 0 ]]; then
+        echobad "No scan paths found in project — cannot generate phpstan.neon"
+        return 1
+    fi
+
+    {
+        echo "parameters:"
+        echo "    level: ${1:-1}"
+        echo "    paths:"
+        for p in "${paths[@]}"; do
+            echo "        - $p"
+        done
+        for f in "${extra_files[@]}"; do
+            echo "        - $f"
+        done
+        echo "    excludePaths:"
+        for e in "${SCAN_EXCLUDE_PATHS[@]}"; do
+            echo "        - $e (?)"
+        done
+        echo '        - "*.js"'
+        echo "    ignoreErrors:"
+        for err in "${PHPSTAN_IGNORE_ERRORS[@]}"; do
+            echo "        - '$err'"
+        done
+        echo "    reportUnmatchedIgnoredErrors: false"
+    } > phpstan.neon
+
+    echogood "Generated phpstan.neon with paths: ${paths[*]}"
+}
+
+# Build Phan CLI args from the shared config
+scan_get_phan_directory_args() {
+    local paths
+    read -ra paths <<< "$(scan_get_existing_paths)"
+    local extra_files
+    read -ra extra_files <<< "$(scan_get_existing_extra_files)"
+
+    local args=()
+    for p in "${paths[@]}"; do
+        args+=(--directory "$p")
+    done
+    # Phan uses --include-analysis-file-list for individual files
+    if [[ ${#extra_files[@]} -gt 0 ]]; then
+        local joined
+        joined=$(IFS=,; echo "${extra_files[*]}")
+        args+=(--include-analysis-file-list "$joined")
+    fi
+    echo "${args[@]}"
+}
