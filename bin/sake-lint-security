@@ -180,6 +180,8 @@ done < <(find . -maxdepth 1 -type d \
     -not -path './node_modules*' \
     -print0)
 
+TARGETS+=("vendor/$PACKAGIST_USERNAME")
+
 ############################################ 1) Composer audit
 if should_run composer-audit; then
     ECHOHEAD "Composer Audit"
@@ -271,6 +273,14 @@ if should_run semgrep; then
             local_cmd+=(--config .semgrep)
         fi
         run "${local_cmd[@]}" .
+        cp -r "vendor/$PACKAGIST_USERNAME" /tmp/my-scan
+        semgrep scan \
+            --config p/phpcs-security-audit \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --include='*.php' \
+            /tmp/my-scan
+        rm -rf /tmp/my-scan
     else
         echobad "Skipping Semgrep (not installed). Try: pipx install semgrep"
     fi
