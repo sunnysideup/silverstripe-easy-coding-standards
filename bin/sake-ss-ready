@@ -28,7 +28,7 @@ while (($#)); do
         check_forks='yes'
         ;;
     *)
-        if sake_handle_common_flags "$1"; then
+        if sake_handle_help_flag "$1"; then
             shift
             continue
         fi
