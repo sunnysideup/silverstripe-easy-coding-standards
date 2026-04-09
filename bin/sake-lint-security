@@ -27,6 +27,7 @@ declare -A CHECK_DESC=(
 KEY_CHECKS=(
     composer-audit
     roave
+    phpcs
     semgrep
     npm-audit
     public-files
@@ -225,12 +226,28 @@ fi
 ############################################ 4) PHPCS (security ruleset)
 if should_run phpcs; then
     ECHOHEAD "PHPCS Security"
+
     if command -v phpcs >/dev/null 2>&1; then
-        run phpcs --standard=Security "${TARGETS[@]}"
+        PHPCS=phpcs
     elif [[ -x vendor/bin/phpcs ]]; then
-        run vendor/bin/phpcs --standard=Security "${TARGETS[@]}"
+        PHPCS=vendor/bin/phpcs
     else
         echobad 'Skipping PHPCS (phpcs not found).'
+        PHPCS=""
+    fi
+
+    if [[ -n "$PHPCS" ]]; then
+        run "$PHPCS" \
+            --standard=Security \
+            --severity=6 \
+            --ignore='*/vendor/*,*/node_modules/*,public/assets/*,.graphql-generated/*' \
+            "${TARGETS[@]}"
+
+        run "$PHPCS" \
+            --standard=Security \
+            --severity=6 \
+            --ignore='*/node_modules/*' \
+            vendor/sunnysideup
     fi
 fi
 
