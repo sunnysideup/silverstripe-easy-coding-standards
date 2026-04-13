@@ -327,8 +327,25 @@ rm -f "$tmpDir/ready.txt"
 # Always check the original repo
 check_repo "$owner/$repo"
 
-# Only check forks if explicitly requested with -c / --check-forks
-if [[ "$check_forks" == "yes" ]] && [[ ${#forkRepos[@]} -gt 0 ]]; then
+# Check if main repo already has a match — skip forks if so
+main_ready=0
+for key in "${!BRANCH_RESULTS[@]}"; do
+    full="${key%%|||*}"
+    if [[ "$full" != "$owner/$repo" ]]; then
+        continue
+    fi
+    value="${BRANCH_RESULTS[$key]}"
+    matched="${value%%|||*}"
+    if [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]] && [[ "$matched" != "NONE" ]]; then
+        main_ready=1
+        break
+    fi
+done
+
+if [[ $main_ready -eq 1 ]]; then
+    echonice "✔ Main repo is ready for $test — skipping fork checks."
+    echoline
+elif [[ "$check_forks" == "yes" ]] && [[ ${#forkRepos[@]} -gt 0 ]]; then
     echonice "Checking forks…"
     echoline
     for r in "${forkRepos[@]}"; do
