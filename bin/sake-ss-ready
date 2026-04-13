@@ -405,7 +405,7 @@ if [[ -z "$best_main" ]] && [[ -z "$best_fork" ]]; then
 fi
 
 echoline
-echoend
+
 
 # JSON output (only when --format json)
 if [[ "$format" == "json" ]]; then
@@ -416,18 +416,9 @@ if [[ "$format" == "json" ]]; then
         status="fork"
     fi
 
-    json=$(cat <<ENDJSON
-{
-  "package": "$target",
-  "test": "$test",
-  "status": "$status",
-  "main": ${best_main:-null},
-  "fork": ${best_fork:-null}
-}
-ENDJSON
-)
-    echo "$json" >&3   # write to real stdout (fd 3)
+    printf '{"package":"%s","test":"%s","status":"%s","main":%s,"fork":%s}\n' \
+        "$target" "$test" "$status" \
+        "${best_main:-null}" "${best_fork:-null}" >&3
 fi
 
-echoline
 echoend
