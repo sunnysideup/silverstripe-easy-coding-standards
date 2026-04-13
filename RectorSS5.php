@@ -2,20 +2,16 @@
 
 declare(strict_types=1);
 
-use Netwerkstatt\SilverstripeRector\Rector\Injector\UseCreateRector;
 use Rector\Config\RectorConfig;
-use Netwerkstatt\SilverstripeRector\Rector\DataObject\EnsureTableNameIsSetRector;
 use Rector\Set\ValueObject\LevelSetList;
 use Rector\Set\ValueObject\SetList;
 use Netwerkstatt\SilverstripeRector\Set\SilverstripeSetList;
 use Netwerkstatt\SilverstripeRector\Set\SilverstripeLevelSetList;
+use Rector\CodeQuality\Rector\Class_\CompleteDynamicPropertiesRector;
 
-return RectorConfig::configure()
-    ->withPreparedSets(
-        deadCode: true,
-        codeQuality: true
-    )
-    ->withSets([
+return static function (RectorConfig $rectorConfig): void {
+
+    $rectorConfig->sets([
         //rector lists
         LevelSetList::UP_TO_PHP_83,
         SetList::CODE_QUALITY,
@@ -23,7 +19,14 @@ return RectorConfig::configure()
         //silverstripe rector
         SilverstripeSetList::CODE_STYLE,
         SilverstripeLevelSetList::UP_TO_SS_5_4
-    ])
+    ]);
+    $rectorConfig->skip(
+        [
+            CompleteDynamicPropertiesRector::class,
+            //\Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer
+            //\Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer::class,
+        ]
+    );
     // ->withRules([
     //     EnsureTableNameIsSetRector::class,
     //     UseCreateRector::class
@@ -34,4 +37,4 @@ return RectorConfig::configure()
     //     ClassPropertyAssignToConstructorPromotionRector::class,
     //     ReturnNeverTypeRector::class
     // ])
-;
+};
