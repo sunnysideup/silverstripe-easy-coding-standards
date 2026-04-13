@@ -115,6 +115,11 @@ get_rule_value() {
     eval "echo \"\${$ACTIVE_RULESET[$key]}\""
 }
 
+# When format=json, send human-readable output to stderr
+if [[ "$format" == "json" ]]; then
+    exec 3>&1          # save real stdout on fd 3
+    exec 1>&2          # redirect stdout → stderr (all echos go there)
+fi
 # ----------------------------------------------------
 # 2. Resolve composer package → repo URL
 # ----------------------------------------------------
@@ -327,13 +332,11 @@ rm -f "$tmpDir/ready.txt"
 # Always check the original repo
 check_repo "$owner/$repo"
 
-# Check if main repo already has a match — skip forks if so
+# Did the main repo match?
 main_ready=0
 for key in "${!BRANCH_RESULTS[@]}"; do
     full="${key%%|||*}"
-    if [[ "$full" != "$owner/$repo" ]]; then
-        continue
-    fi
+    [[ "$full" != "$owner/$repo" ]] && continue
     value="${BRANCH_RESULTS[$key]}"
     matched="${value%%|||*}"
     if [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]] && [[ "$matched" != "NONE" ]]; then
@@ -342,15 +345,15 @@ for key in "${!BRANCH_RESULTS[@]}"; do
     fi
 done
 
-if [[ $main_ready -eq 1 ]]; then
-    echonice "✔ Main repo is ready for $test — skipping fork checks."
-    echoline
-elif [[ "$check_forks" == "yes" ]] && [[ ${#forkRepos[@]} -gt 0 ]]; then
-    echonice "Checking forks…"
+if [[ $main_ready -eq 0 ]] && [[ "$check_forks" == "yes" ]] && [[ ${#forkRepos[@]} -gt 0 ]]; then
+    echonice "Main repo not ready — checking forks…"
     echoline
     for r in "${forkRepos[@]}"; do
         check_repo "$r"
     done
+else
+    echonice "✔ Main repo is ready for $test — skipping fork checks."
+    echoline
 fi
 
 # ----------------------------------------------------
@@ -358,12 +361,16 @@ fi
 # ----------------------------------------------------
 ECHOHEAD "Results: branches ready for $ACTIVE_RULESET"
 
-found_any=0
+# Collect structured results
+best_main=""
+best_fork=""
+best_fork_score=0
+
 for key in "${!BRANCH_RESULTS[@]}"; do
     full="${key%%|||*}"
     rest="${key#*|||}"
     branch="${rest%%|||*}"
-    path="${rest##*|||}"          # ← was missing
+    path="${rest##*|||}"
 
     value="${BRANCH_RESULTS[$key]}"
     matched="${value%%|||*}"
@@ -372,21 +379,54 @@ for key in "${!BRANCH_RESULTS[@]}"; do
         continue
     fi
 
-    found_any=1
+    # Count matched packages as a simple score
+    score=$(echo "$matched" | grep -o '"' | wc -l)
+    score=$((score / 4))  # each pkg contributes 4 quotes: "key": "val"
 
     if [[ "$full" == "$owner/$repo" ]]; then
-        echonice "  ✔ $full:$branch"
-        echonice "    [$path]"
-        echonice "    matched: $matched"
+        echonice "  ✔ $full:$branch [$path] matched: $matched"
+        if [[ -z "$best_main" ]]; then
+            best_main=$(printf '{"repo":"%s","branch":"%s","path":"%s","matched":%s}' \
+                "$full" "$branch" "$path" "$matched")
+        fi
     else
-        echonice "  ✔ $full:$branch  (fork of $owner/$repo)"
-        echonice "    [$path]"
-        echonice "    matched: $matched"
+        echonice "  ✔ $full:$branch (fork of $owner/$repo) [$path] matched: $matched"
+        if (( score > best_fork_score )); then
+            best_fork_score=$score
+            best_fork=$(printf '{"repo":"%s","branch":"%s","path":"%s","matched":%s}' \
+                "$full" "$branch" "$path" "$matched")
+        fi
     fi
 done
 
-if [[ $found_any -eq 0 ]]; then
+# Human-readable summary
+if [[ -z "$best_main" ]] && [[ -z "$best_fork" ]]; then
     echobad "  ✗ No branches found ready for $ACTIVE_RULESET"
+fi
+
+echoline
+echoend
+
+# JSON output (only when --format json)
+if [[ "$format" == "json" ]]; then
+    status="not-ready"
+    if [[ -n "$best_main" ]]; then
+        status="ready"
+    elif [[ -n "$best_fork" ]]; then
+        status="fork"
+    fi
+
+    json=$(cat <<ENDJSON
+{
+  "package": "$target",
+  "test": "$test",
+  "status": "$status",
+  "main": ${best_main:-null},
+  "fork": ${best_fork:-null}
+}
+ENDJSON
+)
+    echo "$json" >&3   # write to real stdout (fd 3)
 fi
 
 echoline
