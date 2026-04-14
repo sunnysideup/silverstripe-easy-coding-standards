@@ -9,7 +9,8 @@ source "$SCRIPT_DIR/sake-self-methods"
 
 
 ############################################ DEFAULTS
-DEFAULT_MODEL='openai/gpt-5.1-codex'
+DEFAULT_PROVIDER='google'
+DEFAULT_MODEL='gemini-1.5-pro'
 OPEN_CODE_INSTALL_CMD='curl -fsSL https://opencode.ai/install | bash'
 
 ############################################ SETTINGS
@@ -24,9 +25,10 @@ containsText=''     # e.g. --contains='function getCMSFields'
 apiKeyEnvName='LLM_API_KEY' # --api-key-env=NAME (source env var to read key from)
 
 # optional overrides
-modelOverride=''  # --model=provider/model-id
-apiEnvOverride='' # --api-env=OPENAI_API_KEY
-apiKeyOverride='' # --api-key=... (avoid; prefer env)
+providerOverride='' # --provider=PROVIDER
+modelOverride=''    # --model=model-id
+apiEnvOverride=''   # --api-env=OPENAI_API_KEY
+apiKeyOverride=''   # --api-key=... (avoid; prefer env)
 
 while (($#)); do
     case $1 in
@@ -61,6 +63,10 @@ while (($#)); do
         fi
         containsText="$2"
         shift 2
+        ;;
+    --provider=*)
+        providerOverride="${1#*=}"
+        shift
         ;;
     --model=*)
         modelOverride="${1#*=}"
@@ -101,17 +107,18 @@ help_and_exit() {
     echonice "File selection is via --files=GLOB (supports *), e.g. --files=./src/app/Tasks/*.php"
 
     ECHOHEAD "Current settings:"
-    echonice "working dir:                  $WORKING_DIR"
-    echonice "selected dir:                 $WORKING_DIR/$dir"
-    echonice "files:                        ${filesPattern:-'(not set)'}"
-    echonice "contains filter:              ${containsText:-'(not set)'}"
-    echonice "prompt file:                  ${prompt:-"$promptDefault"}"
-    echonice "opencode path:                $opencodePath"
-    echonice "dry run:                      $dryRun"
-    echonice "model (override/env/default): ${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
-    echonice "api env override:             ${apiEnvOverride:-'(not set)'}"
-    echonice "api key source env:           $apiKeyEnvName"
-    echonice "key value:                    $(mask_api_key "${apiKeyEnvValue-}")"
+    echonice "working dir:                     $WORKING_DIR"
+    echonice "selected dir:                    $dir"
+    echonice "files:                           ${filesPattern:-'(not set)'}"
+    echonice "contains filter:                 ${containsText:-'(not set)'}"
+    echonice "prompt file:                     ${prompt:-"$promptDefault"}"
+    echonice "opencode path:                   $opencodePath"
+    echonice "dry run:                         $dryRun"
+    echonice "provider (override/env/default): ${providerOverride:-${LLM_PROVIDER:-$DEFAULT_PROVIDER}}"
+    echonice "model (override/env/default):    ${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
+    echonice "api env override:                ${apiEnvOverride:-'(not set)'}"
+    echonice "api key source env:              $apiKeyEnvName"
+    echonice "key value:                       $(mask_api_key "${apiKeyEnvValue-}")"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                    show help information"
@@ -119,7 +126,8 @@ help_and_exit() {
     echonice "--contains=STRING             only include files that contain STRING"
     echonice "--prompt=FILE                 prompt file path (default: $promptDefault)"
     echonice "--opencode-path=PATH          opencode binary/path (default: opencode)"
-    echonice "--model=PROVIDER/MODEL        model to use (default: $DEFAULT_MODEL)"
+    echonice "--provider=PROVIDER           model to use (default: $DEFAULT_PROVIDER)"
+    echonice "--model=MODEL                 model to use (default: $DEFAULT_MODEL)"
     echonice "--api-env=ENVVAR              force which env var to pass the key into"
     echonice "--api-key-env=ENVVAR          which env var to read the key from (default: LLM_API_KEY)"
     echonice "--dry-run                     list files + print final command, do not run"
@@ -197,6 +205,7 @@ provider_to_api_env() {
 ############################################ INPUT RESOLUTION
 
 cd "$WORKING_DIR"
+cd "$dir"
 
 prompt="${prompt:-"$SCRIPT_DIR/prompt.txt"}"
 
@@ -256,11 +265,12 @@ fi
 
 ############################################ MODEL / PROVIDER / AUTH
 
+provider="${providerOverride:-${LLM_PROVIDER:-$DEFAULT_PROVIDER}}"
 model="${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
 
 # Ensure provider/model format (OpenCode expects this format)
 if [[ "$model" != */* ]]; then
-    model="openai/$model"
+    model="$provider/$model"
 fi
 provider="${model%%/*}"
 
@@ -285,22 +295,37 @@ fi
 
 promptText="$(cat "$prompt")"
 
+# Build the command (no stdbuf — it deadlocks TUI apps like opencode)
 cmd=( env )
 if [[ -n "$apiKey" ]]; then
-    if [[ "$dryRun" == "yes" ]]; then
-        cmd+=( "$apiEnv=$(mask_api_key "$apiKey")" )
-    else
-        cmd+=( "$apiEnv=$apiKey" )
-    fi
+    cmd+=( "$apiEnv=$apiKey" )
 fi
-
 cmd+=( "$opencodeResolved" run --agent build -m "$model" )
 
+# Add files
+for f in "${selectedFiles[@]}"; do
+    cmd+=( -f "$f" )
+done
+
+# Add prompt
+cmd+=( -- "$promptText" )
+
+# Build a display-safe version with masked API key
+print_cmd_masked() {
+    local piece
+    for piece in "${cmd[@]}"; do
+        if [[ "$piece" == "$apiEnv="* && -n "$apiKey" ]]; then
+            printf '%s ' "$apiEnv=$(mask_api_key "$apiKey")"
+        else
+            printf '%s ' "$piece"
+        fi
+    done
+    printf '\n'
+}
+
 if [[ "$dryRun" == "yes" ]]; then
-
-
     ECHOHEAD "Command:"
-    echonice "${cmd[@]}"
+    print_cmd_masked
 
     ECHOHEAD "Files included (${#selectedFiles[@]}):"
     for f in "${selectedFiles[@]}"; do
@@ -315,19 +340,19 @@ if [[ "$dryRun" == "yes" ]]; then
 fi
 
 ECHOHEAD "Command:"
-printf '%q ' "${cmd[@]}"
-echo "" # Add a newline at the end
+print_cmd_masked
+
+ECHOHEAD "Working directory:"
+echonice "$(pwd)"
 
 ECHOHEAD "Files included (${#selectedFiles[@]}):"
 for f in "${selectedFiles[@]}"; do
-    cmd+=( -f "$f" )
     echonice "$f"
 done
 
-# 1. Print the command safely (with properly escaped spaces/special characters)
 ECHOHEAD "Prompt content"
 echonice "$promptText"
 
-cmd+=( -- "$promptText" )
+echo ""
 "${cmd[@]}"
 echoend

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 ############################################ BASICS
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
-WORKING_DIR=$(pwd)
+WORKING_DIR="$(pwd)"
+# shellcheck source=/dev/null
 source "$SCRIPT_DIR/sake-self-methods"
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 ############################################ DIR
 dir='./'
@@ -17,6 +18,7 @@ help='no'
 allCommitsInBranch='no'
 intoBranch='HEAD'
 allCommits='no'
+confirmAll='no'
 while (($#)); do
     case $1 in
     -n | --number-of-commits)
@@ -37,6 +39,10 @@ while (($#)); do
         ;;
     -i | --into-branch)
         intoBranch=$2
+        shift
+        ;;
+    -y | --no-interaction)
+        confirmAll='yes'
         shift
         ;;
     -z | --ze-entire-project)
@@ -65,12 +71,13 @@ help_and_exit() {
 
     ECHOHEAD "Current settings:"
     echonice "Directory to analyse:                $WORKING_DIR/$dir"
-    echonice "Number of commits to merge:          $numberOfCommits"
+    echonice "Number of commits to merge (n):      $numberOfCommits"
     echonice "Message (-m):                        $message"
     echonice "Do today (-t):                       $doToday"
-    echonice "Do all commits of branch (-a):       $allCommitsInBranch"
+    echonice "Do all commits of branch (-b):       $allCommitsInBranch"
     echonice "Into Branch (-i) (merging branch):   $intoBranch"
-    echonice "Do all commits (-z):                 $allCommits"
+    echonice "Do all commits (-z) (RISKY!):        $allCommits"
+    echonice "Skip confirmations (-y):             $confirmAll"
 
     ECHOHEAD "Available settings:"
     echonice "-n, --number-of-commits              number of commits to merge, default: 0"
@@ -78,6 +85,7 @@ help_and_exit() {
     echonice "-t, --today                          squash commits today, default: no"
     echonice "-b, --branch--merge-all-commits      merge all commits for current branch, MUST BE SET TO yes, default: no"
     echonice "-i, --into-branch                    target branch, default: origin/HEAD"
+    echonice "-y, --no-interaction                 automatically confirm all prompts, default: no"
     echonice "-z, --ze-entire-project              merge all commits, MUST BE SET TO yes, default: no"
     echonice "-h, --help                           show help information"
 
@@ -93,7 +101,20 @@ help_and_exit() {
 
 sake_check_help_and_exit
 
-############################################ COMMIT MESSAGE
+############################################ HELPERS
+
+confirm_or_skip() {
+    local promptText="$1"
+    if [[ "$confirmAll" == "yes" ]]; then
+        return 0
+    fi
+    local answer
+    read -p "$promptText (yes/no): " answer
+    [[ "$answer" == "yes" ]]
+}
+
+############################################ VALIDATION
+
 message=$(check_commit_message "$message")
 retVal=$?
 
@@ -102,119 +123,108 @@ if [[ $retVal -ne 0 ]]; then
     exit 1
 fi
 
-# Get the current Git branch
-currentBranch=$(git branch --show-current)
+if ! [[ "$numberOfCommits" =~ ^[0-9]+$ ]]; then
+    echobad "Error: number-of-commits must be a positive integer, got: $numberOfCommits"
+    exit 1
+fi
 
-# Check if a branch is found
-if [ -z "$currentBranch" ]; then
-    currentBranch=$(git symbolic-ref --short HEAD)
-    if [ -z "$currentBranch" ]; then
-        echo "No current branch found."
+# Get the current Git branch
+currentBranch="$(git branch --show-current)"
+
+if [[ -z "$currentBranch" ]]; then
+    currentBranch="$(git symbolic-ref --short HEAD)"
+    if [[ -z "$currentBranch" ]]; then
+        echobad "No current branch found."
         exit 1
     fi
 fi
 
 ECHOHEAD "Current branch: $currentBranch"
 
-git checkout $currentBranch
-git pull origin $currentBranch
+git checkout "$currentBranch"
+git pull origin "$currentBranch"
 
 ############################################ ALL
 if [[ "$allCommits" == "yes" ]]; then
 
-    # Confirm with the user
-    read -p "Do you want to squash all commits on this project? (yes/no): " confirmation
-
-    if [ "$confirmation" = "yes" ]; then
-
-        # Switch back to the main branch
-        git checkout $currentBranch
-
-        # Reset to the initial commit
-        git reset $(git rev-list --max-parents=0 HEAD)
-
-        # Recommit everything as a single commit
-        git add .
-        git commit -m "$message"
-        read -p "Do you want to force push the changes to the remote? (yes/no): " pushConfirmation
-        if [ "$pushConfirmation" = "yes" ]; then
-            git push origin $currentBranch --force-with-lease
-
-            echonice "All commits in $currentBranch have been squashed into one. Temporary branch deleted."
-
-            # delete local tags
-            git tag -d $(git tag -l)
-            # Fetch all the tags from the remote repository
-            git fetch --tags
-
-            # delete all of them from the remote repository
-            git tag -l | xargs -I {} git push origin :refs/tags/{}
-        else
-            ECHOHEAD "Force push cancelled."
-            echoend
-            exit 0
-        fi
-        # If you've pushed to a remote before and want to force push, uncomment the line below:
-
-        ECHOHEAD "One more time"
-        git reset --soft HEAD~1
-        git commit --amend -m "$message"
-        git push --force
-
-        ECHOHEAD "All local and remote tags have been deleted."
-        echoend
-        exit
-    else
+    if ! confirm_or_skip "Do you want to squash all commits on this project?"; then
         ECHOHEAD "Operation cancelled."
         echoend
         exit 0
     fi
 
+    git checkout "$currentBranch"
+
+    # Reset to the initial commit
+    initialCommit="$(git rev-list --max-parents=0 HEAD)"
+    git reset "$initialCommit"
+
+    # Recommit everything as a single commit
+    git add .
+    git commit -m "$message"
+
+    if ! confirm_or_skip "Do you want to force push the changes to the remote?"; then
+        ECHOHEAD "Force push cancelled."
+        echoend
+        exit 0
+    fi
+
+    git push origin "$currentBranch" --force-with-lease
+    echonice "All commits in $currentBranch have been squashed into one."
+
+    # Delete local tags (only if any exist)
+    tags="$(git tag -l)"
+    if [[ -n "$tags" ]]; then
+        git tag -d $tags
+        git fetch --tags
+        git tag -l | xargs -I {} git push origin :refs/tags/{}
+    fi
+
+    ECHOHEAD "Amending final commit"
+    git reset --soft HEAD~1
+    git commit --amend -m "$message"
+    git push origin "$currentBranch" --force-with-lease
+
+    ECHOHEAD "All local and remote tags have been deleted."
+    echoend
+    exit
 fi
 
 # IMPORTANT - DO THIS FIRST
-
-git fetch origin
 git fetch origin
 
-############################################ ALL
+############################################ BRANCH
 if [[ "$allCommitsInBranch" == "yes" ]]; then
 
-    # Fetch the latest changes from the remote
-
     # Merge origin/$intoBranch into the current branch
-    if ! git merge origin/$intoBranch; then
-        echo "Merge failed!"
+    if ! git merge "origin/$intoBranch"; then
+        echobad "Merge failed!"
         exit 1
     fi
 
     # List commits that are ahead of origin/$intoBranch
     echo "Commits ahead of 'origin/$intoBranch':"
-    git log --oneline origin/$intoBranch..$currentBranch
+    git log --oneline "origin/$intoBranch..$currentBranch"
 
-    # Confirm with the user to squash commits
-    read -p "Would you like to squash these commits into a single commit? (yes/no): " confirmation
-
-    if [ "$confirmation" = "yes" ]; then
-        echonice "Squashing commits..."
-        git reset --soft $(git merge-base origin/$intoBranch $currentBranch)
-        git commit -m "$message"
-
-        # Confirm to push
-        read -p "Do you want to force push the changes to the remote? (yes/no): " pushConfirmation
-        if [ "$pushConfirmation" = "yes" ]; then
-            git push origin "$currentBranch" --force-with-lease
-            echonice "Changes have been force pushed."
-        else
-            ECHOHEAD "Operation cancelled."
-            echoend
-            exit 0
-        fi
-    else
+    if ! confirm_or_skip "Would you like to squash these commits into a single commit?"; then
         ECHOHEAD "Operation cancelled."
         echoend
         exit 0
     fi
+
+    echonice "Squashing commits..."
+    mergeBase="$(git merge-base "origin/$intoBranch" "$currentBranch")"
+    git reset --soft "$mergeBase"
+    git commit -m "$message"
+
+    if ! confirm_or_skip "Do you want to force push the changes to the remote?"; then
+        ECHOHEAD "Operation cancelled."
+        echoend
+        exit 0
+    fi
+
+    git push origin "$currentBranch" --force-with-lease
+    echonice "Changes have been force pushed."
 
     echoend
     exit 0
@@ -224,7 +234,7 @@ fi
 
 cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
-todaysCount=$(git log --since="4am" --oneline | wc -l)
+todaysCount="$(git log --since="4am" --oneline | wc -l)"
 
 ECHOHEAD "List of commits for today"
 git log --since="4am" --oneline
@@ -233,13 +243,13 @@ ECHOHEAD "Number of commits today:"
 git shortlog -s -n --all --no-merges --since="4am"
 
 if [[ "$doToday" == "yes" ]]; then
-    numberOfCommits=$todaysCount
+    numberOfCommits="$todaysCount"
 fi
 
-if [ $numberOfCommits \> 0 ]; then
-    git reset --soft HEAD~$numberOfCommits
-    git add . -A
-    git commit . -m "$message"
+if [[ "$numberOfCommits" -gt 0 ]]; then
+    git reset --soft "HEAD~$numberOfCommits"
+    git add .
+    git commit -m "$message"
     git push --force-with-lease
 else
     ECHOHEAD "Nothing to squash, please use -t or -n option"
