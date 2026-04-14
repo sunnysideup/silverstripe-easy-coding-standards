@@ -20,9 +20,14 @@ if test -f "$COMPOSER_DIR/composer.json"; then
     cd vendor/sunnysideup/easy-coding-standards
     sake-git-commit-and-push . -m "MNT: automated commit"
     cd -
+    cd cd vendor/wernerkrauss/silverstripe-rector/
+    sake-git-commit-and-push . -m "MNT: automated commit"
+    cd -
     composer update sunnysideup/easy-coding-standards --prefer-source
     composer update
     sake-composer-available-updates
+    cd /upgrader/
+    sake-git-commit-and-push . -m "MNT: automated commit"
 else
     echo "===================================================="
     echo " ERROR: could not find composer file in: $COMPOSER_DIR/composer.json"
