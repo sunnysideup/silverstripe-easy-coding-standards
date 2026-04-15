@@ -50,9 +50,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-ss-ready sunnysideup/templateoverview "
-    echonice "sake-ss-ready sunnysideup/templateoverview --check-forks"
-    echonice "sake-ss-ready sunnysideup/templateoverview -t SS4"
+    echonice "sake-ss-ready sunnysideup/templateoverview ."
     echonice "sake-ss-ready https://github.com/vendor/silverstripe-module"
 
     echofunctions
@@ -112,11 +110,11 @@ ECHOHEAD "Using ruleset: $ACTIVE_RULESET"
 
 # ── Early exit: if the ruleset has no packages, this test is unrelated ──
 if [[ ${#ruleset_keys[@]} -eq 0 ]]; then
-    echonice "✔ No core packages defined in $ACTIVE_RULESET — package is unrelated to this test."
+    echonice "✔ No core packages defined in $ACTIVE_RULESET — package is unknown to this test."
     echoline
 
     if [[ "$format" == "json" ]]; then
-        printf '{"package":"%s","test":"%s","status":"unrelated","main":null,"fork":null}\n' \
+        printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
             "$target" "$test"
     fi
 
@@ -168,6 +166,14 @@ else
 fi
 
 echonice "Repository: $owner/$repo"
+
+# Fetch the default branch name (used later for "unknown" determination)
+default_branch=$(curl -s \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    "https://api.github.com/repos/$owner/$repo" \
+    | jq -r '.default_branch // "main"'
+)
+echonice "Default branch: $default_branch"
 echoline
 
 # ----------------------------------------------------
@@ -272,8 +278,8 @@ check_branch() {
         return 0
     fi
 
-    # Added type check to prevent crash on missing .tree (e.g. API errors)
-    paths=$(echo "$tree" | jq -r 'if type == "object" and .tree != null then .tree[] | select(.path | endswith("composer.json")) | .path else empty end')
+    # Only consider the root composer.json, not nested ones (e.g. in vendor/)
+    paths=$(echo "$tree" | jq -r 'if type == "object" and .tree != null then .tree[] | select(.path == "composer.json") | .path else empty end')
 
     if [ -z "$paths" ]; then
         return 0
@@ -368,14 +374,17 @@ check_repo "$owner/$repo"
 
 # Did the main repo match?
 main_ready=0
-main_unrelated=1   # assume unrelated until we find any SS dependency
+main_unrelated=1   # assume unrelated until we find any SS dependency on the default branch
 for key in "${!BRANCH_RESULTS[@]}"; do
     full="${key%%|||*}"
     [[ "$full" != "$owner/$repo" ]] && continue
+    rest="${key#*|||}"
+    branch="${rest%%|||*}"
     value="${BRANCH_RESULTS[$key]}"
     matched="${value%%|||*}"
-    if [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]]; then
-        main_unrelated=0   # at least one composer.json references an SS package
+    # Only the default branch determines whether this is an SS package
+    if [[ "$branch" == "$default_branch" ]] && [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]]; then
+        main_unrelated=0
     fi
     if [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]] && [[ "$matched" != "NONE" ]]; then
         main_ready=1
@@ -383,9 +392,9 @@ for key in "${!BRANCH_RESULTS[@]}"; do
     fi
 done
 
-# If no composer.json in the repo references any SS package, it's unknown
+# If the default branch's composer.json has no SS package in require, it's unknown
 if [[ $main_unrelated -eq 1 ]]; then
-    echonice "✔ No SilverStripe dependencies found — package is unrelated to $test."
+    echonice "✔ No SilverStripe dependencies found on default branch — package is unknown to $test."
     echoline
 
     if [[ "$format" == "json" ]]; then
@@ -462,7 +471,9 @@ echoline
 # JSON output (only when --format json)
 if [[ "$format" == "json" ]]; then
     status="not-ready"
-    if [[ -n "$best_main" ]]; then
+    if [[ $main_unrelated -eq 1 ]]; then
+        status="unknown"
+    elif [[ -n "$best_main" ]]; then
         status="ready"
     elif [[ -n "$best_fork" ]]; then
         status="fork"
