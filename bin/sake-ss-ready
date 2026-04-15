@@ -177,75 +177,9 @@ echonice "Default branch: $default_branch"
 echoline
 
 # ----------------------------------------------------
-# 3. Optionally fetch forks (paginated)
+# 3. Optionally fetch forks (moved to after main repo assessment)
 # ----------------------------------------------------
 forkRepos=()
-
-if [[ "$check_forks" == "yes" ]]; then
-    echonice "Fetching forks…"
-
-    page=1
-    while true; do
-        forksUrl="https://api.github.com/repos/$owner/$repo/forks?per_page=100&page=$page"
-
-        apiResponse=$(curl -s \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "$forksUrl"
-        )
-
-        if [[ "$apiResponse" == "" ]] || [[ "$apiResponse" =~ "<" ]]; then
-            echobad "❌ GitHub returned non-JSON output:"
-            echobad "$apiResponse"
-            exit 1
-        fi
-
-        jsonType=$(echo "$apiResponse" | jq -r 'type')
-
-        if [ "$jsonType" = "object" ]; then
-            message=$(echo "$apiResponse" | jq -r '.message // empty')
-            if [ -n "$message" ] && [ "$message" != "null" ]; then
-                echobad "❌ GitHub API error: $message"
-                echobad "Full response:"
-                echobad "$apiResponse"
-                exit 1
-            fi
-            echobad "❌ Unexpected JSON object instead of array:"
-            echobad "$apiResponse"
-            exit 1
-        fi
-
-        if [ "$jsonType" != "array" ]; then
-            echobad "❌ Unexpected JSON type: $jsonType"
-            echobad "$apiResponse"
-            exit 1
-        fi
-
-        count=$(echo "$apiResponse" | jq 'length')
-        if [[ "$count" -eq 0 ]]; then
-            break
-        fi
-
-        forks=$(echo "$apiResponse" | jq -r '.[].full_name')
-        if [ -n "$forks" ]; then
-            while read -r f; do
-                forkRepos+=("$f")
-            done <<< "$forks"
-        fi
-
-        echonice "  … fetched page $page ($count forks)"
-
-        # If fewer than 100 results, we've reached the last page
-        if [[ "$count" -lt 100 ]]; then
-            break
-        fi
-
-        page=$((page + 1))
-    done
-
-    echonice "Found ${#forkRepos[@]} fork(s) total"
-    echoline
-fi
 
 # ----------------------------------------------------
 # 4. Branch + composer checks
@@ -404,6 +338,73 @@ if [[ $main_unrelated -eq 1 ]]; then
 
     echoend
     exit 0
+fi
+
+# Fetch forks now (only if needed — main repo is SS-related but not ready)
+if [[ $main_ready -eq 0 ]] && [[ "$check_forks" == "yes" ]]; then
+    echonice "Fetching forks…"
+
+    page=1
+    while true; do
+        forksUrl="https://api.github.com/repos/$owner/$repo/forks?per_page=100&page=$page"
+
+        apiResponse=$(curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$forksUrl"
+        )
+
+        if [[ "$apiResponse" == "" ]] || [[ "$apiResponse" =~ "<" ]]; then
+            echobad "❌ GitHub returned non-JSON output:"
+            echobad "$apiResponse"
+            exit 1
+        fi
+
+        jsonType=$(echo "$apiResponse" | jq -r 'type')
+
+        if [ "$jsonType" = "object" ]; then
+            message=$(echo "$apiResponse" | jq -r '.message // empty')
+            if [ -n "$message" ] && [ "$message" != "null" ]; then
+                echobad "❌ GitHub API error: $message"
+                echobad "Full response:"
+                echobad "$apiResponse"
+                exit 1
+            fi
+            echobad "❌ Unexpected JSON object instead of array:"
+            echobad "$apiResponse"
+            exit 1
+        fi
+
+        if [ "$jsonType" != "array" ]; then
+            echobad "❌ Unexpected JSON type: $jsonType"
+            echobad "$apiResponse"
+            exit 1
+        fi
+
+        count=$(echo "$apiResponse" | jq 'length')
+        if [[ "$count" -eq 0 ]]; then
+            break
+        fi
+
+        forks=$(echo "$apiResponse" | jq -r '.[].full_name')
+        if [ -n "$forks" ]; then
+            while read -r f; do
+                forkRepos+=("$f")
+            done <<< "$forks"
+        fi
+
+        echonice "  … fetched page $page ($count forks)"
+
+        # If fewer than 100 results, we've reached the last page
+        if [[ "$count" -lt 100 ]]; then
+            break
+        fi
+
+        page=$((page + 1))
+    done
+
+    echonice "Found ${#forkRepos[@]} fork(s) total"
+    echoline
 fi
 
 if [[ $main_ready -eq 0 ]] && [[ "$check_forks" == "yes" ]] && [[ ${#forkRepos[@]} -gt 0 ]]; then
