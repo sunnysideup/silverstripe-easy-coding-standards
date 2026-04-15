@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 ############################################ BASICS
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
@@ -51,7 +50,9 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-ss-ready sunnysideup/templateoverview ."
+    echonice "sake-ss-ready sunnysideup/templateoverview "
+    echonice "sake-ss-ready sunnysideup/templateoverview --check-forks"
+    echonice "sake-ss-ready sunnysideup/templateoverview -t SS4"
     echonice "sake-ss-ready https://github.com/vendor/silverstripe-module"
 
     echofunctions
@@ -109,6 +110,19 @@ eval "ruleset_keys=(\"\${!$ACTIVE_RULESET[@]}\")"
 
 ECHOHEAD "Using ruleset: $ACTIVE_RULESET"
 
+# ── Early exit: if the ruleset has no packages, this test is unrelated ──
+if [[ ${#ruleset_keys[@]} -eq 0 ]]; then
+    echonice "✔ No core packages defined in $ACTIVE_RULESET — package is unrelated to this test."
+    echoline
+
+    if [[ "$format" == "json" ]]; then
+        printf '{"package":"%s","test":"%s","status":"unrelated","main":null,"fork":null}\n' \
+            "$target" "$test"
+    fi
+
+    echoend
+    exit 0
+fi
 
 get_rule_value() {
     local key="$1"
@@ -125,10 +139,11 @@ fi
 # ----------------------------------------------------
 resolve_repo_from_composer() {
     pkg="$1"
+    # Moved head before sed to prevent 'broken pipe' errors
     curl -s "https://repo.packagist.org/p2/$pkg.json" \
         | jq -r '.packages[][].source.url' \
-        | sed 's|git://|https://|; s|git@github.com:|https://github.com/|' \
-        | head -n1
+        | head -n1 \
+        | sed 's|git://|https://|; s|git@github.com:|https://github.com/|'
 }
 
 if [[ "$target" =~ ^https?:// ]]; then
@@ -156,56 +171,73 @@ echonice "Repository: $owner/$repo"
 echoline
 
 # ----------------------------------------------------
-# 3. Optionally fetch forks
+# 3. Optionally fetch forks (paginated)
 # ----------------------------------------------------
 forkRepos=()
 
 if [[ "$check_forks" == "yes" ]]; then
     echonice "Fetching forks…"
 
-    forksUrl="https://api.github.com/repos/$owner/$repo/forks?per_page=100"
+    page=1
+    while true; do
+        forksUrl="https://api.github.com/repos/$owner/$repo/forks?per_page=100&page=$page"
 
-    apiResponse=$(curl -s \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        "$forksUrl"
-    )
+        apiResponse=$(curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$forksUrl"
+        )
 
-    if [[ "$apiResponse" == "" ]] || [[ "$apiResponse" =~ "<" ]]; then
-        echobad "❌ GitHub returned non-JSON output:"
-        echobad "$apiResponse"
-        exit 1
-    fi
-
-    jsonType=$(echo "$apiResponse" | jq -r 'type')
-
-    if [ "$jsonType" = "object" ]; then
-        message=$(echo "$apiResponse" | jq -r '.message // empty')
-        if [ -n "$message" ] && [ "$message" != "null" ]; then
-            echobad "❌ GitHub API error: $message"
-            echobad "Full response:"
+        if [[ "$apiResponse" == "" ]] || [[ "$apiResponse" =~ "<" ]]; then
+            echobad "❌ GitHub returned non-JSON output:"
             echobad "$apiResponse"
             exit 1
         fi
-        echobad "❌ Unexpected JSON object instead of array:"
-        echobad "$apiResponse"
-        exit 1
-    fi
 
-    if [ "$jsonType" != "array" ]; then
-        echobad "❌ Unexpected JSON type: $jsonType"
-        echobad "$apiResponse"
-        exit 1
-    fi
+        jsonType=$(echo "$apiResponse" | jq -r 'type')
 
-    forks=$(echo "$apiResponse" | jq -r '.[].full_name')
-    if [ -n "$forks" ]; then
-        while read -r f; do
-            forkRepos+=("$f")
-        done <<< "$forks"
-    fi
+        if [ "$jsonType" = "object" ]; then
+            message=$(echo "$apiResponse" | jq -r '.message // empty')
+            if [ -n "$message" ] && [ "$message" != "null" ]; then
+                echobad "❌ GitHub API error: $message"
+                echobad "Full response:"
+                echobad "$apiResponse"
+                exit 1
+            fi
+            echobad "❌ Unexpected JSON object instead of array:"
+            echobad "$apiResponse"
+            exit 1
+        fi
 
-    echonice "Found ${#forkRepos[@]} fork(s)"
+        if [ "$jsonType" != "array" ]; then
+            echobad "❌ Unexpected JSON type: $jsonType"
+            echobad "$apiResponse"
+            exit 1
+        fi
+
+        count=$(echo "$apiResponse" | jq 'length')
+        if [[ "$count" -eq 0 ]]; then
+            break
+        fi
+
+        forks=$(echo "$apiResponse" | jq -r '.[].full_name')
+        if [ -n "$forks" ]; then
+            while read -r f; do
+                forkRepos+=("$f")
+            done <<< "$forks"
+        fi
+
+        echonice "  … fetched page $page ($count forks)"
+
+        # If fewer than 100 results, we've reached the last page
+        if [[ "$count" -lt 100 ]]; then
+            break
+        fi
+
+        page=$((page + 1))
+    done
+
+    echonice "Found ${#forkRepos[@]} fork(s) total"
     echoline
 fi
 
@@ -240,7 +272,8 @@ check_branch() {
         return 0
     fi
 
-    paths=$(echo "$tree" | jq -r '.tree[] | select(.path | endswith("composer.json")) | .path')
+    # Added type check to prevent crash on missing .tree (e.g. API errors)
+    paths=$(echo "$tree" | jq -r 'if type == "object" and .tree != null then .tree[] | select(.path | endswith("composer.json")) | .path else empty end')
 
     if [ -z "$paths" ]; then
         return 0
@@ -305,10 +338,11 @@ check_repo() {
     local full="$1"
     ECHOHEAD "Checking $full"
 
+    # Added type check for branch array to prevent crash on empty/dead forks
     branches=$(curl -s \
         -H "Authorization: token $GITHUB_TOKEN" \
         "https://api.github.com/repos/$full/branches?per_page=100" \
-        | jq -r '.[].name'
+        | jq -r 'if type == "array" then .[].name else empty end'
     )
 
     if [ -z "$branches" ]; then
@@ -334,16 +368,34 @@ check_repo "$owner/$repo"
 
 # Did the main repo match?
 main_ready=0
+main_unrelated=1   # assume unrelated until we find any SS dependency
 for key in "${!BRANCH_RESULTS[@]}"; do
     full="${key%%|||*}"
     [[ "$full" != "$owner/$repo" ]] && continue
     value="${BRANCH_RESULTS[$key]}"
     matched="${value%%|||*}"
+    if [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]]; then
+        main_unrelated=0   # at least one composer.json references an SS package
+    fi
     if [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]] && [[ "$matched" != "NONE" ]]; then
         main_ready=1
         break
     fi
 done
+
+# If no composer.json in the repo references any SS package, it's unknown
+if [[ $main_unrelated -eq 1 ]]; then
+    echonice "✔ No SilverStripe dependencies found — package is unrelated to $test."
+    echoline
+
+    if [[ "$format" == "json" ]]; then
+        printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+            "$target" "$test" >&3
+    fi
+
+    echoend
+    exit 0
+fi
 
 if [[ $main_ready -eq 0 ]] && [[ "$check_forks" == "yes" ]] && [[ ${#forkRepos[@]} -gt 0 ]]; then
     echonice "Main repo not ready — checking forks…"
