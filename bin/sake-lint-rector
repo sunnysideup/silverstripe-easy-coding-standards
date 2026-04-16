@@ -60,16 +60,27 @@ help_and_exit() {
     ECHOHEAD "Available settings:"
     echonice "-a, --also                     also lint - e.g. app/_config.php OR myfolder"
     echonice "-d, --dry-run                  dry run"
-    echonice "-r, --rector-config            rector config file locaton e.g. ../rector.php"
-    echonice "                               options are:"
-    echonice "                               - Rector.php"
-    echonice "                               - RectorSS5.php"
-    echonice "                               - RectorSS6.php"
+    echonice "-r, --rector-config            rector config file location e.g. ../rector.php"
+
+    local rectorDir="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rectors"
+    if [ -d "$rectorDir" ]; then
+        echonice "                               available options:"
+        for file in "$rectorDir"/*.php; do
+            if [ -f "$file" ]; then
+                local basename
+                basename=$(basename "$file")
+                local shorthand="${basename#Rector}"
+                shorthand="${shorthand%.php}"
+                echonice "                               - ${shorthand} (${basename})"
+            fi
+        done
+    fi
+
     echonice "-v, --verbose                  enable debug (verbose) mode"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-lint-rector -a app_more/_config.php   -r ./RectorSS6.php   app/src "
+    echonice "sake-lint-rector -a app_more/_config.php   -r SS6   app/src "
     echoline
 
     echofunctions
@@ -83,9 +94,17 @@ sake_check_help_and_exit
 
 cd_or_fail "$WORKING_DIR" help_and_exit
 
+# Resolve shorthand rector config names (e.g. "SS4" -> "RectorSS4.php")
 if [ ! -f "$rectorConfig" ]; then
-    rectorConfig="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/$rectorConfig"
-    if [ ! -f "$rectorConfig" ]; then
+    local rectorDir="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rectors"
+
+    # Try as full filename first (e.g. RectorSS4.php)
+    if [ -f "$rectorDir/$rectorConfig" ]; then
+        rectorConfig="$rectorDir/$rectorConfig"
+    # Try as shorthand (e.g. SS4 -> RectorSS4.php)
+    elif [ -f "$rectorDir/Rector${rectorConfig}.php" ]; then
+        rectorConfig="$rectorDir/Rector${rectorConfig}.php"
+    else
         echobad "Could not find rector config file: $rectorConfig"
         help_and_exit
     fi

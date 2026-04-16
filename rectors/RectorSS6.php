@@ -23,8 +23,6 @@ return static function (RectorConfig $rectorConfig): void {
     $rectorConfig->skip(
         [
             CompleteDynamicPropertiesRector::class,
-            //\Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer
-            //\Symplify\CodingStandard\Fixer\Commenting\RemoveUselessDefaultCommentFixer::class,
         ]
     );
 };
