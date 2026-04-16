@@ -69,7 +69,6 @@ help_and_exit() {
     echonice "         constraint (dev-main on default, N.x-dev on numeric)"
     echonice "     This ensures main remains the only source of truth and prevents backward contamination."
     echonice "     Any non-composer.json conflict aborts the merge and skips the repo."
-    echonice "     These conflicts are listed at the end of script for manual resolution."
     echonice ""
     echonice "  6. MIGRATES 'master' to 'main' if the default branch is still 'master':"
     echonice "       - pushes the merged state to a new 'main' branch"
@@ -164,41 +163,41 @@ update_org_deps() {
     ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
 }
 
-# # Merges $source into the currently-checked-out branch, then re-pins $GITHUB_ORG/* deps
-# # to $pin. Resolves any composer.json conflicts by taking the incoming version (which
-# # gets overwritten by the re-pin step anyway). Aborts on any non-composer.json conflict.
-# #
-# # Usage:  merge_and_repin <source_branch> <pin_constraint>
-# # Returns 0 on success, 1 on real (non-composer.json) conflict.
-# merge_and_repin() {
-#     local source="$1"
-#     local pin="$2"
-#     local target
-#     target=$(git branch --show-current)
+# Merges $source into the currently-checked-out branch, then re-pins $GITHUB_ORG/* deps
+# to $pin. Resolves any composer.json conflicts by taking the incoming version (which
+# gets overwritten by the re-pin step anyway). Aborts on any non-composer.json conflict.
+#
+# Usage:  merge_and_repin <source_branch> <pin_constraint>
+# Returns 0 on success, 1 on real (non-composer.json) conflict.
+merge_and_repin() {
+    local source="$1"
+    local pin="$2"
+    local target
+    target=$(git branch --show-current)
 
-#     if ! git merge --no-edit "$source" -m "MNT Merge branch '$source' into $target" -q; then
-#         # Only accept conflicts in composer.json; anything else is a real conflict.
-#         local other_conflicts
-#         other_conflicts=$(git diff --name-only --diff-filter=U | grep -v '^composer.json$' || true)
-#         if [[ -n "$other_conflicts" ]]; then
-#             git merge --abort
-#             return 1
-#         fi
-#         # Take incoming composer.json; we'll re-pin immediately.
-#         git checkout --theirs composer.json
-#         git add composer.json
-#         git commit --no-edit -q
-#     fi
+    if ! git merge --no-edit "$source" -m "MNT Merge branch '$source' into $target" -q; then
+        # Only accept conflicts in composer.json; anything else is a real conflict.
+        local other_conflicts
+        other_conflicts=$(git diff --name-only --diff-filter=U | grep -v '^composer.json$' || true)
+        if [[ -n "$other_conflicts" ]]; then
+            git merge --abort
+            return 1
+        fi
+        # Take incoming composer.json; we'll re-pin immediately.
+        git checkout --theirs composer.json
+        git add composer.json
+        git commit --no-edit -q
+    fi
 
-#     # Re-pin $GITHUB_ORG/* deps to this branch's correct constraint.
-#     update_org_deps "$pin"
-#     if ! git diff --quiet composer.json; then
-#         git add composer.json
-#         git commit -m "MNT Re-pin $GITHUB_ORG/* deps to $pin on $target" -q
-#     fi
+    # Re-pin $GITHUB_ORG/* deps to this branch's correct constraint.
+    update_org_deps "$pin"
+    if ! git diff --quiet composer.json; then
+        git add composer.json
+        git commit -m "MNT Re-pin $GITHUB_ORG/* deps to $pin on $target" -q
+    fi
 
-#     return 0
-# }
+    return 0
+}
 
 ############################################ MAIN SCRIPT
 
@@ -218,7 +217,6 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 successful_syncs=0
 ahead_report=()   # lines describing lower branches ahead of higher branches
-conflict_report=()   # repos skipped due to non-composer.json merge conflicts
 
 ECHOHEAD "Fetching repositories for $GITHUB_ORG..."
 git reset --hard >/dev/null 2>&1 || true
@@ -305,17 +303,6 @@ while read -r repo; do
     else
         echonice "Branch '$target_branch' does not exist. Creating..."
         git checkout -b "$target_branch" -q
-
-        # Pin deps immediately on newly-created numeric branches
-        if [[ "$target_branch" =~ ^[0-9]+$ ]]; then
-            constraint="$target_branch.x-dev"
-            update_org_deps "$constraint"
-            if ! git diff --quiet composer.json 2>/dev/null; then
-                echonice "Pinning $GITHUB_ORG dependencies to $constraint on new branch $target_branch..."
-                git add composer.json
-                git commit -m "MNT Pin $GITHUB_ORG dependencies to $constraint" -q
-            fi
-        fi
     fi
 
     # ----------------------------------------------------
@@ -371,29 +358,24 @@ while read -r repo; do
     fi
 
     if [[ -n "$highest_branch" && "$default_branch" != "$highest_branch" ]]; then
-        echonice "Merging $default_branch → $highest_branch (repo-scoped latest version)"
-        git checkout "$highest_branch" -q
 
-        # Track if we actually made changes to this branch
-        local branch_modified=0
+        echonice "Merging $default_branch → $highest_branch (repo-scoped latest version)"
+
+        git checkout "$highest_branch" -q
 
         if ! git merge --no-edit "$default_branch" -q; then
             conflicts=$(git diff --name-only --diff-filter=U | grep -v '^composer.json$' || true)
+
             if [[ -n "$conflicts" ]]; then
                 git merge --abort
                 echobad "Conflict in $highest_branch (non-composer.json). Skipping."
                 cd "$TMP_DIR"
                 continue
             fi
+
             git checkout --theirs composer.json
             git add composer.json
             git commit --no-edit -q
-            branch_modified=1
-        else
-            # Even if merge was clean, check if HEAD moved
-            if [[ $(git rev-parse HEAD) != $(git rev-parse HEAD@{1}) ]]; then
-                branch_modified=1
-            fi
         fi
 
         pin_constraint=$(get_branch_constraint "$highest_branch")
@@ -402,14 +384,6 @@ while read -r repo; do
         if ! git diff --quiet composer.json; then
             git add composer.json
             git commit -m "MNT Re-pin deps on $highest_branch" -q
-            branch_modified=1
-        fi
-
-        # Ensure it's marked for pushing if it's not the target/default branch
-        if [[ $branch_modified -eq 1 ]]; then
-            if [[ "$highest_branch" != "$target_branch" && "$highest_branch" != "$default_branch" ]]; then
-                extra_branches_to_push+=("$highest_branch")
-            fi
         fi
     fi
 
@@ -448,15 +422,12 @@ while read -r repo; do
         fi
 
         if [[ "$default_branch" != "$target_branch" ]]; then
+            # Ensure highest branch is always pushed last (source-of-truth merge target)
             git push origin "$target_branch" -q
         fi
 
-        # Duplicate Push Prevention
         if (( ${#extra_branches_to_push[@]} > 0 )); then
-            # Use tr and sort -u to unique the list in case a branch was
-            # added in both the pinning loop and the merge block
-            unique_branches=$(echo "${extra_branches_to_push[@]}" | tr ' ' '\n' | sort -u)
-            for ex_branch in $unique_branches; do
+            for ex_branch in "${extra_branches_to_push[@]}"; do
                 git push origin "$ex_branch" -q
             done
         fi
@@ -493,20 +464,6 @@ if (( ${#ahead_report[@]} > 0 )); then
     fi
 else
     echogood "No lower-version branches are ahead of higher-version branches."
-fi
-
-# ----------------------------------------------------
-# CONFLICT REPORT (end-of-script)
-# ----------------------------------------------------
-if (( ${#conflict_report[@]} > 0 )); then
-    ECHOHEAD "Repositories skipped due to merge conflicts:"
-    echonice "The following repos had non-composer.json conflicts when merging"
-    echonice "the default branch into the highest numeric branch. These require"
-    echonice "manual resolution."
-    echonice ""
-    for entry in "${conflict_report[@]}"; do
-        echobad "$entry"
-    done
 fi
 
 echoend
