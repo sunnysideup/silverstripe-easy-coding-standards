@@ -73,6 +73,11 @@ $SCRIPT_DIR/phpcs --config-set installed_paths "$SCRIPT_DIR/../phpcompatibility/
 $SCRIPT_DIR/phpcs --config-set colors 1
 $SCRIPT_DIR/phpcs --config-set severity $severity
 $SCRIPT_DIR/phpcs --config-show
+
+echo "Running PHP Compatability for PHP $phpVersion with severity $severity"
+echo "Running command: $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion"
 $SCRIPT_DIR/phpcs -p $dir --standard=PHPCompatibility --extensions=php --runtime-set testVersion $phpVersion
+
+
 
 echoend

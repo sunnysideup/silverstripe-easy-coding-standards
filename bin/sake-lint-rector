@@ -96,7 +96,7 @@ cd_or_fail "$WORKING_DIR" help_and_exit
 
 # Resolve shorthand rector config names (e.g. "SS4" -> "RectorSS4.php")
 if [ ! -f "$rectorConfig" ]; then
-    local rectorDir="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rectors"
+    rectorDir="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rectors"
 
     # Try as full filename first (e.g. RectorSS4.php)
     if [ -f "$rectorDir/$rectorConfig" ]; then

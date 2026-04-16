@@ -176,6 +176,29 @@ default_branch=$(curl -s \
 echonice "Default branch: $default_branch"
 echoline
 
+# ── Early exit: if the default branch composer.json type is not silverstripe-vendormodule ──
+default_composer=$(curl -s -L \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    "https://raw.githubusercontent.com/$owner/$repo/$default_branch/composer.json"
+)
+if echo "$default_composer" | jq '.' >/dev/null 2>&1; then
+    composer_type=$(echo "$default_composer" | jq -r '.type // empty')
+    if [[ "$composer_type" != "silverstripe-vendormodule" ]]; then
+        echonice "✔ composer.json type is '${composer_type:-unset}', not 'silverstripe-vendormodule' — package is unknown to $test."
+        echoline
+
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+                "$target" "$test" >&3
+        fi
+
+        echoend
+        exit 0
+    fi
+    echonice "✔ composer.json type: $composer_type"
+    echoline
+fi
+
 # ----------------------------------------------------
 # 3. Optionally fetch forks (moved to after main repo assessment)
 # ----------------------------------------------------
