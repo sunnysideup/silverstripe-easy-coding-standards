@@ -64,15 +64,15 @@ help_and_exit() {
     echonice ""
     echonice "2. COMPOSER TYPE CHECK"
     echonice "   The root composer.json on the default branch is fetched. If the 'type'"
-    echonice "   field is not 'silverstripe-vendormodule', the script exits with status"
-    echonice "   'unknown'. This filters out non-SilverStripe packages early."
+    echonice "   field is not 'silverstripe-vendormodule' or 'silverstripe-recipe' or 'silverstripe-theme'"
+    echonice "   the script exits with status 'unknown'. This filters out non-SilverStripe packages early."
     echonice ""
     echonice "3. DEFAULT BRANCH DEPENDENCY CHECK"
     echonice "   Using the same composer.json, the script checks whether any of the"
     echonice "   core packages from the ruleset appear in the 'require' section"
     echonice "   (require-dev is not checked). If none are found, the script exits"
     echonice "   with status 'unknown'. This filters out packages that are typed as"
-    echonice "   silverstripe-vendormodule but do not actually depend on SilverStripe"
+    echonice "   silverstripe modules but do not actually depend on SilverStripe"
     echonice "   core (e.g. standalone themes or tooling)."
     echonice ""
     echonice "4. ALL-BRANCH SCAN (main repo)"
@@ -109,8 +109,9 @@ help_and_exit() {
     echonice "  }"
     echonice ""
     echonice "Status values:"
-    echonice "  unknown    — Not a silverstripe-vendormodule, or no SS core"
-    echonice "               dependencies in require on the default branch, or"
+    echonice "  unknown    — Not a silverstripe-vendormodule",
+    echonice "               or 'silverstripe-recipe' or 'silverstripe-theme',"
+    echonice "               or no SS core dependencies in require on the default branch, or"
     echonice "               the ruleset for this test is empty."
     echonice "  ready      — At least one branch on the main repo has core"
     echonice "               packages matching the required major version."
@@ -298,7 +299,7 @@ default_composer=$(curl -s -L \
 )
 if echo "$default_composer" | jq '.' >/dev/null 2>&1; then
     composer_type=$(echo "$default_composer" | jq -r '.type // empty')
-    if [[ "$composer_type" != "silverstripe-vendormodule" ]]; then
+    if [[ "$composer_type" != "silverstripe-vendormodule" && "$composer_type" != "silverstripe-recipe" && "$composer_type" != "silverstripe-theme" ]]; then
         echonice "✔ composer.json type is '${composer_type:-unset}', not 'silverstripe-vendormodule' — package is unknown to $test."
         echoline
 
