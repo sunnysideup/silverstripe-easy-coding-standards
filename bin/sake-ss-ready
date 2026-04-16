@@ -300,7 +300,7 @@ default_composer=$(curl -s -L \
 if echo "$default_composer" | jq '.' >/dev/null 2>&1; then
     composer_type=$(echo "$default_composer" | jq -r '.type // empty')
     if [[ "$composer_type" != "silverstripe-vendormodule" && "$composer_type" != "silverstripe-recipe" && "$composer_type" != "silverstripe-theme" ]]; then
-        echonice "✔ composer.json type is '${composer_type:-unset}', not 'silverstripe-vendormodule' — package is unknown to $test."
+        echonice "✔ composer.json type is '${composer_type:-unset}', not 'silverstripe-*' — package is unknown to $test."
         echoline
 
         if [[ "$format" == "json" ]]; then
