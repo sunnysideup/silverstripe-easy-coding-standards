@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ SETTINGS
+includeSnyk='no'
+filterFor=''
+filterNot=''
+mode='mine' # mine | incoming
+
+while (($#)); do
+    case $1 in
+    -s | --include-snyk)
+        includeSnyk='yes'
+        shift
+        ;;
+    -f | --filter-for)
+        filterFor="${2:-}"
+        shift 2
+        ;;
+    -n | --filter-not)
+        filterNot="${2:-}"
+        shift 2
+        ;;
+    -i | --incoming)
+        mode='incoming'
+        shift
+        ;;
+    -m | --mine)
+        mode='mine'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        shift
+        ;;
+    esac
+done
+
+############################################ HELP
+
+help_and_exit() {
+    ECHOHEAD 'My Pull Requests'
+
+    echonice "directory of script:           $SCRIPT_DIR"
+
+    ECHOHEAD 'Available settings:'
+    echonice '-h, --help                     show help information'
+    echonice '-s, --include-snyk             include PRs with [snyk] in title'
+    echonice '-f, --filter-for STRING        only include PRs containing STRING'
+    echonice '-n, --filter-not STRING        exclude PRs containing STRING'
+    echonice '-m, --mine                     show PRs created by me (default)'
+    echonice '-i, --incoming                 show PRs others made on my repositories'
+
+    ECHOHEAD 'Example usage:'
+    echonice 'sake-git-my-pull-request'
+    echonice 'sake-git-my-pull-request --filter-not upgrade'
+    echonice 'sake-git-my-pull-request --incoming'
+
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ SEARCH SETTINGS
+
+searchArgs=(
+    gh search prs
+    --state open
+    --limit 200
+    --sort created
+    --order desc
+    --json number,title,repository,url,createdAt,author
+)
+
+if [[ "$mode" == 'mine' ]]; then
+    searchArgs+=(--author @me)
+fi
+
+############################################ RUN
+
+ECHOHEAD 'Pull Requests'
+
+"${searchArgs[@]}" --jq "
+def ago:
+  (now - (.createdAt | fromdateiso8601)) as \$d
+  | if \$d < 3600 then \"\((\$d/60|floor))m ago\"
+    elif \$d < 86400 then \"\((\$d/3600|floor))h ago\"
+    else \"\((\$d/86400|floor))d ago\"
+    end;
+
+.[]
+$(if [[ "$mode" == 'incoming' ]]; then
+    echo '| select(.author.login != "@me")'
+fi)
+$(if [[ "$includeSnyk" != 'yes' ]]; then
+    echo '| select(.title | test("\\[snyk\\]"; "i") | not)'
+fi)
+$(if [[ -n "$filterFor" ]]; then
+    printf '| select(.title | test("%s"; "i"))\n' "$filterFor"
+fi)
+$(if [[ -n "$filterNot" ]]; then
+    printf '| select(.title | test("%s"; "i") | not)\n' "$filterNot"
+fi)
+| \"\(.repository.nameWithOwner)\"
+  + \" | \(.author.login)\"
+  + \" | \(ago)\"
+  + \" | \(.url)\"
+  + \" | \(.title)\"
+"
+
+echoend

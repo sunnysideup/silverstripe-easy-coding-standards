@@ -56,6 +56,7 @@
     "bin/sake-git-find-any-changes",
     "bin/sake-git-info",
     "bin/sake-git-merge-towards-production",
+    "bin/sake-git-my-pull-request",
     "bin/sake-git-remove-stale-branches",
     "bin/sake-git-quick",
     "bin/sake-git-squash-and-pr",
