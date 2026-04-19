@@ -13,6 +13,7 @@ format="json"
 test="SS6"
 help='no'
 check_forks='no'
+default_only='no'
 while (($#)); do
     case $1 in
     -f | --format)
@@ -25,6 +26,9 @@ while (($#)); do
         ;;
     -c | --check-forks)
         check_forks='yes'
+        ;;
+    -d | --default-only)
+        default_only='yes'
         ;;
     *)
         if sake_handle_help_flag "$1"; then
@@ -160,11 +164,13 @@ help_and_exit() {
     echonice "-f, --format                   output format: json (default) or text"
     echonice "-t, --test                     test to perform, e.g. SS6 (default), SS5"
     echonice "-c, --check-forks              also check forks if main repo is not ready"
+    echonice "-d, --default-only             only check the default branch (ignores other branches/forks)"
     echonice "-h, --help                     show this help information"
 
     ECHOHEAD "Example usage:"
     echonice "sake-ss-ready sunnysideup/templateoverview"
     echonice "sake-ss-ready sunnysideup/templateoverview --check-forks"
+    echonice "sake-ss-ready sunnysideup/templateoverview --default-only"
     echonice "sake-ss-ready sunnysideup/templateoverview -t SS5"
     echonice "sake-ss-ready sunnysideup/templateoverview -t SS6 --check-forks --format json"
     echonice "sake-ss-ready https://github.com/vendor/silverstripe-module"
@@ -207,6 +213,7 @@ if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" = "null" ]; then
     echoline
     echobad "Or set it manually:"
     echobad "  export GITHUB_TOKEN=xxxx"
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
     exit 1
 fi
 
@@ -226,7 +233,8 @@ ECHOHEAD "Using ruleset: $ACTIVE_RULESET"
 
 # ── Early exit: if the ruleset has no packages, this test is unrelated ──
 if [[ ${#ruleset_keys[@]} -eq 0 ]]; then
-    echonice "✔ No core packages defined in $ACTIVE_RULESET — package is unknown to this test."
+    echonice "ERROR: No core packages defined in $ACTIVE_RULESET — package is unknown to this test."
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
     echoline
 
     if [[ "$format" == "json" ]]; then
@@ -253,10 +261,9 @@ fi
 # ----------------------------------------------------
 resolve_repo_from_composer() {
     pkg="$1"
-    # Moved head before sed to prevent 'broken pipe' errors
-    curl -s "https://repo.packagist.org/p2/$pkg.json" \
-        | jq -r '.packages[][].source.url' \
-        | head -n1 \
+    # Using the standard v1 API is often more reliable for quick lookups
+    curl -s "https://packagist.org/packages/$pkg.json" \
+        | jq -r '.package.repository // empty' \
         | sed 's|git://|https://|; s|git@github.com:|https://github.com/|'
 }
 
@@ -278,6 +285,7 @@ if [[ "$repoUrl" =~ github.com[:/]+([^/]+)/([^/.]+) ]]; then
     repo="${BASH_REMATCH[2]}"
 else
     echobad "❌ Only GitHub repositories supported."
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
     exit 1
 fi
 
@@ -301,6 +309,7 @@ if echo "$default_composer" | jq '.' >/dev/null 2>&1; then
     composer_type=$(echo "$default_composer" | jq -r '.type // empty')
     if [[ "$composer_type" != "silverstripe-vendormodule" && "$composer_type" != "silverstripe-recipe" && "$composer_type" != "silverstripe-theme" ]]; then
         echonice "✔ composer.json type is '${composer_type:-unset}', not 'silverstripe-*' — package is unknown to $test."
+        echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
         echoline
 
         if [[ "$format" == "json" ]]; then
@@ -325,6 +334,7 @@ if echo "$default_composer" | jq '.' >/dev/null 2>&1; then
 
     if [[ "$default_has_ss" == "no" ]]; then
         echonice "✔ No SilverStripe core dependencies in require on default branch — package is unknown to $test."
+        echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
         echoline
 
         if [[ "$format" == "json" ]]; then
@@ -441,12 +451,18 @@ check_repo() {
     local full="$1"
     ECHOHEAD "Checking $full"
 
-    # Added type check for branch array to prevent crash on empty/dead forks
-    branches=$(curl -s \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        "https://api.github.com/repos/$full/branches?per_page=100" \
-        | jq -r 'if type == "array" then .[].name else empty end'
-    )
+    if [[ "$default_only" == "yes" ]]; then
+        # Only check the default branch we resolved earlier
+        echonice "  (Default branch only mode)"
+        branches="$default_branch"
+    else
+        # Standard logic: fetch all branches
+        branches=$(curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$full/branches?per_page=100" \
+            | jq -r 'if type == "array" then .[].name else empty end'
+        )
+    fi
 
     if [ -z "$branches" ]; then
         echobad "  ❌ could not fetch branches"
@@ -620,9 +636,22 @@ if [[ "$format" == "json" ]]; then
         status="fork"
     fi
 
-    printf '{"package":"%s","test":"%s","status":"%s","main":%s,"fork":%s}\n' \
-        "$target" "$test" "$status" \
-        "${best_main:-null}" "${best_fork:-null}" >&3
+    # The Logic:
+    # 1. Construct JSON
+    # 2. Pipe to jq for prettifying
+    # 3. Check if FD 3 is open; if so, send to 3 (stdout), otherwise send to stdout anyway
+    if { >&3; } 2>/dev/null; then
+        printf '{"package":"%s","test":"%s","status":"%s","main":%s,"fork":%s}\n' \
+            "$target" "$test" "$status" \
+            "${best_main:-null}" "${best_fork:-null}" \
+            | jq . >&3
+    else
+        # Fallback if FD 3 isn't available for some reason
+        printf '{"package":"%s","test":"%s","status":"%s","main":%s,"fork":%s}\n' \
+            "$target" "$test" "$status" \
+            "${best_main:-null}" "${best_fork:-null}" \
+            | jq .
+    fi
 fi
 
 echoend
