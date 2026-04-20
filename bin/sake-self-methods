@@ -152,7 +152,6 @@ echoend() {
     echogood "COMPLETED"
     echoline
 
-    (( RANDOM % 400 == 0 )) && "$SCRIPT_DIR/sake-self-update"
 }
 
 echofunctions() {
