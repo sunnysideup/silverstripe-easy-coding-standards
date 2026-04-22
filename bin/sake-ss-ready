@@ -48,14 +48,20 @@ help_and_exit() {
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
     ECHOHEAD "How it works:"
-    echonice "This script determines whether a given Composer package (or GitHub repo)"
+    echonice "This script determines whether a given Composer package (or git repository URL)"
     echonice "is ready for a specific SilverStripe version (e.g. SS6)."
     echonice ""
     echonice "It accepts either a Packagist package name (e.g. sunnysideup/templateoverview)"
-    echonice "or a GitHub URL. Packagist names are resolved to their GitHub repository via"
-    echonice "the Packagist API. Only GitHub-hosted repositories are supported."
+    echonice "or a git URL (HTTPS or SSH, e.g. https://github.com/... or git@github.com:...)."
     echonice ""
-    echonice "A GitHub personal access token is required. The script reads it from:"
+    echonice "When a git URL is provided, the repository is cloned into a temporary directory"
+    echonice "and only the default branch is checked. Fork scanning is not available in this"
+    echonice "mode. Git handles authentication natively via SSH keys or credential helpers —"
+    echonice "no API token is required."
+    echonice ""
+    echonice "When a Packagist package name is provided, the Packagist API is used to resolve"
+    echonice "the GitHub repository, and the GitHub API is used to scan all branches. A GitHub"
+    echonice "personal access token is required, read from:"
     echonice "  ~/.config/composer/auth.json  (github-oauth.github.com)"
     echonice "or from the GITHUB_TOKEN environment variable."
 
@@ -79,7 +85,7 @@ help_and_exit() {
     echonice "   silverstripe modules but do not actually depend on SilverStripe"
     echonice "   core (e.g. standalone themes or tooling)."
     echonice ""
-    echonice "4. ALL-BRANCH SCAN (main repo)"
+    echonice "4. ALL-BRANCH SCAN (package name mode only)"
     echonice "   The script fetches all branches of the main repository and checks"
     echonice "   the root composer.json on each branch. For each branch:"
     echonice "   - If no core packages from the ruleset are found in 'require', the"
@@ -89,8 +95,9 @@ help_and_exit() {
     echonice "   - If one or more core packages match the required major version,"
     echonice "     the branch is recorded as a match."
     echonice "   If any branch on the main repo matches, the result is 'ready'."
+    echonice "   When a git URL is provided, only the default branch is checked."
     echonice ""
-    echonice "5. FORK SCAN (optional, only with --check-forks)"
+    echonice "5. FORK SCAN (optional, package name mode only, only with --check-forks)"
     echonice "   If no branch on the main repo matched and --check-forks was passed,"
     echonice "   the script fetches all forks (paginated, no 100-fork limit) and"
     echonice "   repeats the all-branch scan for each fork. The fork with the most"
@@ -120,7 +127,7 @@ help_and_exit() {
     echonice "  ready      — At least one branch on the main repo has core"
     echonice "               packages matching the required major version."
     echonice "  fork       — No main branch matched, but a fork has a match"
-    echonice "               (only possible with --check-forks)."
+    echonice "               (only possible with --check-forks in package name mode)."
     echonice "  not-ready  — The package is a valid SilverStripe module with"
     echonice "               core dependencies, but no branch (and no fork)"
     echonice "               matches the required major version yet."
@@ -163,8 +170,8 @@ help_and_exit() {
     ECHOHEAD "Available settings:"
     echonice "-f, --format                   output format: json (default) or text"
     echonice "-t, --test                     test to perform, e.g. SS6 (default), SS5"
-    echonice "-c, --check-forks              also check forks if main repo is not ready"
-    echonice "-d, --default-only             only check the default branch (ignores other branches/forks)"
+    echonice "-c, --check-forks              also check forks if main repo is not ready (package name mode only)"
+    echonice "-d, --default-only             only check the default branch (package name mode only)"
     echonice "-h, --help                     show this help information"
 
     ECHOHEAD "Example usage:"
@@ -174,6 +181,9 @@ help_and_exit() {
     echonice "sake-ss-ready sunnysideup/templateoverview -t SS5"
     echonice "sake-ss-ready sunnysideup/templateoverview -t SS6 --check-forks --format json"
     echonice "sake-ss-ready https://github.com/vendor/silverstripe-module"
+    echonice "sake-ss-ready git@github.com:vendor/silverstripe-module"
+    echonice "sake-ss-ready https://bitbucket.org/vendor/silverstripe-module"
+    echonice "sake-ss-ready git@bitbucket.org:vendor/silverstripe-module"
 
     echofunctions
     exit 1
@@ -195,30 +205,6 @@ set -e
 target="$dir"
 tmpDir="${TMPDIR:-/tmp}/scan_tmp"
 mkdir -p "$tmpDir"
-
-# -------------------------------------
-# Load GitHub token from composer auth
-# -------------------------------------
-
-authFile="$HOME/.config/composer/auth.json"
-
-if [ -f "$authFile" ]; then
-    GITHUB_TOKEN=$(jq -r '.["github-oauth"]["github.com"] // empty' "$authFile")
-fi
-
-if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" = "null" ]; then
-    echobad "❌ No GitHub token found."
-    echobad "Make sure you have a token in:"
-    echobad "  ~/.config/composer/auth.json"
-    echoline
-    echobad "Or set it manually:"
-    echobad "  export GITHUB_TOKEN=xxxx"
-    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
-    exit 1
-fi
-
-echonice "✔ Loaded GitHub token from composer auth.json"
-echoline
 
 # ----------------------------------------------------
 # 1. VERSION RULE SETS
@@ -256,6 +242,149 @@ if [[ "$format" == "json" ]]; then
     exec 3>&1          # save real stdout on fd 3
     exec 1>&2          # redirect stdout → stderr (all echos go there)
 fi
+
+# ============================================================
+# URL MODE: git clone → check default branch only, then exit
+# ============================================================
+if [[ "$target" =~ ^https?:// ]] || [[ "$target" =~ ^git@ ]]; then
+
+    if [[ "$check_forks" == "yes" ]]; then
+        echonice "⚠ --check-forks is not supported in URL mode and will be ignored."
+        echoline
+    fi
+
+    cloneDir="$tmpDir/clone_$$"
+    echonice "URL mode: cloning $target …"
+    echonice "(only the default branch will be checked; forks are not scanned)"
+    echoline
+
+    if ! git clone --bare --quiet "$target" "$cloneDir" 2>&1; then
+        echobad "❌ Failed to clone $target"
+        exit 1
+    fi
+
+    # Derive the default branch from HEAD
+    default_branch=$(git -C "$cloneDir" symbolic-ref HEAD 2>/dev/null | sed 's|refs/heads/||')
+    if [[ -z "$default_branch" ]]; then
+        default_branch="main"
+    fi
+    echonice "Default branch: $default_branch"
+
+    # Read root composer.json from the default branch
+    comp=$(git -C "$cloneDir" show "HEAD:composer.json" 2>/dev/null || true)
+
+    rm -rf "$cloneDir"
+
+    emit_unknown() {
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+                "$target" "$test" >&3
+        fi
+        echoend
+        exit 0
+    }
+
+    # ── Type check ──
+    if ! echo "$comp" | jq '.' >/dev/null 2>&1; then
+        echonice "✔ No valid composer.json found on default branch — package is unknown to $test."
+        emit_unknown
+    fi
+
+    composer_type=$(echo "$comp" | jq -r '.type // empty')
+    if [[ "$composer_type" != "silverstripe-vendormodule" && "$composer_type" != "silverstripe-recipe" && "$composer_type" != "silverstripe-theme" ]]; then
+        echonice "✔ composer.json type is '${composer_type:-unset}', not 'silverstripe-*' — package is unknown to $test."
+        emit_unknown
+    fi
+    echonice "✔ composer.json type: $composer_type"
+
+    # ── SS dependency check ──
+    default_has_ss="no"
+    for pkg in "${ruleset_keys[@]}"; do
+        have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
+        if [[ -n "$have" ]]; then
+            default_has_ss="yes"
+            break
+        fi
+    done
+
+    if [[ "$default_has_ss" == "no" ]]; then
+        echonice "✔ No SilverStripe core dependencies in require on default branch — package is unknown to $test."
+        emit_unknown
+    fi
+
+    # ── Version matching ──
+    declare -A matched_pkgs=()
+    for pkg in "${ruleset_keys[@]}"; do
+        need=$(get_rule_value "$pkg")
+        have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
+        major=${need#"^"}
+        if [[ -n "$have" ]]; then
+            if sake_check_major_version_match "$have" "$major"; then
+                matched_pkgs["$pkg"]="$have"
+            fi
+        fi
+    done
+
+    # ── Output ──
+    ECHOHEAD "Results: branches ready for $ACTIVE_RULESET"
+
+    if (( ${#matched_pkgs[@]} > 0 )); then
+        match_list=""
+        for k in "${!matched_pkgs[@]}"; do
+            match_list+="\"$k\": \"${matched_pkgs[$k]}\","
+        done
+        match_list="${match_list%,}"
+        best_main=$(printf '{"repo":"%s","branch":"%s","path":"composer.json","matched":{%s}}' \
+            "$target" "$default_branch" "$match_list")
+        echonice "  ✔ $target:$default_branch matched: {$match_list}"
+        echoline
+
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"ready","main":%s,"fork":null}\n' \
+                "$target" "$test" "$best_main" | jq . >&3
+        fi
+    else
+        echobad "  ✗ No branches found ready for $ACTIVE_RULESET"
+        echoline
+
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"not-ready","main":null,"fork":null}\n' \
+                "$target" "$test" >&3
+        fi
+    fi
+
+    echoend
+    exit 0
+fi
+
+# ============================================================
+# PACKAGE NAME MODE: Packagist + GitHub API (original flow)
+# ============================================================
+
+# -------------------------------------
+# Load GitHub token from composer auth
+# -------------------------------------
+
+authFile="$HOME/.config/composer/auth.json"
+
+if [ -f "$authFile" ]; then
+    GITHUB_TOKEN=$(jq -r '.["github-oauth"]["github.com"] // empty' "$authFile")
+fi
+
+if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" = "null" ]; then
+    echobad "❌ No GitHub token found."
+    echobad "Make sure you have a token in:"
+    echobad "  ~/.config/composer/auth.json"
+    echoline
+    echobad "Or set it manually:"
+    echobad "  export GITHUB_TOKEN=xxxx"
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
+    exit 1
+fi
+
+echonice "✔ Loaded GitHub token from composer auth.json"
+echoline
+
 # ----------------------------------------------------
 # 2. Resolve composer package → repo URL
 # ----------------------------------------------------
@@ -267,12 +396,8 @@ resolve_repo_from_composer() {
         | sed 's|git://|https://|; s|git@github.com:|https://github.com/|'
 }
 
-if [[ "$target" =~ ^https?:// ]]; then
-    repoUrl="$target"
-else
-    echonice "Resolving '$target' via Packagist..."
-    repoUrl=$(resolve_repo_from_composer "$target")
-fi
+echonice "Resolving '$target' via Packagist..."
+repoUrl=$(resolve_repo_from_composer "$target")
 
 if [ -z "$repoUrl" ]; then
     echobad "❌ Could not resolve repository."
