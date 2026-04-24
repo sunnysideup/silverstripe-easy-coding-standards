@@ -122,8 +122,9 @@ help_and_exit() {
     echonice "Status values:"
     echonice "  unknown    — Not a silverstripe-vendormodule",
     echonice "               or 'silverstripe-recipe' or 'silverstripe-theme',"
-    echonice "               or no SS core dependencies in require on the default branch, or"
-    echonice "               the ruleset for this test is empty."
+    echonice "               or no SS core dependencies in require on the default branch,"
+    echonice "               or the ruleset for this test is empty,"
+    echonice "               or the package could not be found on Packagist and no git URL was provided."
     echonice "  ready      — At least one branch on the main repo has core"
     echonice "               packages matching the required major version."
     echonice "  fork       — No main branch matched, but a fork has a match"
@@ -400,8 +401,17 @@ echonice "Resolving '$target' via Packagist..."
 repoUrl=$(resolve_repo_from_composer "$target")
 
 if [ -z "$repoUrl" ]; then
-    echobad "❌ Could not resolve repository."
-    exit 1
+    echonice "✔ Package '$target' not found on Packagist — package is unknown to $test."
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
+    echoline
+
+    if [[ "$format" == "json" ]]; then
+        printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+            "$target" "$test" | jq . >&3
+    fi
+
+    echoend
+    exit 0
 fi
 
 # Extract GitHub owner/repo
