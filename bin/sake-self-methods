@@ -494,6 +494,7 @@ declare -A SAKE_CORE_PACKAGES_SS7=(
     ["silverstripe/recipe-core"]="^7"
     ["silverstripe/cms"]="^7"
     ["silverstripe/admin"]="^4"
+    ["dnadesign/silverstripe-elemental"]="^7"
 )
 
 # Helper: Safely parses complex composer constraints
