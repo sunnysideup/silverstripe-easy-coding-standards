@@ -9,7 +9,7 @@ source "$SCRIPT_DIR/sake-self-methods"
 includeSnyk='no'
 filterFor=''
 filterNot=''
-mode='mine' # mine | incoming
+mode='mine' # mine | incoming | review
 
 while (($#)); do
     case $1 in
@@ -31,6 +31,10 @@ while (($#)); do
         ;;
     -m | --mine)
         mode='mine'
+        shift
+        ;;
+    -r | --review)
+        mode='review'
         shift
         ;;
     *)
@@ -57,11 +61,13 @@ help_and_exit() {
     echonice '-n, --filter-not STRING        exclude PRs containing STRING'
     echonice '-m, --mine                     show PRs created by me (default)'
     echonice '-i, --incoming                 show PRs others made on my repositories'
+    echonice '-r, --review-requested         show PRs where I am requested as a reviewer'
 
     ECHOHEAD 'Example usage:'
     echonice 'sake-git-my-pull-request'
     echonice 'sake-git-my-pull-request --filter-not upgrade'
     echonice 'sake-git-my-pull-request --incoming'
+
 
     echofunctions
     exit
@@ -82,6 +88,8 @@ searchArgs=(
 
 if [[ "$mode" == 'mine' ]]; then
     searchArgs+=(--author @me)
+elif [[ "$mode" == 'review' ]]; then
+    searchArgs+=(--review-requested @me)
 fi
 
 ############################################ RUN
