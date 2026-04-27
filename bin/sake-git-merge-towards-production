@@ -18,6 +18,8 @@ direct='no'
 reverse='no'
 ship='no'       # shorthand: develop -> production (stepwise)
 toProd='no'     # shorthand: set --to production
+toStage='no'    # shorthand: set --to staging
+toTest='no'     # shorthand: set --to testing
 
 while (($#)); do
     case $1 in
@@ -50,6 +52,14 @@ while (($#)); do
         toProd='yes'
         shift
         ;;
+    -s | --stage | --staging)
+        toStage='yes'
+        shift
+        ;;
+    -t | --test | --testing)
+        toTest='yes'
+        shift
+        ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
@@ -74,6 +84,8 @@ help_and_exit() {
     echonice "message:                       $message"
     echonice "ship:                          $ship"
     echonice "to production:                 $toProd"
+    echonice "to staging:                    $toStage"
+    echonice "to testing:                    $toTest"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
@@ -84,6 +96,8 @@ help_and_exit() {
     echonice "-r, --reverse                  run merges from higher envs to lower envs (e.g. production → develop)"
     echonice "--ship                         shorthand: develop → production (stepwise, non-reverse)"
     echonice "-p, --prod                      shorthand: sets --to production"
+    echonice "-s, --stage                     shorthand: sets --to staging"
+    echonice "-t, --test                      shorthand: sets --to testing"
 
     echonice 'Usage example:'
     echonice '  sake-git-merge-towards-production ./ --ship'
@@ -114,6 +128,14 @@ fi
 
 if [[ "$toProd" == 'yes' ]]; then
     to='production'
+fi
+
+if [[ "$toStage" == 'yes' ]]; then
+    to='staging'
+fi
+
+if [[ "$toTest" == 'yes' ]]; then
+    to='test'
 fi
 
 ############################################ BRANCH CACHE (single remote scan)
