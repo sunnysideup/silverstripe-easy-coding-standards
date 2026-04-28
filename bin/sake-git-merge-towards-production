@@ -1,0 +1,491 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+message=''
+from='develop'
+to='test'
+direct='no'
+reverse='no'
+ship='no'       # shorthand: develop -> production (stepwise)
+toProd='no'     # shorthand: set --to production
+toStage='no'    # shorthand: set --to staging
+toTest='no'     # shorthand: set --to testing
+
+while (($#)); do
+    case $1 in
+
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -from | --from)
+        from=$2
+        shift
+        ;;
+    -to | --to)
+        to=$2
+        shift
+        ;;
+    -d | --direct)
+        direct='yes'
+        shift
+        ;;
+    -r | --reverse)
+        reverse='yes'
+        shift
+        ;;
+    --ship | --dev-to-prod | --develop-to-production)
+        ship='yes'
+        shift
+        ;;
+    -p | --prod | --production)
+        toProd='yes'
+        shift
+        ;;
+    -s | --stage | --staging)
+        toStage='yes'
+        shift
+        ;;
+    -t | --test | --testing)
+        toTest='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+############################################ HELPERS (need them for help output too)
+
+help_and_exit() {
+    ECHOHEAD 'Merge branches stepwise (skipping missing): develop ↔ test ↔ (stage|staging) ↔ production'
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to commit:           $WORKING_DIR/$dir"
+    echonice "from:                          $from"
+    echonice "to:                            $to"
+    echonice "direct:                        $direct"
+    echonice "reverse:                       $reverse"
+    echonice "message:                       $message"
+    echonice "ship:                          $ship"
+    echonice "to production:                 $toProd"
+    echonice "to staging:                    $toStage"
+    echonice "to testing:                    $toTest"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+    echonice "-m, --message                  commit message to use (default: auto-generated)"
+    echonice "-from, --from                  source branch to start from (default: develop; reverse default: production)"
+    echonice "-to, --to                      target branch to merge into (default: test; reverse default: develop)"
+    echonice "-d, --direct                   don't do stepwise merges, just merge directly A → Z"
+    echonice "-r, --reverse                  run merges from higher envs to lower envs (e.g. production → develop)"
+    echonice "--ship                         shorthand: develop → production (stepwise, non-reverse)"
+    echonice "-p, --prod                      shorthand: sets --to production"
+    echonice "-s, --stage                     shorthand: sets --to staging"
+    echonice "-t, --test                      shorthand: sets --to testing"
+
+    echonice 'Usage example:'
+    echonice '  sake-git-merge-towards-production ./ --ship'
+    echonice '  sake-git-merge-towards-production ./ --prod'
+    echonice '  sake-git-merge-towards-production ./ --from develop --to production'
+    echonice '  sake-git-merge-towards-production ./ --from production --to develop --reverse'
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ CODE
+if [ -d "$WORKING_DIR/$dir" ]; then
+    cd "$WORKING_DIR/$dir" || exit 1
+else
+    echobad "Could not change directory to $WORKING_DIR/$dir"
+    help_and_exit
+fi
+
+############################################ SHORTHANDS
+if [[ "$ship" == 'yes' ]]; then
+    from='develop'
+    to='production'
+    reverse='no'
+    direct='no'
+fi
+
+if [[ "$toProd" == 'yes' ]]; then
+    to='production'
+fi
+
+if [[ "$toStage" == 'yes' ]]; then
+    to='staging'
+fi
+
+if [[ "$toTest" == 'yes' ]]; then
+    to='test'
+fi
+
+############################################ BRANCH CACHE (single remote scan)
+declare -A REMOTE_BRANCHES=()
+declare -A LOCAL_BRANCHES=()
+declare -A ORIGIN_TRACKING_BRANCHES=()
+
+load_branch_cache() {
+    local b
+
+    # Remote heads (single call)
+    while IFS= read -r b; do
+        [[ -n "$b" ]] && REMOTE_BRANCHES["$b"]=1
+    done < <(git ls-remote --heads origin 2>/dev/null | awk '{print $2}' | sed 's#refs/heads/##')
+
+    # Local branches
+    while IFS= read -r b; do
+        [[ -n "$b" ]] && LOCAL_BRANCHES["$b"]=1
+    done < <(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+
+    # origin/* tracking branches (if any)
+    while IFS= read -r b; do
+        b=${b#origin/}
+        [[ -n "$b" ]] && ORIGIN_TRACKING_BRANCHES["$b"]=1
+    done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin 2>/dev/null)
+}
+
+branch_exists_remote() {
+    local branchName=$1
+    [[ -n "${REMOTE_BRANCHES[$branchName]:-}" ]]
+}
+
+branch_exists_local() {
+    local branchName=$1
+    [[ -n "${LOCAL_BRANCHES[$branchName]:-}" || -n "${ORIGIN_TRACKING_BRANCHES[$branchName]:-}" ]]
+}
+
+branch_exists() {
+    local branchName=$1
+    branch_exists_remote "$branchName" || branch_exists_local "$branchName"
+}
+
+ensure_local_branch() {
+    local branchName=$1
+
+    if git show-ref --verify --quiet "refs/heads/${branchName}"; then
+        return 0
+    fi
+
+    if branch_exists_remote "$branchName"; then
+        git fetch origin "$branchName" >/dev/null 2>&1 || true
+        git checkout -b "$branchName" "origin/${branchName}" >/dev/null 2>&1
+        return $?
+    fi
+
+    return 1
+}
+
+resolve_stage_branch() {
+    # Prefer staging if both exist
+    if branch_exists 'staging'; then
+        echo 'staging'
+        return
+    fi
+    if branch_exists 'stage'; then
+        echo 'stage'
+        return
+    fi
+    echo ''
+}
+
+desired_index() {
+    case "$1" in
+        develop) echo 0 ;;
+        test) echo 1 ;;
+        stage|staging) echo 2 ;;
+        production) echo 3 ;;
+        *) echo -1 ;;
+    esac
+}
+
+get_pos_in_flow_actual() {
+    local value=$1
+    local i
+    for i in "${!FLOW_ACTUAL[@]}"; do
+        [[ "${FLOW_ACTUAL[$i]}" == "$value" ]] && echo "$i" && return
+    done
+    echo "-1"
+}
+
+pick_existing_at_or_below() {
+    local targetIndex=$1
+    local bestBranch=''
+    local bestIndex=-1
+    local b idx
+
+    for b in "${FLOW_ACTUAL[@]}"; do
+        idx=$(desired_index "$b")
+        if (( idx <= targetIndex && idx > bestIndex )); then
+            bestIndex=$idx
+            bestBranch=$b
+        fi
+    done
+
+    echo "$bestBranch"
+}
+
+pick_existing_at_or_above() {
+    local targetIndex=$1
+    local bestBranch=''
+    local bestIndex=999
+    local b idx
+
+    for b in "${FLOW_ACTUAL[@]}"; do
+        idx=$(desired_index "$b")
+        if (( idx >= targetIndex && idx < bestIndex )); then
+            bestIndex=$idx
+            bestBranch=$b
+        fi
+    done
+
+    echo "$bestBranch"
+}
+
+############################################ PREP
+load_branch_cache
+
+# ---------- defaults for reverse mode
+if [[ "$reverse" == 'yes' ]]; then
+    [[ "$from" == 'develop' ]] && from='production'
+    [[ "$to" == 'test' ]] && to='develop'
+fi
+
+# ---------- message
+if [[ -z "$message" ]]; then
+    if [[ "$reverse" == 'yes' ]]; then
+        message='Merge: merge production branches back towards develop'
+    else
+        message='Merge: merge development branches towards production'
+    fi
+fi
+
+message=$(check_commit_message "$message")
+retVal=$?
+if [[ $retVal -ne 0 ]]; then
+    echobad 'Invalid commit message. Exiting script.'
+    exit 1
+fi
+
+# ---------- normalize stage/staging args to whichever exists (if any)
+stageBranch=$(resolve_stage_branch)
+
+if [[ "$from" == 'stage' || "$from" == 'staging' ]]; then
+    if [[ -n "$stageBranch" ]]; then
+        from="$stageBranch"
+    else
+        echowarn 'No stage/staging branch exists; falling back to develop.'
+        from='develop'
+    fi
+fi
+
+if [[ "$to" == 'stage' || "$to" == 'staging' ]]; then
+    if [[ -n "$stageBranch" ]]; then
+        to="$stageBranch"
+    else
+        echowarn 'No stage/staging branch exists; will target the nearest existing env.'
+        to='staging' # logical; resolved below
+    fi
+fi
+
+############################################ BUILD FLOW (no hard requirements unless needed)
+FLOW_ACTUAL=()
+
+if branch_exists 'develop'; then
+    FLOW_ACTUAL+=('develop')
+fi
+
+if branch_exists 'test'; then
+    FLOW_ACTUAL+=('test')
+fi
+
+if [[ -n "$stageBranch" ]]; then
+    FLOW_ACTUAL+=("$stageBranch")
+fi
+
+if branch_exists 'production'; then
+    FLOW_ACTUAL+=('production')
+fi
+
+if (( ${#FLOW_ACTUAL[@]} < 2 )); then
+    echobad 'Not enough env branches exist (need at least two of develop/test/(stage|staging)/production).'
+    exit 1
+fi
+
+############################################ RESOLVE FROM/TO (skip-able, only within actual flow)
+fromDesired=$(desired_index "$from")
+toDesired=$(desired_index "$to")
+
+if (( fromDesired == -1 || toDesired == -1 )); then
+    echobad "Invalid branch name. Use develop, test, stage|staging, production."
+    exit 1
+fi
+
+if ! [[ " ${FLOW_ACTUAL[*]} " == *" ${from} "* ]]; then
+    if [[ "$reverse" == 'yes' ]]; then
+        from=$(pick_existing_at_or_above "$fromDesired")
+    else
+        from=$(pick_existing_at_or_below "$fromDesired")
+    fi
+    if [[ -z "$from" ]]; then
+        echobad 'Could not resolve a usable --from branch.'
+        exit 1
+    fi
+    echowarn "Requested --from not available; using: $from"
+fi
+
+if ! [[ " ${FLOW_ACTUAL[*]} " == *" ${to} "* ]]; then
+    if [[ "$reverse" == 'yes' ]]; then
+        # in reverse mode, missing "to" should move UP to the next available (e.g. develop missing -> test)
+        to=$(pick_existing_at_or_above "$toDesired")
+    else
+        # forward mode: never overshoot upward
+        to=$(pick_existing_at_or_below "$toDesired")
+    fi
+    if [[ -z "$to" ]]; then
+        echobad 'Could not resolve a usable --to branch.'
+        exit 1
+    fi
+    echowarn "Requested --to not available; using: $to"
+fi
+
+fromPos=$(get_pos_in_flow_actual "$from")
+toPos=$(get_pos_in_flow_actual "$to")
+
+if (( fromPos == -1 || toPos == -1 )); then
+    echobad 'Could not resolve from/to branches in the available flow.'
+    exit 1
+fi
+
+if [[ "$reverse" == 'yes' ]]; then
+    if (( fromPos < toPos )); then
+        echobad "Reverse mode cannot merge upwards (from $from to $to)."
+        exit 1
+    fi
+else
+    if (( fromPos > toPos )); then
+        echobad "Cannot merge backwards (from $from to $to)."
+        exit 1
+    fi
+fi
+
+############################################ BUILD MERGE STEPS
+steps=()
+if [[ "$direct" == 'yes' ]]; then
+    steps=("${from}→${to}")
+else
+    if [[ "$reverse" == 'yes' ]]; then
+        for (( i=fromPos; i>toPos; i-- )); do
+            steps+=("${FLOW_ACTUAL[$i]}→${FLOW_ACTUAL[$((i-1))]}")
+        done
+    else
+        for (( i=fromPos; i<toPos; i++ )); do
+            steps+=("${FLOW_ACTUAL[$i]}→${FLOW_ACTUAL[$((i+1))]}")
+        done
+    fi
+fi
+
+############################################ RUN MERGES
+for step in "${steps[@]}"; do
+    IFS='→' read -r fromBranch toBranch <<< "$step"
+    echonice "### Processing merge: $fromBranch → $toBranch ###"
+
+    git fetch origin "$toBranch" "$fromBranch"
+
+    ensure_local_branch "$fromBranch" || {
+        echobad "Cannot checkout/create branch: $fromBranch"
+        exit 1
+    }
+    ensure_local_branch "$toBranch" || {
+        echobad "Cannot checkout/create branch: $toBranch"
+        exit 1
+    }
+
+    # Reverse merge first (bring target into source)
+    git checkout "$fromBranch"
+    git pull origin "$fromBranch"
+    git merge "origin/${toBranch}" --no-edit || {
+        echobad "Reverse merge failed: $toBranch into $fromBranch"
+        exit 1
+    }
+    git push origin "$fromBranch"
+
+    # Forward merge (bring source into target)
+    git checkout "$toBranch"
+    git pull origin "$toBranch"
+    git merge "origin/${fromBranch}" --no-edit || {
+        echobad "Forward merge failed: $fromBranch into $toBranch"
+        exit 1
+    }
+    git push origin "$toBranch"
+
+    echonice "✓ Completed $fromBranch ↔ $toBranch"
+done
+
+
+echonice ''
+ECHOHEAD 'Branch status after merges'
+
+git fetch origin >/dev/null 2>&1 || true
+
+# ---- Adjacent branch comparison
+printf '  %-20s  %-10s  %-10s\n' 'COMPARISON' 'AHEAD' 'BEHIND'
+printf '  %-20s  %-10s  %-10s\n' '────────────────────' '──────────' '──────────'
+
+for (( i=0; i<${#FLOW_ACTUAL[@]}-1; i++ )); do
+    left="${FLOW_ACTUAL[$i]}"
+    right="${FLOW_ACTUAL[$((i+1))]}"
+
+    counts=$(git rev-list --left-right --count "origin/${left}...origin/${right}" 2>/dev/null)
+    if [[ $? -eq 0 && -n "$counts" ]]; then
+        ahead=$(echo "$counts" | awk '{print $1}')
+        behind=$(echo "$counts" | awk '{print $2}')
+        printf '  %-20s  %-10s  %-10s\n' "${left} → ${right}" "$ahead" "$behind"
+    else
+        printf '  %-20s  %-10s  %-10s\n' "${left} → ${right}" '?' '?'
+    fi
+done
+
+# ---- Local vs origin
+echonice ''
+printf '  %-20s  %-10s  %-10s\n' 'BRANCH' 'LOCAL +' 'LOCAL −'
+printf '  %-20s  %-10s  %-10s\n' '────────────────────' '──────────' '──────────'
+
+for b in "${FLOW_ACTUAL[@]}"; do
+    if git show-ref --verify --quiet "refs/heads/${b}" && branch_exists_remote "$b"; then
+        counts=$(git rev-list --left-right --count "${b}...origin/${b}" 2>/dev/null)
+        if [[ $? -eq 0 && -n "$counts" ]]; then
+            ahead=$(echo "$counts" | awk '{print $1}')
+            behind=$(echo "$counts" | awk '{print $2}')
+            printf '  %-20s  %-10s  %-10s\n' "$b" "$ahead" "$behind"
+        else
+            printf '  %-20s  %-10s  %-10s\n' "$b" '?' '?'
+        fi
+    fi
+done
+
+echonice ''
+
+# Always end on develop (if it exists)
+if git show-ref --verify --quiet 'refs/heads/develop' || git show-ref --verify --quiet 'refs/remotes/origin/develop'; then
+    ensure_local_branch 'develop' >/dev/null 2>&1 || true
+    git checkout develop >/dev/null 2>&1 || true
+fi

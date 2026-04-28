@@ -34,12 +34,14 @@ These files need to be deleted, but they are useful for now as they show us the 
 # How to try this at home?
 
 To try this out for yourself on a module, run:
+
 ```shell
 composer global require sunnysideup/easy-coding-standards:dev-master
 composer global update
 ```
 
 Then run:
+
 ```shell
 git clone [REPO]
 cd [REPO]

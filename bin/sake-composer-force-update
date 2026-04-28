@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+
+check_for_env_var "PACKAGIST_USERNAME"
+check_for_env_var "PACKAGIST_API_TOKEN"
+############################################ DIR
+dir='./'
+package=''
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+############################################ HELP
+help_and_exit() {
+
+    ECHOHEAD "Composer Require"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-composer-force-update "
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
+
+allInfo=$(composer info --format=json)
+nonDevInfo=$(composer info --no-dev --format=json)
+
+nonDirectPackages=$(echo "$allInfo" | jq -r '
+  .installed[]
+  | select(.["direct-dependency"] == false)
+  | "\(.name):\(.version)"
+')
+# Extract direct package names and their repository URLs
+
+# ECHOHEAD "Non-direct packages (name:version):"
+# echonice "$nonDirectPackages"
+
+# ECHOHEAD "Getting list of package names from non-dev info..."
+nonDevNames=$(echo "$nonDevInfo" | jq -r '.installed[] | .name')
+# ECHOHEAD "Non-dev package names:"
+# echonice "$nonDevNames"
+
+nonDevPackagesProcessed=()
+devPackagesProcessed=()
+
+while IFS= read -r line; do
+    pkgName=${line%%:*}
+    pkgVersion=${line#*:}
+    pkgVersion=${pkgVersion%% *}
+
+    ECHOHEAD "Processing package '$pkgName' with version '$pkgVersion'"
+
+    echonice "Update request sent to Packagist for ${pkgName}."
+
+    if [[ "$pkgVersion" == dev-master* || "$pkgVersion" == dev-main* ]]; then
+
+        if echo "$nonDevNames" | grep -qx "$pkgName"; then
+            nonDevPackagesProcessed+=("$pkgName")
+            echonice "Package '$pkgName' is a non-dev dependency."
+            composer require "${pkgName}:${pkgVersion}"
+        else
+            devPackagesProcessed+=("$pkgName")
+            echonice "Package '$pkgName' is a dev-only dependency."
+            composer require --dev "${pkgName}:${pkgVersion}"
+        fi
+
+        composer update "${pkgName}" -W
+    else
+        echonice "Package '$pkgName' version '$pkgVersion' does not start with dev-master or dev-main. Skipping."
+    fi
+
+    echoline
+done <<<"$nonDirectPackages"
+
+allInfo=$(composer info --format=json)
+directPackages=$(echo "$allInfo" | jq -r '
+  .installed[]
+  | select(.["direct-dependency"] == true)
+  | {name: .name, version: .version, repo: (.source // null)}
+  | @json
+')
+
+echo "$directPackages" | jq -c '.' | while read -r package; do
+    pkgName=$(echo "$package" | jq -r '.name')
+    pkgVersion=$(echo "$package" | jq -r '.version')
+    repoUrl=$(echo "$package" | jq -r '.repo')
+
+    if [[ -n "$repoUrl" && "$repoUrl" != "null" ]]; then
+
+        ECHOHEAD "Processing package '$pkgName' with version '$pkgVersion'"
+
+        if [[ "$pkgVersion" == dev-master* || "$pkgVersion" == dev-main* ]]; then
+            # Remove '/tree/master' or '/tree/main' or any other branch
+            repoUrl=$(echo "$repoUrl" | sed -E 's|/tree/[^/]+$||')
+            # Replace these with your actual details
+            # Construct the API URL
+            PACKAGIST_API_URL="https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_API_TOKEN}"
+
+            # Send a POST request to trigger the update
+            echonice "Posting to $PACKAGIST_API_URL with repo URL: ${repoUrl}"
+            RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
+                -d "{\"repository\":\"${repoUrl}\"}" \
+                "${PACKAGIST_API_URL}")
+            echonice "Response from Packagist: ${RESPONSE}"
+            composer update "${pkgName}" -W
+        else
+            echonice "Package '$pkgName' version '$pkgVersion' does not start with dev-master or dev-main. Skipping."
+        fi
+    else
+        echo "Skipping $pkgName ($pkgVersion): No repository URL found."
+    fi
+    echoline
+done <<<"$directPackages"
+
+echoline
+ECHOHEAD "Summary:"
+echonice "Non-dev packages updated: ${nonDevPackagesProcessed[*]}"
+echonice "Dev-only packages updated: ${devPackagesProcessed[*]}"
+composer audit --fix
+echoend

@@ -1,0 +1,504 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:-}"
+WORKING_DIR="$(pwd)"
+[[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/sake-self-methods" ]] && source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ CHECK REGISTRY
+# Each check: KEY="description"
+declare -A CHECK_DESC=(
+    [composer-audit]="Composer audit for known vulnerabilities"
+    [roave]="roave/security-advisories dry-run update"
+    [phpstan]="PHPStan static analysis (level 1)"
+    [phpcs]="PHPCS with Security ruleset"
+    [semgrep]="Semgrep OWASP + security rules"
+    [npm-audit]="NPM audit per package.json"
+    [npm-audit-dev]="npm-audit-dev with security plugins"
+    [public-files]="Sensitive files in public/"
+    [world-writable]="World-writable file detection"
+    [gitleaks]="Scan for leaked secrets/credentials"
+    [php-dangerous]="Grep for dangerous PHP functions"
+    [env-permissions]="Check .env file permissions"
+)
+
+# Which checks are "key" (default). User can adjust this list.
+KEY_CHECKS=(
+    composer-audit
+    roave
+    phpcs
+    semgrep
+    npm-audit
+    public-files
+    world-writable
+    php-dangerous
+    env-permissions
+)
+
+ALL_CHECKS=(
+    composer-audit
+    roave
+    phpstan
+    phpcs
+    semgrep
+    npm-audit
+    npm-audit-dev
+    public-files
+    world-writable
+    gitleaks
+    php-dangerous
+    env-permissions
+)
+
+############################################ HELP / ARG PARSING
+mode="key"          # "all", "key", or "only"
+only_check=""
+
+help_and_exit() {
+    ECHOHEAD "Security Scan"
+    ECHOHEAD "Current settings:"
+    echonice "project dir:                 $WORKING_DIR"
+
+    ECHOHEAD "Usage:"
+    echonice "sake-lint-security [OPTIONS]"
+
+    ECHOHEAD "Options:"
+    echonice "-h, --help                   Show help information"
+    echonice "-a, --all                    Run ALL checks"
+    echonice "-k, --key                    Run key checks only (default)"
+    echonice "-o, --only CHECK             Run a single check"
+    echonice "-l, --list                   List available checks"
+
+    ECHOHEAD "Available checks:"
+    for key in "${ALL_CHECKS[@]}"; do
+        local marker=" "
+        for k in "${KEY_CHECKS[@]}"; do
+            [[ "$k" == "$key" ]] && marker="*" && break
+        done
+        echonice "  [$marker] $key — ${CHECK_DESC[$key]}"
+    done
+    echonice ""
+    echonice "  * = included in --key (default)"
+
+    ECHOHEAD "Examples:"
+    echonice "sake-lint-security                   # run key checks"
+    echonice "sake-lint-security --all             # run everything"
+    echonice "sake-lint-security --only semgrep    # run one check"
+    echonice "sake-lint-security --list            # show checks"
+    echofunctions
+    exit 0
+}
+
+list_checks() {
+    echo ""
+    echo "Available checks:"
+    for key in "${ALL_CHECKS[@]}"; do
+        local marker=" "
+        for k in "${KEY_CHECKS[@]}"; do
+            [[ "$k" == "$key" ]] && marker="*" && break
+        done
+        echo "  [$marker] $key — ${CHECK_DESC[$key]}"
+    done
+    echo ""
+    echo "  * = included in --key (default)"
+    exit 0
+}
+
+while (($#)); do
+    case $1 in
+        -h|--help)     help_and_exit ;;
+        -a|--all)      mode="all" ;;
+        -k|--key)      mode="key" ;;
+        -l|--list)     list_checks ;;
+        -o|--only)
+            mode="only"
+            shift
+            only_check="${1:?'--only requires a check name. Use --list to see options.'}"
+            ;;
+        *)
+            if sake_handle_help_flag "$1"; then
+                shift
+                continue
+            fi
+            ;;
+    esac
+    shift
+done
+
+############################################ RESOLVE WHICH CHECKS TO RUN
+declare -A ENABLED_CHECKS=()
+
+case "$mode" in
+    all)
+        for c in "${ALL_CHECKS[@]}"; do ENABLED_CHECKS[$c]=1; done
+        ;;
+    key)
+        for c in "${KEY_CHECKS[@]}"; do ENABLED_CHECKS[$c]=1; done
+        ;;
+    only)
+        if [[ -z "${CHECK_DESC[$only_check]+x}" ]]; then
+            echobad "Unknown check: $only_check"
+            echobad "Use --list to see available checks."
+            exit 1
+        fi
+        ENABLED_CHECKS[$only_check]=1
+        ;;
+esac
+
+should_run() {
+    [[ -n "${ENABLED_CHECKS[$1]+x}" ]]
+}
+
+############################################ ENTER PROJECT ROOT
+cd_or_fail "$WORKING_DIR" help_and_exit
+
+status=0
+
+run() {
+    echo -e "\n> $*  (cwd: $(pwd))"
+    if ! "$@"; then
+        status=1
+    fi
+}
+
+# Build targets array safely (handles spaces in dir names)
+TARGETS=()
+while IFS= read -r -d '' d; do
+    TARGETS+=("$d")
+done < <(find . -maxdepth 1 -type d \
+    -not -path './vendor*' \
+    -not -path './datauploadfolder*' \
+    -not -path './bin*' \
+    -not -path './.graphql*' \
+    -not -path './public/assets/*' \
+    -not -path './.git' \
+    -not -path './_upgrade*' \
+    -not -path './patches*' \
+    -not -path './_dev*' \
+    -not -path './node_modules*' \
+    -print0)
+
+TARGETS+=("vendor/$PACKAGIST_USERNAME")
+
+############################################ 1) Composer audit
+if should_run composer-audit; then
+    ECHOHEAD "Composer Audit"
+    if command -v composer >/dev/null; then
+        run composer audit
+    else
+        echobad "Skipping Composer audit (composer not found)."
+    fi
+fi
+
+############################################ 2) roave/security-advisories
+if should_run roave; then
+    ECHOHEAD "Roave Security Advisories"
+    if command -v composer >/dev/null; then
+        if composer show roave/security-advisories >/dev/null 2>&1; then
+            run composer update --dry-run roave/security-advisories
+        else
+            echobad "roave/security-advisories not required; skipping."
+        fi
+    else
+        echobad "Skipping roave/security-advisories (composer not found)."
+    fi
+fi
+
+
+############################################ 3) PHPStan
+if should_run phpstan; then
+    ECHOHEAD "PHPStan"
+    if [[ ! -f phpstan.neon ]] && [[ ! -f phpstan.neon.dist ]] && [[ ! -f phpstan.dist.neon ]]; then
+        scan_generate_phpstan_neon 1
+    fi
+    if command -v phpstan >/dev/null 2>&1; then
+        cd ~/.config/composer && composer update phpstan/extension-installer && cd "$WORKING_DIR"
+        run phpstan clear-result-cache
+        run phpstan analyse
+    elif [[ -x vendor/bin/phpstan ]]; then
+        run vendor/bin/phpstan clear-result-cache
+        run vendor/bin/phpstan analyse
+    else
+        echobad 'Skipping PHPStan (phpstan not found).'
+    fi
+fi
+
+############################################ 4) PHPCS (security ruleset)
+if should_run phpcs; then
+    check_for_env_var "PACKAGIST_USERNAME"
+    ECHOHEAD "PHPCS Security"
+
+    if command -v phpcs >/dev/null 2>&1; then
+        PHPCS=phpcs
+    elif [[ -x vendor/bin/phpcs ]]; then
+        PHPCS=vendor/bin/phpcs
+    else
+        echobad 'Skipping PHPCS (phpcs not found).'
+        PHPCS=""
+    fi
+
+    if [[ -n "$PHPCS" ]]; then
+        run "$PHPCS" \
+            --standard=Security \
+            --severity=6 \
+            --ignore='*/vendor/*,*/node_modules/*,public/assets/*,.graphql-generated/*' \
+            "${TARGETS[@]}"
+
+        run "$PHPCS" \
+            --standard=Security \
+            --severity=6 \
+            --ignore='*/node_modules/*' \
+            "vendor/$PACKAGIST_USERNAME"
+    fi
+fi
+
+############################################ 5) Semgrep
+if should_run semgrep; then
+    ECHOHEAD "Semgrep"
+    if ! command -v semgrep >/dev/null 2>&1; then
+        echobad "Semgrep is not installed. To install: pipx install semgrep"
+    fi
+
+    if command -v semgrep >/dev/null 2>&1; then
+        echogood "Semgrep is installed."
+        local_cmd=(semgrep scan
+            --config p/phpcs-security-audit
+            --config p/security-audit
+            --config p/owasp-top-ten
+            --include='*.php'
+        )
+        if [[ -d .semgrep ]]; then
+            local_cmd+=(--config .semgrep)
+        fi
+        run "${local_cmd[@]}" .
+        mkdir -p "/tmp/my-scan-of/vendor"
+        cp -r "vendor/$PACKAGIST_USERNAME" "/tmp/my-scan-of/vendor/$PACKAGIST_USERNAME"
+        semgrep scan \
+            --config p/phpcs-security-audit \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --include='*.php' \
+            "/tmp/my-scan-of/vendor/$PACKAGIST_USERNAME"
+        rm -rf "/tmp/my-scan-of/vendor/$PACKAGIST_USERNAME"
+    else
+        echobad "Skipping Semgrep (not installed). Try: pipx install semgrep"
+    fi
+fi
+
+############################################ 6) NPM audit
+if should_run npm-audit; then
+    ECHOHEAD "NPM Audit (Production)"
+    while IFS= read -r -d '' pkg; do
+        npmdir="$(dirname "$pkg")"
+        pushd "$npmdir" >/dev/null
+        if command -v npm >/dev/null; then
+            if [[ ! -f package-lock.json ]]; then
+                npm i --package-lock-only --ignore-scripts 2>/dev/null || { popd >/dev/null; continue; }
+            fi
+            result=$(npm audit --omit=dev --audit-level=high 2>&1) || status=1
+            if [[ "$result" != *"found 0 vulnerabilities"* ]]; then
+                echobad "$npmdir:"
+                echo "$result"
+            else
+                echogood "$npmdir: no vulnerabilities"
+            fi
+        else
+            echobad "Skipping npm audit (npm not found)."
+        fi
+        popd >/dev/null
+    done < <(find . -type f -name 'package.json' \
+        -not -path './vendor/*' \
+        -not -path '*/node_modules/*' -print0)
+fi
+############################################ 7) NPM audit (dev)
+if should_run npm-audit-dev; then
+    ECHOHEAD "NPM Audit (Dev)"
+    while IFS= read -r -d '' pkg; do
+        npmdir="$(dirname "$pkg")"
+        pushd "$npmdir" >/dev/null
+        if command -v npm >/dev/null; then
+            if [[ ! -f package-lock.json ]]; then
+                npm i --package-lock-only --ignore-scripts 2>/dev/null || { popd >/dev/null; continue; }
+            fi
+            result=$(npm audit --audit-level=critical 2>&1) || true
+            if [[ "$result" != *"found 0 vulnerabilities"* ]]; then
+                echobad "$npmdir (non-blocking):"
+                echo "$result"
+            else
+                echogood "$npmdir: no vulnerabilities"
+            fi
+        else
+            echobad "Skipping npm audit dev (npm not found)."
+        fi
+        popd >/dev/null
+    done < <(find . -type f -name 'package.json' \
+        -not -path './vendor/*' \
+        -not -path '*/node_modules/*' -print0)
+fi
+
+
+############################################ 8) Sensitive files in public/
+if should_run public-files; then
+    ECHOHEAD "Public Directory Check"
+
+    # Patterns to flag in public/ (edit these lists as needed)
+    SENSITIVE_NAMES=(
+        '.env*'
+        'composer*'
+        '.git*'
+        '*.sql'
+        '*.log'
+        '*.bak'
+        '*.dump'
+        '*.sqlite'
+    )
+    # Exceptions — allowed in public/
+    SENSITIVE_EXCEPTIONS=(
+        '.gitignore'
+        '.gitkeep'
+    )
+
+    if [[ -d public ]]; then
+        # Build find args
+        find_args=(public -type f '(')
+        for i in "${!SENSITIVE_NAMES[@]}"; do
+            [[ $i -gt 0 ]] && find_args+=(-o)
+            find_args+=(-name "${SENSITIVE_NAMES[$i]}")
+        done
+        find_args+=(')')
+        for ex in "${SENSITIVE_EXCEPTIONS[@]}"; do
+            find_args+=(-not -name "$ex")
+        done
+
+        if find "${find_args[@]}" | grep -q .; then
+            echobad "Security issue: Found sensitive files in the public directory!"
+            find "${find_args[@]}"
+            status=1
+        else
+            echogood "No sensitive files found in the public directory."
+        fi
+    else
+        echonice "No public/ directory found; skipping."
+    fi
+fi
+
+############################################ 9) World-writable files
+if should_run world-writable; then
+    ECHOHEAD "World-Writable Files"
+    world_writable_files=()
+    while IFS= read -r -d '' f; do
+        world_writable_files+=("$f")
+    done < <(find . -type f -perm -o=w \
+        -not -path './vendor/*' \
+        -not -path '*/node_modules/*' -print0)
+
+    if [[ ${#world_writable_files[@]} -gt 0 ]]; then
+        echobad "Security issue: Found ${#world_writable_files[@]} world-writable file(s). Fixing..."
+        for f in "${world_writable_files[@]}"; do
+            old_perms=$(stat -c '%a' "$f" 2>/dev/null || stat -f '%Lp' "$f" 2>/dev/null)
+            chmod o-w "$f"
+            new_perms=$(stat -c '%a' "$f" 2>/dev/null || stat -f '%Lp' "$f" 2>/dev/null)
+            echonice "  Fixed: $f ($old_perms → $new_perms)"
+        done
+        status=1
+    else
+        echogood "No world-writable files found."
+    fi
+fi
+
+############################################ 10) Gitleaks (secret scanning)
+if should_run gitleaks; then
+    ECHOHEAD "Gitleaks (Secret Scanning) - consider using .gitleaksignore for exceptions OR .gitleaks.toml for custom config OR BFG Repo-Cleaner for history cleanup"
+    if ! command -v gitleaks >/dev/null 2>&1; then
+        echobad "Gitleaks not installed."
+        if ask "Install gitleaks? (requires Go or download binary)" "n"; then
+            # Try snap or direct download
+            if command -v snap >/dev/null 2>&1; then
+                sudo snap install gitleaks
+            else
+                echobad "Please install manually: https://github.com/gitleaks/gitleaks#installing"
+            fi
+        fi
+    fi
+
+    if command -v gitleaks >/dev/null 2>&1; then
+        gitleaks_args=(gitleaks detect --source . -v --log-opts=""--since=6months"")
+        if [[ -f .gitleaks.toml ]]; then
+            gitleaks_args+=(--config .gitleaks.toml)
+        fi
+        run "${gitleaks_args[@]}"
+    else
+        echobad "Skipping gitleaks. Tip: https://github.com/gitleaks/gitleaks#installing"
+    fi
+fi
+
+############################################ 11) Dangerous PHP functions
+if should_run php-dangerous; then
+    ECHOHEAD "Dangerous PHP Functions"
+    dangerous_found=0
+    # Patterns that are almost always dangerous in application code
+    patterns='\beval\s*\(|\bexec\s*\(|\bsystem\s*\(|\bpassthru\s*\(|\bshell_exec\s*\(|\bpopen\s*\(|\bproc_open\s*\(|\bassert\s*\('
+    while IFS= read -r -d '' f; do
+        matches=$(grep -Pn "$patterns" "$f" 2>/dev/null) || continue
+        dangerous_found=1
+        echobad "$f:"
+        echo "$matches"
+    done < <(find . -name '*.php' \
+        -not -path './vendor/*' \
+        -not -path '*/node_modules/*' -print0)
+
+    if [[ $dangerous_found -eq 1 ]]; then
+        echobad "Found potentially dangerous PHP function calls (review above)."
+        status=1
+    else
+        echogood "No dangerous PHP function calls found."
+    fi
+fi
+
+############################################ 12) .env file permissions
+if should_run env-permissions; then
+    ECHOHEAD ".env File Permissions"
+    WEB_GROUP="${WEB_GROUP:-www-data}"
+
+    while IFS= read -r -d '' envfile; do
+        # Skip .env.example — not sensitive
+        [[ "$(basename "$envfile")" == ".env.example" ]] && continue
+
+        perms=$(stat -c '%a' "$envfile" 2>/dev/null || stat -f '%Lp' "$envfile" 2>/dev/null)
+        group=$(stat -c '%G' "$envfile" 2>/dev/null || stat -f '%Sg' "$envfile" 2>/dev/null)
+
+        needs_fix=0
+        if [[ "$perms" != "640" && "$perms" != "600" ]]; then
+            needs_fix=1
+        fi
+        if [[ "$group" != "$WEB_GROUP" ]]; then
+            needs_fix=1
+        fi
+
+        if [[ $needs_fix -eq 1 ]]; then
+            echobad "$envfile: perms=$perms group=$group — fixing to 640:$WEB_GROUP"
+            chgrp "$WEB_GROUP" "$envfile" 2>/dev/null || echobad "  Could not chgrp (try with sudo)"
+            chmod 640 "$envfile" 2>/dev/null || echobad "  Could not chmod (try with sudo)"
+            status=1
+        else
+            echogood "$envfile permissions OK ($perms, group: $group)"
+        fi
+    done < <(find . -maxdepth 2 -name '.env*' -type f \
+        -not -path './vendor/*' -print0)
+
+    if ! find . -maxdepth 2 -name '.env*' -type f -not -path './vendor/*' | grep -q .; then
+        echonice "No .env files found."
+    fi
+fi
+
+############################################ SUMMARY
+ECHOHEAD "Security Scan Summary (mode: $mode)"
+if [[ $status -ne 0 ]]; then
+    echobad 'Security checks found issues.'
+else
+    echogood 'All security checks passed.'
+fi
+
+echoend
+exit "$status"

@@ -1,0 +1,792 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+format="json"
+test="SS6"
+help='no'
+check_forks='no'
+default_only='no'
+while (($#)); do
+    case $1 in
+    -f | --format)
+        format=$2
+        shift
+        ;;
+    -t | --test)
+        test=$2
+        shift
+        ;;
+    -c | --check-forks)
+        check_forks='yes'
+        ;;
+    -d | --default-only)
+        default_only='yes'
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Check if a SilverStripe package is ready for $test"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "How it works:"
+    echonice "This script determines whether a given Composer package (or git repository URL)"
+    echonice "is ready for a specific SilverStripe version (e.g. SS6)."
+    echonice ""
+    echonice "It accepts either a Packagist package name (e.g. sunnysideup/templateoverview)"
+    echonice "or a git URL (HTTPS or SSH, e.g. https://github.com/... or git@github.com:...)."
+    echonice ""
+    echonice "When a git URL is provided, the repository is cloned into a temporary directory"
+    echonice "and only the default branch is checked. Fork scanning is not available in this"
+    echonice "mode. Git handles authentication natively via SSH keys or credential helpers —"
+    echonice "no API token is required."
+    echonice ""
+    echonice "When a Packagist package name is provided, the Packagist API is used to resolve"
+    echonice "the GitHub repository, and the GitHub API is used to scan all branches. A GitHub"
+    echonice "personal access token is required, read from:"
+    echonice "  ~/.config/composer/auth.json  (github-oauth.github.com)"
+    echonice "or from the GITHUB_TOKEN environment variable."
+
+    ECHOHEAD "Decision logic (in order):"
+    echonice "1. RULESET CHECK"
+    echonice "   The script loads a ruleset named SAKE_CORE_PACKAGES_<test> (e.g."
+    echonice "   SAKE_CORE_PACKAGES_SS6), which is a map of core SilverStripe packages"
+    echonice "   and their expected major versions. If the ruleset is empty (no packages"
+    echonice "   defined), the script exits immediately with status 'unknown'."
+    echonice ""
+    echonice "2. COMPOSER TYPE CHECK"
+    echonice "   The root composer.json on the default branch is fetched. If the 'type'"
+    echonice "   field is not 'silverstripe-vendormodule' or 'silverstripe-recipe' or 'silverstripe-theme'"
+    echonice "   the script exits with status 'unknown'. This filters out non-SilverStripe packages early."
+    echonice ""
+    echonice "3. DEFAULT BRANCH DEPENDENCY CHECK"
+    echonice "   Using the same composer.json, the script checks whether any of the"
+    echonice "   core packages from the ruleset appear in the 'require' section"
+    echonice "   (require-dev is not checked). If none are found, the script exits"
+    echonice "   with status 'unknown'. This filters out packages that are typed as"
+    echonice "   silverstripe modules but do not actually depend on SilverStripe"
+    echonice "   core (e.g. standalone themes or tooling)."
+    echonice ""
+    echonice "4. ALL-BRANCH SCAN (package name mode only)"
+    echonice "   The script fetches all branches of the main repository and checks"
+    echonice "   the root composer.json on each branch. For each branch:"
+    echonice "   - If no core packages from the ruleset are found in 'require', the"
+    echonice "     branch is skipped (marked as NOT_A_SILVERSTRIPE_DEPENDENCY)."
+    echonice "   - If core packages are found but none match the required major"
+    echonice "     version, the branch is recorded as NONE (has SS deps, wrong version)."
+    echonice "   - If one or more core packages match the required major version,"
+    echonice "     the branch is recorded as a match."
+    echonice "   If any branch on the main repo matches, the result is 'ready'."
+    echonice "   When a git URL is provided, only the default branch is checked."
+    echonice ""
+    echonice "5. FORK SCAN (optional, package name mode only, only with --check-forks)"
+    echonice "   If no branch on the main repo matched and --check-forks was passed,"
+    echonice "   the script fetches all forks (paginated, no 100-fork limit) and"
+    echonice "   repeats the all-branch scan for each fork. The fork with the most"
+    echonice "   matching core packages is selected as the best fork."
+    echonice "   If a fork matches, the result is 'fork'."
+    echonice ""
+    echonice "6. If none of the above produced a match, the result is 'not-ready'."
+
+    ECHOHEAD "JSON output (--format json):"
+    echonice "When --format json is used, the script outputs a single JSON object"
+    echonice "to stdout (all human-readable output goes to stderr)."
+    echonice ""
+    echonice "Schema:"
+    echonice "  {"
+    echonice "    \"package\": \"<input package name or URL>\","
+    echonice "    \"test\":    \"<test name, e.g. SS6>\","
+    echonice "    \"status\":  \"<ready|fork|not-ready|unknown>\","
+    echonice "    \"main\":    <match object or null>,"
+    echonice "    \"fork\":    <match object or null>"
+    echonice "  }"
+    echonice ""
+    echonice "Status values:"
+    echonice "  unknown    — Not a silverstripe-vendormodule",
+    echonice "               or 'silverstripe-recipe' or 'silverstripe-theme',"
+    echonice "               or no SS core dependencies in require on the default branch,"
+    echonice "               or the ruleset for this test is empty,"
+    echonice "               or the package could not be found on Packagist and no git URL was provided."
+    echonice "  ready      — At least one branch on the main repo has core"
+    echonice "               packages matching the required major version."
+    echonice "  fork       — No main branch matched, but a fork has a match"
+    echonice "               (only possible with --check-forks in package name mode)."
+    echonice "  not-ready  — The package is a valid SilverStripe module with"
+    echonice "               core dependencies, but no branch (and no fork)"
+    echonice "               matches the required major version yet."
+    echonice ""
+    echonice "Match object (used in 'main' and 'fork' fields):"
+    echonice "  {"
+    echonice "    \"repo\":    \"owner/repo-name\","
+    echonice "    \"branch\":  \"branch-name\","
+    echonice "    \"path\":    \"composer.json\","
+    echonice "    \"matched\": {"
+    echonice "      \"silverstripe/framework\": \"^6.0\","
+    echonice "      \"silverstripe/admin\": \"^3.0\""
+    echonice "    }"
+    echonice "  }"
+    echonice ""
+    echonice "  - 'repo' is the GitHub owner/repo (may differ from input for forks)."
+    echonice "  - 'branch' is the branch name where the match was found."
+    echonice "  - 'path' is always 'composer.json' (only root composer.json is checked)."
+    echonice "  - 'matched' lists each core package that matched, with its actual"
+    echonice "    version constraint from the composer.json."
+    echonice ""
+    echonice "  For 'main': the first matching branch found is used."
+    echonice "  For 'fork': the fork with the highest number of matching core"
+    echonice "  packages is selected."
+    echonice ""
+    echonice "Examples:"
+    echonice "  Ready:     {\"package\":\"sunnysideup/phone_field\",\"test\":\"SS6\","
+    echonice "              \"status\":\"ready\","
+    echonice "              \"main\":{\"repo\":\"sunnysideup/silverstripe-phone_field\","
+    echonice "              \"branch\":\"main\",\"path\":\"composer.json\","
+    echonice "              \"matched\":{\"silverstripe/framework\":\"^6.0\"}},"
+    echonice "              \"fork\":null}"
+    echonice ""
+    echonice "  Unknown:   {\"package\":\"pelago/emogrifier\",\"test\":\"SS6\","
+    echonice "              \"status\":\"unknown\",\"main\":null,\"fork\":null}"
+    echonice ""
+    echonice "  Not ready: {\"package\":\"sunnysideup/some-module\",\"test\":\"SS6\","
+    echonice "              \"status\":\"not-ready\",\"main\":null,\"fork\":null}"
+
+    ECHOHEAD "Available settings:"
+    echonice "-f, --format                   output format: json (default) or text"
+    echonice "-t, --test                     test to perform, e.g. SS6 (default), SS5"
+    echonice "-c, --check-forks              also check forks if main repo is not ready (package name mode only)"
+    echonice "-d, --default-only             only check the default branch (package name mode only)"
+    echonice "-h, --help                     show this help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-ready sunnysideup/templateoverview"
+    echonice "sake-ss-ready sunnysideup/templateoverview --check-forks"
+    echonice "sake-ss-ready sunnysideup/templateoverview --default-only"
+    echonice "sake-ss-ready sunnysideup/templateoverview -t SS5"
+    echonice "sake-ss-ready sunnysideup/templateoverview -t SS6 --check-forks --format json"
+    echonice "sake-ss-ready https://github.com/vendor/silverstripe-module"
+    echonice "sake-ss-ready git@github.com:vendor/silverstripe-module"
+    echonice "sake-ss-ready https://bitbucket.org/vendor/silverstripe-module"
+    echonice "sake-ss-ready git@bitbucket.org:vendor/silverstripe-module"
+
+    echofunctions
+    exit 1
+}
+
+declare -A BRANCH_RESULTS
+
+
+sake_check_help_and_exit
+
+if [ -z "$dir" ] || [ "$dir" = "./" ]; then
+    echobad "Usage: sake-ss-ready <composer-package OR git-url>"
+    help_and_exit
+fi
+
+# break on errors
+set -e
+
+target="$dir"
+tmpDir="${TMPDIR:-/tmp}/scan_tmp"
+mkdir -p "$tmpDir"
+
+# ----------------------------------------------------
+# 1. VERSION RULE SETS
+# ----------------------------------------------------
+# A repo is READY if ANY rule in the chosen ruleset matches.
+
+# Choose which ruleset to apply (using the centralized matrices)
+ACTIVE_RULESET="SAKE_CORE_PACKAGES_${test:-SS6}"
+eval "ruleset_keys=(\"\${!$ACTIVE_RULESET[@]}\")"
+
+ECHOHEAD "Using ruleset: $ACTIVE_RULESET"
+
+# ── Early exit: if the ruleset has no packages, this test is unrelated ──
+if [[ ${#ruleset_keys[@]} -eq 0 ]]; then
+    echonice "ERROR: No core packages defined in $ACTIVE_RULESET — package is unknown to this test."
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
+    echoline
+
+    if [[ "$format" == "json" ]]; then
+        printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+            "$target" "$test"
+    fi
+
+    echoend
+    exit 0
+fi
+
+get_rule_value() {
+    local key="$1"
+    eval "echo \"\${$ACTIVE_RULESET[$key]}\""
+}
+
+# When format=json, send human-readable output to stderr
+if [[ "$format" == "json" ]]; then
+    exec 3>&1          # save real stdout on fd 3
+    exec 1>&2          # redirect stdout → stderr (all echos go there)
+fi
+
+# ============================================================
+# URL MODE: git clone → check default branch only, then exit
+# ============================================================
+if [[ "$target" =~ ^https?:// ]] || [[ "$target" =~ ^git@ ]]; then
+
+    if [[ "$check_forks" == "yes" ]]; then
+        echonice "⚠ --check-forks is not supported in URL mode and will be ignored."
+        echoline
+    fi
+
+    cloneDir="$tmpDir/clone_$$"
+    echonice "URL mode: cloning $target …"
+    echonice "(only the default branch will be checked; forks are not scanned)"
+    echoline
+
+    if ! git clone --bare --quiet "$target" "$cloneDir" 2>&1; then
+        echobad "❌ Failed to clone $target"
+        exit 1
+    fi
+
+    # Derive the default branch from HEAD
+    default_branch=$(git -C "$cloneDir" symbolic-ref HEAD 2>/dev/null | sed 's|refs/heads/||')
+    if [[ -z "$default_branch" ]]; then
+        default_branch="main"
+    fi
+    echonice "Default branch: $default_branch"
+
+    # Read root composer.json from the default branch
+    comp=$(git -C "$cloneDir" show "HEAD:composer.json" 2>/dev/null || true)
+
+    rm -rf "$cloneDir"
+
+    emit_unknown() {
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+                "$target" "$test" >&3
+        fi
+        echoend
+        exit 0
+    }
+
+    # ── Type check ──
+    if ! echo "$comp" | jq '.' >/dev/null 2>&1; then
+        echonice "✔ No valid composer.json found on default branch — package is unknown to $test."
+        emit_unknown
+    fi
+
+    composer_type=$(echo "$comp" | jq -r '.type // empty')
+    if [[ "$composer_type" != "silverstripe-vendormodule" && "$composer_type" != "silverstripe-recipe" && "$composer_type" != "silverstripe-theme" ]]; then
+        echonice "✔ composer.json type is '${composer_type:-unset}', not 'silverstripe-*' — package is unknown to $test."
+        emit_unknown
+    fi
+    echonice "✔ composer.json type: $composer_type"
+
+    # ── SS dependency check ──
+    default_has_ss="no"
+    for pkg in "${ruleset_keys[@]}"; do
+        have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
+        if [[ -n "$have" ]]; then
+            default_has_ss="yes"
+            break
+        fi
+    done
+
+    if [[ "$default_has_ss" == "no" ]]; then
+        echonice "✔ No SilverStripe core dependencies in require on default branch — package is unknown to $test."
+        emit_unknown
+    fi
+
+    # ── Version matching ──
+    declare -A matched_pkgs=()
+    for pkg in "${ruleset_keys[@]}"; do
+        need=$(get_rule_value "$pkg")
+        have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
+        major=${need#"^"}
+        if [[ -n "$have" ]]; then
+            if sake_check_major_version_match "$have" "$major"; then
+                matched_pkgs["$pkg"]="$have"
+            fi
+        fi
+    done
+
+    # ── Output ──
+    ECHOHEAD "Results: branches ready for $ACTIVE_RULESET"
+
+    if (( ${#matched_pkgs[@]} > 0 )); then
+        match_list=""
+        for k in "${!matched_pkgs[@]}"; do
+            match_list+="\"$k\": \"${matched_pkgs[$k]}\","
+        done
+        match_list="${match_list%,}"
+        best_main=$(printf '{"repo":"%s","branch":"%s","path":"composer.json","matched":{%s}}' \
+            "$target" "$default_branch" "$match_list")
+        echonice "  ✔ $target:$default_branch matched: {$match_list}"
+        echoline
+
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"ready","main":%s,"fork":null}\n' \
+                "$target" "$test" "$best_main" | jq . >&3
+        fi
+    else
+        echobad "  ✗ No branches found ready for $ACTIVE_RULESET"
+        echoline
+
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"not-ready","main":null,"fork":null}\n' \
+                "$target" "$test" >&3
+        fi
+    fi
+
+    echoend
+    exit 0
+fi
+
+# ============================================================
+# PACKAGE NAME MODE: Packagist + GitHub API (original flow)
+# ============================================================
+
+# -------------------------------------
+# Load GitHub token from composer auth
+# -------------------------------------
+
+authFile="$HOME/.config/composer/auth.json"
+
+if [ -f "$authFile" ]; then
+    GITHUB_TOKEN=$(jq -r '.["github-oauth"]["github.com"] // empty' "$authFile")
+fi
+
+if [ -z "$GITHUB_TOKEN" ] || [ "$GITHUB_TOKEN" = "null" ]; then
+    echobad "❌ No GitHub token found."
+    echobad "Make sure you have a token in:"
+    echobad "  ~/.config/composer/auth.json"
+    echoline
+    echobad "Or set it manually:"
+    echobad "  export GITHUB_TOKEN=xxxx"
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
+    exit 1
+fi
+
+echonice "✔ Loaded GitHub token from composer auth.json"
+echoline
+
+# ----------------------------------------------------
+# 2. Resolve composer package → repo URL
+# ----------------------------------------------------
+resolve_repo_from_composer() {
+    pkg="$1"
+    # Using the standard v1 API is often more reliable for quick lookups
+    curl -s "https://packagist.org/packages/$pkg.json" \
+        | jq -r '.package.repository // empty' \
+        | sed 's|git://|https://|; s|git@github.com:|https://github.com/|'
+}
+
+echonice "Resolving '$target' via Packagist..."
+repoUrl=$(resolve_repo_from_composer "$target")
+
+if [ -z "$repoUrl" ]; then
+    echonice "✔ Package '$target' not found on Packagist — package is unknown to $test."
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
+    echoline
+
+    if [[ "$format" == "json" ]]; then
+        printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+            "$target" "$test" | jq . >&3
+    fi
+
+    echoend
+    exit 0
+fi
+
+# Extract GitHub owner/repo
+if [[ "$repoUrl" =~ github.com[:/]+([^/]+)/([^/.]+) ]]; then
+    owner="${BASH_REMATCH[1]}"
+    repo="${BASH_REMATCH[2]}"
+else
+    echobad "❌ Only GitHub repositories supported."
+    echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
+    exit 1
+fi
+
+echonice "Repository: $owner/$repo"
+
+# Fetch the default branch name (used later for "unknown" determination)
+default_branch=$(curl -s \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    "https://api.github.com/repos/$owner/$repo" \
+    | jq -r '.default_branch // "main"'
+)
+echonice "Default branch: $default_branch"
+echoline
+
+# ── Early exit: if the default branch composer.json type is not silverstripe-vendormodule ──
+default_composer=$(curl -s -L \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    "https://raw.githubusercontent.com/$owner/$repo/$default_branch/composer.json"
+)
+if echo "$default_composer" | jq '.' >/dev/null 2>&1; then
+    composer_type=$(echo "$default_composer" | jq -r '.type // empty')
+    if [[ "$composer_type" != "silverstripe-vendormodule" && "$composer_type" != "silverstripe-recipe" && "$composer_type" != "silverstripe-theme" ]]; then
+        echonice "✔ composer.json type is '${composer_type:-unset}', not 'silverstripe-*' — package is unknown to $test."
+        echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
+        echoline
+
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+                "$target" "$test" >&3
+        fi
+
+        echoend
+        exit 0
+    fi
+    echonice "✔ composer.json type: $composer_type"
+
+    # ── Early exit: if no SS core packages found in require on default branch ──
+    default_has_ss="no"
+    for pkg in "${ruleset_keys[@]}"; do
+        have=$(echo "$default_composer" | jq -r ".require[\"$pkg\"] // empty")
+        if [[ -n "$have" ]]; then
+            default_has_ss="yes"
+            break
+        fi
+    done
+
+    if [[ "$default_has_ss" == "no" ]]; then
+        echonice "✔ No SilverStripe core dependencies in require on default branch — package is unknown to $test."
+        echonice "TIP: use sake-ss-ready -h to see usage instructions and available tests."
+        echoline
+
+        if [[ "$format" == "json" ]]; then
+            printf '{"package":"%s","test":"%s","status":"unknown","main":null,"fork":null}\n' \
+                "$target" "$test" >&3
+        fi
+
+        echoend
+        exit 0
+    fi
+
+    echoline
+fi
+
+# ----------------------------------------------------
+# 3. Optionally fetch forks (moved to after main repo assessment)
+# ----------------------------------------------------
+forkRepos=()
+
+# ----------------------------------------------------
+# 4. Branch + composer checks
+# ----------------------------------------------------
+
+# Key/value use ||| as separator to avoid IFS single-char split issues
+add_json_record() {
+    local full="$1"
+    local branch="$2"
+    local path="$3"
+    local matched="$4"
+    local deps_present="$5"
+
+    local key="${full}|||${branch}|||${path}"
+    BRANCH_RESULTS["$key"]="${matched}|||${deps_present}"
+}
+
+check_branch() {
+    local full="$1"
+    local branch="$2"
+    local encoded_branch
+    encoded_branch=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$branch', safe=''))")
+
+    tree=$(curl -s \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$full/git/trees/$encoded_branch?recursive=1"
+    )
+
+    if [[ -z "$tree" ]] || [[ "$tree" =~ "<" ]]; then
+        return 0
+    fi
+
+    # Only consider the root composer.json, not nested ones (e.g. in vendor/)
+    paths=$(echo "$tree" | jq -r 'if type == "object" and .tree != null then .tree[] | select(.path == "composer.json") | .path else empty end')
+
+    if [ -z "$paths" ]; then
+        return 0
+    fi
+
+    while read -r path; do
+
+        comp=$(curl -s -L \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            "https://raw.githubusercontent.com/$full/$encoded_branch/$path"
+        )
+
+        if ! echo "$comp" | jq '.' >/dev/null 2>&1; then
+            continue
+        fi
+
+        # Evaluate early-exit and matches
+        found_any_ss_pkg="no"
+        declare -A matched_pkgs=()
+
+        for pkg in "${ruleset_keys[@]}"; do
+            need=$(get_rule_value "$pkg")
+            have=$(echo "$comp" | jq -r ".require[\"$pkg\"] // empty")
+            major=${need#"^"} # sake_check_major_version_match expects pure integer
+
+            if printf '%s\n' "${ruleset_keys[@]}" | grep -q "^$pkg$"; then
+                if [[ -n "$have" ]]; then
+                    found_any_ss_pkg="yes"
+                fi
+            fi
+
+            # Version match — centralized helper function
+            if [[ -n "$have" ]]; then
+                if sake_check_major_version_match "$have" "$major"; then
+                    matched_pkgs["$pkg"]="$have"
+                fi
+            fi
+        done
+
+        if [[ "$found_any_ss_pkg" == "no" ]]; then
+            add_json_record "$full" "$branch" "$path" "NOT_A_SILVERSTRIPE_DEPENDENCY" "false"
+        else
+            if (( ${#matched_pkgs[@]} > 0 )); then
+                local match_list=""
+                for k in "${!matched_pkgs[@]}"; do
+                    match_list+="\"$k\": \"${matched_pkgs[$k]}\","
+                done
+                match_list="${match_list%,}"
+                add_json_record "$full" "$branch" "$path" "{$match_list}" "true"
+            else
+                add_json_record "$full" "$branch" "$path" "NONE" "true"
+            fi
+        fi
+
+    done <<< "$paths"
+
+    return 0
+}
+
+
+check_repo() {
+    local full="$1"
+    ECHOHEAD "Checking $full"
+
+    if [[ "$default_only" == "yes" ]]; then
+        # Only check the default branch we resolved earlier
+        echonice "  (Default branch only mode)"
+        branches="$default_branch"
+    else
+        # Standard logic: fetch all branches
+        branches=$(curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$full/branches?per_page=100" \
+            | jq -r 'if type == "array" then .[].name else empty end'
+        )
+    fi
+
+    if [ -z "$branches" ]; then
+        echobad "  ❌ could not fetch branches"
+        echoline
+        return
+    fi
+
+    for branch in $branches; do
+        check_branch "$full" "$branch"
+    done
+
+    echoline
+}
+
+# ----------------------------------------------------
+# 5. Process repos
+# ----------------------------------------------------
+rm -f "$tmpDir/ready.txt"
+
+# Always check the original repo
+check_repo "$owner/$repo"
+
+# Did the main repo match?
+main_ready=0
+for key in "${!BRANCH_RESULTS[@]}"; do
+    full="${key%%|||*}"
+    [[ "$full" != "$owner/$repo" ]] && continue
+    value="${BRANCH_RESULTS[$key]}"
+    matched="${value%%|||*}"
+    if [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]] && [[ "$matched" != "NONE" ]]; then
+        main_ready=1
+        break
+    fi
+done
+
+# Fetch forks now (only if needed — main repo is SS-related but not ready)
+if [[ $main_ready -eq 0 ]] && [[ "$check_forks" == "yes" ]]; then
+    echonice "Fetching forks…"
+
+    page=1
+    while true; do
+        forksUrl="https://api.github.com/repos/$owner/$repo/forks?per_page=100&page=$page"
+
+        apiResponse=$(curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$forksUrl"
+        )
+
+        if [[ "$apiResponse" == "" ]] || [[ "$apiResponse" =~ "<" ]]; then
+            echobad "❌ GitHub returned non-JSON output:"
+            echobad "$apiResponse"
+            exit 1
+        fi
+
+        jsonType=$(echo "$apiResponse" | jq -r 'type')
+
+        if [ "$jsonType" = "object" ]; then
+            message=$(echo "$apiResponse" | jq -r '.message // empty')
+            if [ -n "$message" ] && [ "$message" != "null" ]; then
+                echobad "❌ GitHub API error: $message"
+                echobad "Full response:"
+                echobad "$apiResponse"
+                exit 1
+            fi
+            echobad "❌ Unexpected JSON object instead of array:"
+            echobad "$apiResponse"
+            exit 1
+        fi
+
+        if [ "$jsonType" != "array" ]; then
+            echobad "❌ Unexpected JSON type: $jsonType"
+            echobad "$apiResponse"
+            exit 1
+        fi
+
+        count=$(echo "$apiResponse" | jq 'length')
+        if [[ "$count" -eq 0 ]]; then
+            break
+        fi
+
+        forks=$(echo "$apiResponse" | jq -r '.[].full_name')
+        if [ -n "$forks" ]; then
+            while read -r f; do
+                forkRepos+=("$f")
+            done <<< "$forks"
+        fi
+
+        echonice "  … fetched page $page ($count forks)"
+
+        # If fewer than 100 results, we've reached the last page
+        if [[ "$count" -lt 100 ]]; then
+            break
+        fi
+
+        page=$((page + 1))
+    done
+
+    echonice "Found ${#forkRepos[@]} fork(s) total"
+    echoline
+fi
+
+if [[ $main_ready -eq 0 ]] && [[ "$check_forks" == "yes" ]] && [[ ${#forkRepos[@]} -gt 0 ]]; then
+    echonice "Main repo not ready — checking forks…"
+    echoline
+    for r in "${forkRepos[@]}"; do
+        check_repo "$r"
+    done
+else
+    echonice "✔ Main repo is ready for $test — skipping fork checks."
+    echoline
+fi
+
+# ----------------------------------------------------
+# 6. Output results
+# ----------------------------------------------------
+ECHOHEAD "Results: branches ready for $ACTIVE_RULESET"
+
+# Collect structured results
+best_main=""
+best_fork=""
+best_fork_score=0
+
+for key in "${!BRANCH_RESULTS[@]}"; do
+    full="${key%%|||*}"
+    rest="${key#*|||}"
+    branch="${rest%%|||*}"
+    path="${rest##*|||}"
+
+    value="${BRANCH_RESULTS[$key]}"
+    matched="${value%%|||*}"
+
+    if [[ "$matched" == "NOT_A_SILVERSTRIPE_DEPENDENCY" ]] || [[ "$matched" == "NONE" ]]; then
+        continue
+    fi
+
+    # Count matched packages as a simple score
+    score=$(echo "$matched" | grep -o '"' | wc -l)
+    score=$((score / 4))  # each pkg contributes 4 quotes: "key": "val"
+
+    if [[ "$full" == "$owner/$repo" ]]; then
+        echonice "  ✔ $full:$branch [$path] matched: $matched"
+        if [[ -z "$best_main" ]]; then
+            best_main=$(printf '{"repo":"%s","branch":"%s","path":"%s","matched":%s}' \
+                "$full" "$branch" "$path" "$matched")
+        fi
+    else
+        echonice "  ✔ $full:$branch (fork of $owner/$repo) [$path] matched: $matched"
+        if (( score > best_fork_score )); then
+            best_fork_score=$score
+            best_fork=$(printf '{"repo":"%s","branch":"%s","path":"%s","matched":%s}' \
+                "$full" "$branch" "$path" "$matched")
+        fi
+    fi
+done
+
+# Human-readable summary
+if [[ -z "$best_main" ]] && [[ -z "$best_fork" ]]; then
+    echobad "  ✗ No branches found ready for $ACTIVE_RULESET"
+fi
+
+echoline
+
+
+# JSON output (only when --format json)
+if [[ "$format" == "json" ]]; then
+    status="not-ready"
+    if [[ -n "$best_main" ]]; then
+        status="ready"
+    elif [[ -n "$best_fork" ]]; then
+        status="fork"
+    fi
+
+    # The Logic:
+    # 1. Construct JSON
+    # 2. Pipe to jq for prettifying
+    # 3. Check if FD 3 is open; if so, send to 3 (stdout), otherwise send to stdout anyway
+    if { >&3; } 2>/dev/null; then
+        printf '{"package":"%s","test":"%s","status":"%s","main":%s,"fork":%s}\n' \
+            "$target" "$test" "$status" \
+            "${best_main:-null}" "${best_fork:-null}" \
+            | jq . >&3
+    else
+        # Fallback if FD 3 isn't available for some reason
+        printf '{"package":"%s","test":"%s","status":"%s","main":%s,"fork":%s}\n' \
+            "$target" "$test" "$status" \
+            "${best_main:-null}" "${best_fork:-null}" \
+            | jq .
+    fi
+fi
+
+echoend

@@ -1,71 +1,142 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 
-############################################ DIR
-dir="./"
+############################################ CONSTANTS / DEFAULTS
+LOCAL_ASSETS_DIR="$WORKING_DIR/public/assets"
+REMOTE_ASSETS_SUBPATH='public/assets'
+RSYNC_OPTS=(--stats -chavzPr)
+WWW_DATA_DEFAULT='www-data'
+envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
 
-############################################ SETTINGS
+############################################ SETTINGS (args)
 server=''
-wwwDataUser='www-data'
+toServer=''
+wwwDataUser="$WWW_DATA_DEFAULT"
 help='no'
-while (( $# )); do
-  case $1 in
-    -w|--www-data-user)         wwwDataUser=$2;shift ;;
-    -h|--help)                  help='yes'; shift;;
-    -*)                         printf 'Unknown option: %q\n\n' "$1";
-                                help_and_exit 1 ;;
-    *)                          server=$1;;
-  esac
-  shift
+reverse='no'
+
+while (($#)); do
+    case $1 in
+        -w|--www-data-user) wwwDataUser=$2; shift ;;
+        -h|--help) help='yes' ;;
+        -r|--reverse) reverse='yes' ;;
+        -t|--to) toServer=$2; shift ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        server=$1
+        ;;
+    esac
+    shift
 done
 
-help_and_exit() {
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
 
-    echohead "Rsync assets from server";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to copy from:        $server/public/assets";
-    echonice "Directory to copy to:          $WORKING_DIR/public/assets";
-
-    echonice "Apache user (-w):              $wwwDataUser";
-
-    echohead "Available settings:";
-    echonice "-w, --www-data-user            the apache user, default: www-data"
-    echonice "-h, --help                     show help information"
-
-    echohead "Example usage:"
-    echonice "sake-ss-rsync-assets my-server:/var/www/website-root";
-
-    echofunctions
-    exit;
-}
-
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
     help_and_exit
 fi
+server="$(normalize_server "$server")"
 
-############################################ CODE
+############################################ HELP
+help_and_exit() {
+    # Show resolved targets (lazy-resolve so help is informative without side-effects)
+    _server_display="${server:-<none>}"
+    _to_display="${toServer:-<none>}"
 
-if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
-else
-    echonice "Could not change to $WORKING_DIR"
+
+    ECHOHEAD 'Rsync SilverStripe assets'
+    echonice "Script dir:                    $SCRIPT_DIR"
+    echonice "Working dir:                   $WORKING_DIR"
+    echonice "Local assets dir:              $LOCAL_ASSETS_DIR"
+    echonice "Remote assets subpath:         $REMOTE_ASSETS_SUBPATH"
+    echonice "Server (- none if blank):      $_server_display"
+    echonice "To server (post-pull push):    $_to_display"
+    echonice "Reverse push (-r):             $reverse"
+    echonice "Apache user (-w):              $wwwDataUser"
+
+    ECHOHEAD 'Options'
+    echonice "-w, --www-data-user <user>     Apache (owner) user. Default: $WWW_DATA_DEFAULT"
+    echonice "-r, --reverse                  Push LOCAL → SERVER (dangerous)."
+    echonice "-t, --to <srv[:/path]>         After pulling, push LOCAL → this server."
+    echonice "-h, --help                     Show this help."
+
+    ECHOHEAD 'Usage'
+    echonice "Pull:       sake-ss-rsync-assets user@host:/var/www/site"
+    echonice "Pull+Push:  sake-ss-rsync-assets user@hostA:/var/www/site --to user@hostB:/var/www/site"
+    echonice "Push:       sake-ss-rsync-assets -r user@host:/var/www/site"
+    echonice "Note: Use trailing slashes correctly in rsync semantics (src/ vs src)."
+    ECHOHEAD "Setting defaults:"
+    echonice "Set default server in .env with key $envServerKey,"
+    echonice " e.g. $envServerKey=my-server:/var/www/website-root"
+    echofunctions
+    exit 0
+}
+sake_check_help_and_exit
+
+[[ "$reverse" == 'yes' ]] && echobad 'CAREFUL: you are pushing to the server.'
+
+############################################ HELPERS
+
+server_host() { echo "${1%%:*}"; }
+server_path() { echo "${1#*:}"; }
+
+############################################ PREP
+# Ensure local assets dir exists and is writable for rsync
+sudo mkdir -p "$LOCAL_ASSETS_DIR"
+sudo chown "$USER" "$LOCAL_ASSETS_DIR" -R
+
+
+SERVER_HOST="$(server_host "$server")"
+SERVER_PATH="$(server_path "$server")"
+REMOTE_ASSETS_DIR="$SERVER_PATH/$REMOTE_ASSETS_SUBPATH"
+
+# Normalize optional toServer
+TO_NORMALIZED=''
+if [[ -n "${toServer:-}" ]]; then
+    TO_NORMALIZED="$(normalize_server "$toServer")"
 fi
 
-if [-n "$server"]; then
-    if test -f "$WORKING_DIR/public/assets"; then
-        sudo chown $USER public/assets -R
-        rsync --stats -chavzPr $server/public/assets ./public/assets
-        sudo chown $wwwDataUser public/assets -R
-    else
-        echobad "Could not find  $WORKING_DIR/public/assets"
-    fi
+############################################ RUN
+cd "$WORKING_DIR" || { echobad "Cannot cd to $WORKING_DIR"; exit 1; }
+
+if [[ "$reverse" == 'yes' ]]; then
+    ECHOHEAD "Now syncing LOCAL → $server ..."
+    echowarn "You are about to overwrite remote assets at $REMOTE_ASSETS_DIR with LOCAL $LOCAL_ASSETS_DIR"
+    read -p 'Are you sure? (yes/[no]): ' confirm
+    [[ "$confirm" != 'yes' ]] && echonice 'Aborted.' && exit 1
+    rsync "${RSYNC_OPTS[@]}" "$LOCAL_ASSETS_DIR/" "$server/$REMOTE_ASSETS_SUBPATH"
 else
-    echobad "no server specified $server"
+    ECHOHEAD 'Now clearing local assets...'
+    sudo rm -rf "$LOCAL_ASSETS_DIR"/*
+    ECHOHEAD "Now syncing $server → LOCAL ..."
+    rsync "${RSYNC_OPTS[@]}" "$server/$REMOTE_ASSETS_SUBPATH/" "$LOCAL_ASSETS_DIR"
 fi
 
-echoend;
+# Restore web user ownership
+sudo chown "$wwwDataUser" "$LOCAL_ASSETS_DIR" -R || true
+
+############################################ OPTIONAL POST-PULL PUSH
+if [[ -n "$TO_NORMALIZED" && "$reverse" != 'yes' ]]; then
+    TO_HOST="$(server_host "$TO_NORMALIZED")"
+    TO_PATH="$(server_path "$TO_NORMALIZED")"
+    TO_ASSETS_DIR="$TO_PATH/$REMOTE_ASSETS_SUBPATH"
+
+    ECHOHEAD "Now syncing LOCAL → $TO_NORMALIZED ..."
+    echonice "Re-invoking in reverse mode for safety and consistency."
+    "$0" -w "$wwwDataUser" --reverse "$TO_NORMALIZED"
+fi
+
+echoend

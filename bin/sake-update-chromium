@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Update Chromium"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-update-chromium ."
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+
+
+ECHOHEAD "Installing chromium latest"
+sudo apt-get update -y
+sudo apt-get install -y chromium-browser
+ECHOHEAD "Chromium installed"
+chromium-browser --version
+
+
+echoend

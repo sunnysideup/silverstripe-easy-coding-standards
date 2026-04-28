@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+
+source $dir/.env
+
+help='no'
+name="$SS_DATABASE_NAME"
+while (($#)); do
+    case $1 in
+    -n | --db-name)
+        name=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Dump database"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+    echonice "-n, --db-name                  name for file"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-db-dump -n db.sspak"
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+sspak save . "$name.sspak" --db

@@ -1,17 +1,22 @@
-
 imports:
-    - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/psr2.yaml' }
-    - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/clean-code.yaml' }
-    - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/common.yaml' }
-    # - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/dead-code.yaml' }
+  - {
+      resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/psr2.yaml'
+    }
+  - {
+      resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/clean-code.yaml'
+    }
+  - {
+      resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/common.yaml'
+    }
+  # - { resource: '%vendor_dir%/symplify/easy-coding-standard/config/set/dead-code.yaml' }
 
 parameters:
-    skip:
-        SlevomatCodingStandard\Sniffs\Classes\UnusedPrivateElementsSniff: ~
-        # SlevomatCodingStandard\Sniffs\Functions\UnusedInheritedVariablePassedToClosureSniff: ~
-        # SlevomatCodingStandard\Sniffs\Classes\ModernClassNameReferenceSniff.ClassNameReferencedViaMagicConstant: ~
-        PHP_CodeSniffer\Standards\Generic\Sniffs\CodeAnalysis\AssignmentInConditionSniff.Found: ~
-        PHP_CodeSniffer\Standards\Squiz\Sniffs\Classes\ValidClassNameSniff.NotCamelCaps: ~
-        PhpCsFixer\Fixer\ClassNotation\SelfAccessorFixer: ~
-        PhpCsFixer\Fixer\Operator\NotOperatorWithSuccessorSpaceFixer: ~
-        PhpCsFixer\Fixer\ClassNotation\OrderedClassElementsFixer: ~
+  skip:
+    SlevomatCodingStandard\Sniffs\Classes\UnusedPrivateElementsSniff: ~
+    # SlevomatCodingStandard\Sniffs\Functions\UnusedInheritedVariablePassedToClosureSniff: ~
+    # SlevomatCodingStandard\Sniffs\Classes\ModernClassNameReferenceSniff.ClassNameReferencedViaMagicConstant: ~
+    PHP_CodeSniffer\Standards\Generic\Sniffs\CodeAnalysis\AssignmentInConditionSniff.Found: ~
+    PHP_CodeSniffer\Standards\Squiz\Sniffs\Classes\ValidClassNameSniff.NotCamelCaps: ~
+    PhpCsFixer\Fixer\ClassNotation\SelfAccessorFixer: ~
+    PhpCsFixer\Fixer\Operator\NotOperatorWithSuccessorSpaceFixer: ~
+    PhpCsFixer\Fixer\ClassNotation\OrderedClassElementsFixer: ~ # reorders class elements

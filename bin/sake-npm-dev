@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
+
+############################################ DIR
+dir="./"
+
+############################################ SETTINGS
+webpackDir='themes/sswebpack_engine_only/'
+themeDir=''
+help='no'
+while (($#)); do
+    case $1 in
+    -w | --webpack-dir)
+        webpackDir=$2
+        shift
+        ;;
+    -t | --theme-dir)
+        themeDir=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "NPM dev"
+    echonice "Directory of script:          $SCRIPT_DIR"
+    echonice "Directory to install:         $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+    echonice "Webpack dir (-w):             $WORKING_DIR/$webpackDir"
+    echonice "Theme dir (-t):               $WORKING_DIR/$themeDir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-w, --webpack-dir             directory where webpack lives"
+    echonice "-t, --theme-dir               add --theme-dir to npm command"
+    echonice "-h, --help                    show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-npm-dev -t themes/client"
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+############################################ CODE
+
+if [ -d "$WORKING_DIR/$webpackDir" ]; then
+    cd $WORKING_DIR/$webpackDir
+else
+    echonice "Could not change directory to $WORKING_DIR/$webpackDir"
+    help_and_exit
+fi
+
+if [ "$themeDir" != "" ]; then
+    npm run dev --theme_dir=$themeDir
+else
+    npm run dev
+fi
+
+cd $WORKING_DIR
+
+echoend

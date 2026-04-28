@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+if [ "$1" != "" ]; then
+    dir=$1
+else
+    dir='.'
+fi
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+
+############################################ HELP
+
+help_and_exit() {
+
+    ECHOHEAD "Checking Vendor Packages for Changes"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-contribute-step-1 my-framework-patch"
+
+    echofunctions
+    exit
+}
+
+check_for_env_var "GITHUB_USER_NAME"
+
+
+sake_check_help_and_exit
+
+############################################ CODE
+
+cd_or_fail "$WORKING_DIR" help_and_exit
+
+# Get necessary information from the user
+read -p "Enter the full Git repository URL (e.g., https://github.com/silverstripe/silverstripe-framework.git): " repoUrl
+read -p "Enter your GitHub username: - defaults to $GIT_HUB_USER_NAME" githubUsername
+read -p "Enter the target version (e.g., 5.1): " targetVersion
+read -p "Enter a descriptive name for your working branch: " branchName
+
+if [[ -z "$githubUsername" ]]; then
+    githubUsername = "$GIT_HUB_USER_NAME"
+fi
+
+# Extract module name from the repository URL
+moduleName=$(basename -s .git "$repoUrl")
+
+# Clone the repository (if not already cloned)
+if [[ ! -d "$dir" ]]; then
+    echonice "Cloning the repository..."
+    git clone "$repoUrl" "$dir"
+else
+    echobad "Directory already exists. Assuming repository is already cloned."
+fi
+
+# Navigate to the module directory
+cd "$dir" || {
+    echobad "Failed to navigate to the project path. Exiting."
+    exit 1
+}
+
+# check if the user has forked the repository
+
+# Use GitHub CLI to list user's repositories and check for the fork
+if gh repo list "$githubUsername" --limit 1000 --json fork --jq '.[] | select(.fork == true) | .name' | grep -q "$moduleName"; then
+    echonice "Fork found - Proceeding with the script..."
+else
+    # Use GitHub CLI to fork the repository
+    if gh repo fork "$repoUrl" --clone=false; then
+        echonice "Successfully forked '$repoUrl'."
+    else
+        echobad "Failed to fork '$repoUrl'."
+        exit 1
+    fi
+fi
+
+# Check if the user has forked the module
+
+# Add your fork as a remote
+git remote add pr git@github.com:$githubUsername/$moduleName.git
+
+# Fetch the latest changes and setup the correct base branch
+git fetch origin
+git checkout --track origin/$targetVersion || {
+    echobad "Failed to checkout the base branch. Exiting."
+    exit 1
+}
+
+# Create your working branch
+git checkout -b "$branchName"
+
+ECHOHEAD "make your changes and then, from $dir run: sake-git-contribute-step-2"
+# Prompt the user to make their code changes
+echonice "Make your code changes, adhering to SilverStripe's guidelines."
+echonice "Remember to commit often and write descriptive commit messages."

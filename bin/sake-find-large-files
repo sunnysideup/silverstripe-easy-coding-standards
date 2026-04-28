@@ -1,58 +1,110 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+sudoCmd='sudo'  # default to using sudo
 
 ############################################ DIR
 dir='./'
 
 ############################################ SETTINGS
 help='no'
-while (( $# )); do
-  case $1 in
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
-    *)                 dir=$1;;
-  esac
-  shift
+minSize="100M"
+
+while (($#)); do
+    case $1 in
+    -m|--min-size)
+        minSize=$2
+        shift
+        ;;
+    --no-sudo)
+        sudoCmd=''  # disable sudo
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
 done
+
+
+############################################ HELP
 
 help_and_exit() {
 
-    echohead "Find Large Files";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD 'Find Large Files'
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+    echonice "Min Size:                      $minSize"
 
-    echohead "Available settings:";
-    echonice "-h, --help                     show help information"
+    ECHOHEAD 'Available settings:'
+    echonice '-h, --help                     show help information'
+    echonice '-m, --min-size                 minimum size to be picked up'
+    echonice '--no-sudo                    run without sudo privileges'
 
-    echohead "Example usage:"
-    echonice "sake-find-large-files ./";
+    ECHOHEAD 'Example usage:'
+    echonice 'sake-find-large-files -m 200M --no-sudo ./'
 
     echofunctions
-    exit;
+    exit
 }
 
+sake_check_help_and_exit
 
+# Function to convert human-readable sizes to bytes for comparison
+sizeToBytes() {
+    echo "$1" | awk '
+    /G/ { printf "%.0f\n", $1 * 1024 * 1024 * 1024 }
+    /M/ { printf "%.0f\n", $1 * 1024 * 1024 }
+    /K/ { printf "%.0f\n", $1 * 1024 }
+    /^[0-9]+$/ { print $1 }
+    '
+}
 
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
+# Function to find directories larger than a specified size and format output
+findLargeDirs() {
+    local sizeThresholdBytes=$(sizeToBytes "$1")
+    echo -e 'Size\t\tDirectory'
+    ${sudoCmd} find . -type d -exec du -sb {} + | awk -v size="$sizeThresholdBytes" '$1 > size' |
+        sort -rh | while read -r bytes dir; do
+        humanSize=$(numfmt --to=iec --format='%.1f' "$bytes")
+        relativeDir=${dir#./} # Remove './' prefix
+        printf '%-10s\t%s\n' "$humanSize" "$relativeDir"
+    done
+}
+
+# Verify directory existence
+if [ -d "$dir" ]; then
+    cd "$dir" || {
+        echonice 'Failed to enter directory'
+        exit 1
+    }
+else
+    echonice 'Could not change directory to' "$dir"
     help_and_exit
 fi
 
-############################################ CODE
+echonice "Finding files larger than $minSize in $dir"
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
-else
-    echonice "Could not change to $WORKING_DIR/$dir"
-fi
+# Finding large files and formatting output
+echo -e 'Size\t\tFile'
+${sudoCmd} find . -xdev -type f -size +"$minSize" -exec du -sb {} + |
+    sort -rh | head -n50 | while read -r bytes file; do
+    humanSize=$(numfmt --to=iec --format='%.1f' "$bytes")
+    relativeFile=${file#./} # Remove './' prefix
+    printf '%-10s\t%s\n' "$humanSize" "$relativeFile"
+done
 
-find $WORKING_DIR/$dir -xdev -type f -size +100M -exec du -sh {} ';' | sort -rh | head -n50
+# Finding large directories
+findLargeDirs "$minSize"
 
-echoend;
+echoend
+

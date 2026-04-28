@@ -1,27 +1,32 @@
 parameters:
 
+    phpVersion: 80200  # for PHP 8.2
+
     excludePaths:
         - /tests/*
-        - */tests/*
-        - */_dev/*
+        - '*/tests/*'
+        - '*/_dev/*'
+        # - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
+        # - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
 
     inferPrivatePropertyTypeFromConstructor: true
 
     ignoreErrors:
-        - '#Access to an undefined property#'
-        - '#Call to an undefined method#'
-#       - '#on an unknown class [a-zA-Z0-9\\_]+#'
-        - '#is never read, only written#'
         - '#but returns SilverStripe\\ORM\\DataObject\|null#'
+        - '#Call to an undefined method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
+        - '#Access to an undefined property#'
+        # - '#is never read, only written#'
+        # - '#with incorrect case:#'
+        # - '#Access to an undefined property#'
+        # - '#Call to an undefined method#'
+        # - '#on an unknown class [a-zA-Z0-9\\_]+#'
+        # - '#Call to an undefined static method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
+        # - '#PHPDoc tag @property has invalid value#'
+        # - '#Access to an undefined property SilverStripe\\Core\\Config\\Config_ForClass#'
+        # - '#Access to an undefined property SilverStripe\\ORM\\DataObject#'
 
-#        - '#with incorrect case:#'
-
-#    autoload_directories:
-#        - %currentWorkingDirectory%/app/src
-
-#    excludes_analyse:
-#        - %currentWorkingDirectory%/vendor/phpunit/phpunit-mock-objects/
-#        - %currentWorkingDirectory%/vendor/phpunit/php-code-coverage/Tests/
+    # autoloadDirectories:
+    #     - %currentWorkingDirectory%/app/src
 
     scanDirectories:
-      - %currentWorkingDirectory%
+        - %currentWorkingDirectory%

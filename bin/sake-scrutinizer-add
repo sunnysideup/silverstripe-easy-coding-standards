@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+add='no'
+
+while (($#)); do
+    case $1 in
+    -a | --add)
+        help='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Add all github packages to scrutinizer"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-a, --add                      $add"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-scrutinize-add -a yes "
+
+    echofunctions
+    exit
+}
+
+installpackage "jq"
+installpackage "gh"
+check_gh_auth
+check_for_env_var "SCRUTINIZER_API_TOKEN"
+check_for_env_var "SCRUTINIZER_ORG"
+
+# Get a list of all your non-fork, public GitHub repositories using jq
+
+github_list=$(gh repo list --json nameWithOwner,isPrivate,isFork --limit 1000 | jq -r '.[] | select(.isPrivate == false and .isFork == false) | .nameWithOwner' | sort)
+
+for repo in $github_list; do
+    github_repos+=("$repo")
+done
+
+scrutinizerApiPath="https://scrutinizer-ci.com/api"
+page=1
+scrutinizer_repos=()
+# Loop through pages
+while true; do
+
+    # Construct the URL for the current page - dont do too many or bash can't handle it.
+    endPoint="user/repositories/?access_token=${SCRUTINIZER_API_TOKEN}&page=${page}"
+    url="${scrutinizerApiPath}/${endPoint}"
+    # Make the curl request with quotes around the URL
+    response=$(curl -L -X GET -H "Content-Type: application/json" "$url")
+    # Parse repositories from the response
+    # This depends on the response format. Adjust the jq command as necessary.
+
+    # Use the variable in the jq command
+    repos=$(echo "$response" | jq -r --arg orgSlug "$SCRUTINIZER_ORG" '._embedded.repositories[] | "\(.organization.slug // $orgSlug)/\(.name)"')
+
+    # Check if no more repositories are returned
+    if [ -z "$repos" ]; then
+        break
+    fi
+
+    for repo in $repos; do
+        scrutinizer_repos+=("$repo")
+    done
+
+    # Increment the page number
+    ((page++))
+done
+
+# Find repositories present in GitHub but not in Scrutinizer# Convert arrays to newline-separated strings and sort
+printf '%s\n' "${github_repos[@]}" | sort >github_repos_sorted.txt
+printf '%s\n' "${scrutinizer_repos[@]}" | sort >scrutinizer_repos_sorted.txt
+
+# Use comm to find differences
+repos_not_in_scrutinizer=$(comm -23 github_repos_sorted.txt scrutinizer_repos_sorted.txt)
+
+# Clean up temporary files
+rm github_repos_sorted.txt scrutinizer_repos_sorted.txt
+
+# Output the result
+echo "$repos_not_in_scrutinizer"
+
+ECHOHEAD "GITHUB Repositories:"
+# Debug: Print the array content
+printf '%s\n' "${github_repos[@]}"
+
+ECHOHEAD "Scrutinizer Repositories:"
+# Debug: Print the array content
+printf '%s\n' "${scrutinizer_repos[@]}"
+
+echoline
+# Check if there are any repositories not in Scrutinizer
+if [ -z "$repos_not_in_scrutinizer" ]; then
+    ECHOHEAD "All GitHub repositories are listed on Scrutinizer."
+else
+    ECHOHEAD "GitHub repositories not listed on Scrutinizer:"
+    # Loop through each repo not in Scrutinizer and list them
+    for repo in $repos_not_in_scrutinizer; do
+        echo $repo
+        # add to scrutinizer
+        # addtoscrutinizer $repo
+    done
+fi

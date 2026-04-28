@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 # : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
 
 ############################################ DIR
@@ -12,49 +12,51 @@ dir='./'
 ############################################ SETTINGS
 dryRun='no'
 help='no'
-while (( $# )); do
-  case $1 in
-    -d|--dry-run)      dryRun=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -d | --dry-run)
+        dryRun=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
 done
 
+
+############################################ HELP
+
 help_and_exit() {
-    echohead "Remove Stale Branches";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Remove Stale Branches"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Excluded are:                  master|develop|dev|production|feature/pre-develop";
+    ECHOHEAD "Current settings:"
+    echonice "Excluded are:                  master|develop|dev|production|feature/pre-develop"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-d, --dry-run                  test only, default: no !!!"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-git-remove-stale-branches ./";
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-remove-stale-branches ./"
 
     echofunctions
-    exit;
+    exit
 }
 
 
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
+sake_check_help_and_exit
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
-else
-    echonice "Could not change to $WORKING_DIR/$dir"
-fi
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 if [[ "$dryRun" == "no" ]]; then
     git branch --merged | egrep -v "(^\*|master|develop|dev|production|live|feature/pre-develop)" | xargs git branch -d
@@ -62,4 +64,4 @@ else
     git branch --merged | egrep -v "(^\*|master|develop|dev|production|live|feature/pre-develop)"
 fi
 
-echoend;
+echoend

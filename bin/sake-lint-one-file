@@ -1,68 +1,85 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
 dir='app/src'
 
 ############################################ SETTINGS
 commitAndPush='no'
-message='PATCH: linter'
+message='MNT: linter'
 phpVersion='8.0'
 help='no'
-while (( $# )); do
-  case $1 in
-    -c|--commit-and-push)    commitAndPush=$2;shift ;;
-    -m|--message)            message=$2;shift ;;
-    -p|--php-version)        phpVersion=$2;shift ;;
-    -h|--help)               help='yes';shift ;;
-    -*)                      printf 'Unknown option: %q\n\n' "$1";
-                             help_and_exit 1 ;;
-    *)                       dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -c | --commit-and-push)
+        commitAndPush=$2
+        shift
+        ;;
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -p | --php-version)
+        phpVersion=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
 done
+
+
+############################################ HELP
 
 help_and_exit() {
 
-    echohead "Lint All";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Lint All"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Commit And Push (-c):          $commitAndPush";
-    echonice "Message (-m):                  $message";
-    echonice "Javascript Also (-j):          $javascriptAlso";
-    echonice "PHP Version (-p):              $phpVersion";
+    ECHOHEAD "Current settings:"
+    echonice "Commit And Push (-c):          $commitAndPush"
+    echonice "Message (-m):                  $message"
+    echonice "Javascript Also (-j):          $javascriptAlso"
+    echonice "PHP Version (-p):              $phpVersion"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-c, --commit-and-push          also commit and push, default: no"
-    echonice "-m, --message                  commit message, defualt: PATCH: linter"
+    echonice "-m, --message                  commit message, defualt: MNT: linter"
     echonice "-p, --php-version              php version, default 8.0"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar ";
+    ECHOHEAD "Example usage:"
+    echonice "sake-lint-all   -a app_more/_config.php   -p 7.4   -c yes    foo/bar "
 
     echofunctions
-    exit;
+    exit
 }
+sake_check_help_and_exit
 
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
+message=$(check_commit_message "$message")
+retVal=$?
+
+if [[ $retVal -ne 0 ]]; then
+    echobad "Invalid commit message. Exiting script."
+    exit 1
 fi
+
+
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR" ]; then
-    cd $WORKING_DIR
-else
-    echonice "Could not change to $WORKING_DIR"
-fi
+cd_or_fail "$WORKING_DIR" help_and_exit
 
 if [ -z "$(git status --porcelain)" ]; then
 
@@ -71,37 +88,37 @@ if [ -z "$(git status --porcelain)" ]; then
     cd $WORKING_DIR
 
     echonice "# run linter ecs #1"
-    $SCRIPT_DIR/sake-lint-ecs  $dir
+    $SCRIPT_DIR/sake-lint-ecs $dir
 
     echonice "# run rector #1"
     $SCRIPT_DIR/sake-lint-rector $dir
     cd $WORKING_DIR
 
     echonice "# run ecs #2"
-    $SCRIPT_DIR/sake-lint-ecs  $dir
+    $SCRIPT_DIR/sake-lint-ecs $dir
     cd $WORKING_DIR
 
     echonice "# run rector #2"
-    $SCRIPT_DIR/sake-lint-rector  $dir
+    $SCRIPT_DIR/sake-lint-rector $dir
     cd $WORKING_DIR
 
     echonice "# run ecs #3"
-    $SCRIPT_DIR/sake-lint-ecs  $dir
+    $SCRIPT_DIR/sake-lint-ecs $dir
     cd $WORKING_DIR
 
     echonice "# run stan"
     $SCRIPT_DIR/sake-lint-stan -l 6 $dir
     cd $WORKING_DIR
 
-    echohead "commit in $WORKING_DIR/$dir"
-    $SCRIPT_DIR/sake-git-commit-and-push -m $message  -c $commitAndPush $dir
+    ECHOHEAD "commit in $WORKING_DIR/$dir"
+    $SCRIPT_DIR/sake-git-commit-and-push -m $message -c $commitAndPush $dir
     cd $WORKING_DIR
 
-    echohead "DONE"
+    ECHOHEAD "DONE"
 else
     echoline
     echobad "Sorry, can not run, there are uncommitted changes"
     echoline
 fi
 
-echoend;
+echoend

@@ -1,94 +1,165 @@
 # What it does
 
-Lints your silverstripe php code, checks for potential bugs, and other helpful commands.
+Lints your silverstripe php code, checks for potential bugs, and also has a raft of other helpful commands.
 
-# tl;dr version:
+## tl;dr
 
 Install as global composer package and then try to access the commands, starting with `sake-` from the command line.
 
-# commands available:
+## commands available
 
 ```shell
 
-# silverstripe
-sake-ss-dev-build
+# help
+ - sake-help
 
-# linting
-sake-lint-all
-sake-lint-compat
-sake-lint-ecs
-sake-lint-js
-sake-lint-rector
-sake-lint-stan
+# composer
+ - sake-composer-about - get details about composer recipe at hand
+ - sake-composer-available-updates 
+ - sake-composer-force-update
+ - sake-composer-require - composer require with extras
+ - sake-composer-update - composer update with extras
+
+# find
+ - sake-find-in-files
+ - sake-find-large-files
+ - sake-find-large-folders
 
 # git
-sake-git-commit-and-push
-sake-git-commit-and-push-vendor-packages  
-sake-lint-remove-origs
-sake-git-squash-commits
+ - sake-git-quick
+ - sake-git-commit-and-push
+ - sake-git-commit-and-push-vendor-packages - goes through all vendor packages for uncommitted work
+ - sake-git-diff-analyser
+ - sake-git-fork-comparison - finds all the works and sees which one is ahead
+ - sake-git-info
+ - sake-git-find-any-changes
+ - sake-git-remove-stale-branches 
+ - sake-git-merge-towards-production - take develop to production 
+ - sake-git-my-pull-request
+ - sake-git-squash-and-pr - squash and make a pull request
+ - sake-git-squash-commits
+ - sake-git-tag
+
+
+# php
+ - sake-php-set-timezone
+ - sake-php-line-counter
+
+# lint and security
+ - sake-lint-all
+ - sake-lint-class-rename-comparison
+ - sake-lint-compat
+ - sake-lint-ecs
+ - sake-lint-ide-annotator
+ - sake-lint-js
+ - sake-lint-one-file
+ - sake-lint-phan
+ - sake-lint-psr-4-checker
+ - sake-lint-rector
+ - sake-lint-stan
+ - sake-lint-security
+ - sake-lint-remove-origs
+
+ # edit with LLM
+ - sake-llm-opencode
 
 # webpack
-sake-npm-install
-sake-npm-build
-sake-npm-watch    
+ - sake-npm-audit
+ - sake-npm-install
+ - sake-npm-build
+ - sake-npm-dev
+ - sake-npm-watch
+
+ # npm / node
+ - sake-npm-update-self
+ - sake-npm-publish-on-npmjs-org
+
+# silverstripe
+ - sake-ss-add-site
+ - sake-ss-align-versions
+ - sake-ss-create-env-file
+ - sake-ss-db-dump
+ - sake-ss-db-import
+ - sake-ss-db-open
+ - sake-ss-dev-build
+ - sake-ss-flush
+ - sake-ss-ready
+ - sake-ss-rsync-asset
+ - sake-ss-start-new-module
+ - sake-ss-start-new-feature
+
+# rsync
+- sake-ss-rsync-all
+- sake-ss-rsync-assets
+- sake-ss-rsync-db
+- sake-ss-rsync-sspak
+
+# test
+- sake-test-site test a live site response times
+
+# scrutinizer
+ - sake-scrutinizer-add
+
+# machine maintenance
+ - sake-update-chromium
+ - sake-update-vs-code
+ - sake-self-update
+
 
 ```
 
-# How to install (may not work!)
+## How to install for one project (not recommended - as it may not work)
 
 1. open your terminal
 2. browse to root folder of your project and type:
- ```shell
-composer require --dev sunnysideup/easy-coding-standards:dev-master
- ```
 
-## global install (recommended)
+```shell
+composer require --dev sunnysideup/easy-coding-standards:dev-master
+```
+
+## global install (recommended - more likely to work)
 
 1. open your terminal and type
+
 ```shell
+
+# install ...
+composer global config minimum-stability dev
+composer global config prefer-stable true
 composer global require sunnysideup/easy-coding-standards:dev-master
-```
+cat << 'EOF' >> ~/.bashrc
 
-2. then add path to `~/.bashrc` (or otherwise):
-choose the appropriate one ...
-```shell
-PATH=~/.composer/vendor/bin:$PATH
+# Add composer path
 PATH=~/.config/composer/vendor/bin:$PATH
-```
-To make the composer `vendor/bin` available anywhere (use with care!).
-
-3. To enable it, run:
-```shell
+EOF
 source ~/.bashrc
+
 ```
+
 or restart your computer.
 
-4. Now you should be able to run it from anywhere like this:
+1. Now you should be able to run it from anywhere like this:
 
 ```shell
 sake-lint-ecs [dir]
 ```
+
 (this command, and all the other commands listed above).
 
-# How to use:
+## How to use
+
 Commands should be run from the root directory of your project.
 
-To find out the options, just do this:
+To find out the options for a specific command:
 
 ```shell
 sake-my-command -h
 ```
 
-The default director, in most cases, is `app`.
-
 ## Not installed globally?
+
 If not installed globally, then you should add `vendor/bin/` in front of the commands.
+
 ```shell
 vendor/bin/sake-my-command -h
-```
-
-### apply easy coding standards:
-see: https://github.com/symplify/easy-coding-standard
-```shell
-sake-lint-ecs [dir]
 ```

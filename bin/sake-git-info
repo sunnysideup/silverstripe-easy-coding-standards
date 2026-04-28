@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+full='no'
+while (($#)); do
+    case $1 in
+    -f | --full)
+        full='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+
+############################################ HELP
+
+help_and_exit() {
+    ECHOHEAD "Git info"
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to commit:           $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+    echonice "-f, --full                     run a full git pull and git push on all branches"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-git-info "
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+############################################ CODE
+
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
+
+ECHOHEAD "# making sure we have the core branches"
+
+git checkout develop
+
+git fetch --all
+
+# Check if the develop branch exists
+if [ "$(git branch | grep develop)" == "" ]; then
+    # If it does not exist, create and push it
+    echo "Creating and pushing develop branch..."
+    git checkout -b develop master
+    git push origin develop
+fi
+
+# Check if the production branch exists
+if [ "$(git branch | grep production)" == "" ]; then
+    # If it does not exist, create and push it
+    echo "RECOMMENDED: create production branch..."
+fi
+
+GIT_DIR=$(git rev-parse --show-toplevel)
+
+if test -f "$GIT_DIR/.git/config"; then
+
+    ECHOHEAD "# check status"
+    ECHOHEAD "fetchin --all"
+    git fetch --all
+
+    # set the right way to look at testbranches
+    git config push.default matching
+
+    ECHOHEAD "# check git status"
+    git status
+
+    ECHOHEAD "# current commit"
+    git rev-parse --short --verify HEAD
+
+    ECHOHEAD "# last commit"
+    git log -1
+
+    ECHOHEAD "# unpushed branches"
+    git log --branches --not --remotes --no-walk --decorate --oneline
+
+    ECHOHEAD "# behind / ahead"
+    # Get all remote branches
+    remote_branches=$(git branch -r)
+    # Red color
+    RED='\033[0;31m'
+    # Green color
+    GREEN='\033[0;32m'
+    # No color
+    NC='\033[0m'
+
+    printf "${NC}%-70s ${RED}%-5s${NC} ${GREEN}%s${NC}\n" "Branch Name" "Behind" "Ahead"
+
+    for branch in $remote_branches; do
+        # Skip HEAD
+        if [ "$branch" != "origin/HEAD" ] && [ "$branch" != "->" ]; then
+
+            # Check out the branch to compare
+            git checkout -q $branch
+            if [[ "$full" == "yes" ]]; then
+                git pull -q origin $branch
+                git push -q origin $branch
+            fi
+
+            # Get the number of commits the branch is ahead of develop
+            ahead=$(git rev-list --count develop..$branch)
+
+            # Get the number of commits the branch is behind develop
+            behind=$(git rev-list --count $branch..develop)
+
+            # Print formatted output
+            # Check if $ahead is greater than 0
+            if (($ahead > 0)); then
+                # Get the date of the last commit
+                last_commit_date=$(git show -s --format=%ci)
+                printf "%-70s ${RED}%-5s${NC} ${GREEN}%s${NC} %s\n" "$branch" "$behind" "$ahead" "$last_commit_date"
+            else
+                printf "%-70s ${RED}%-5s${NC} %s\n" "$branch" "$behind" "$ahead"
+            fi
+        fi
+    done
+
+else
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO"
+fi
+
+echoend

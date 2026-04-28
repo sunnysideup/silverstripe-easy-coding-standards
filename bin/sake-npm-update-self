@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
+
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "NPM Update Self (Update NVM, NPM, and Node to latest version)"
+    echonice "Directory of script:          $SCRIPT_DIR"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                    show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-npm-update-self"
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+############################################ RUN
+
+
+# Set NVM repository
+nvm_repo="nvm-sh/nvm"
+
+# Fetch the latest release version using GitHub API
+latest_version=$(curl -fsSL "https://api.github.com/repos/${nvm_repo}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+
+# Check if the version was retrieved
+if [ -z "$latest_version" ]; then
+    echo "Error: Unable to fetch the latest NVM version."
+    exit 1
+fi
+
+echo "Latest NVM version: $latest_version"
+
+# Download and install the latest NVM version
+wget -qO- "https://raw.githubusercontent.com/${nvm_repo}/${latest_version}/install.sh" | bash
+
+# Source NVM for the current shell session
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    source "$NVM_DIR/nvm.sh"
+else
+    echo "Error: nvm.sh not found in $NVM_DIR."
+    exit 1
+fi
+
+# Verify installation
+if command -v nvm &> /dev/null; then
+    echo "NVM installed successfully. Version: $(nvm --version)"
+else
+    echo "Error: NVM installation failed."
+    exit 1
+fi
+
+
+
+
+# Install the latest Node.js version and set it as default
+nvm install node
+nvm use node
+nvm alias default node
+
+# Update npm to the latest version
+npm install -g npm
+
+nvm use default
+
+# Display installed Node.js and npm versions
+echo "Node.js version: $(node -v)"
+echo "npm version: $(npm -v)"
+

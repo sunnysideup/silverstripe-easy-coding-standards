@@ -1,0 +1,358 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/sake-self-methods"
+
+
+############################################ DEFAULTS
+DEFAULT_PROVIDER='google'
+DEFAULT_MODEL='gemini-1.5-pro'
+OPEN_CODE_INSTALL_CMD='curl -fsSL https://opencode.ai/install | bash'
+
+############################################ SETTINGS
+dir='app/client/src'
+help='no'
+promptDefault="$WORKING_DIR/.agents/prompt.txt"
+prompt="$promptDefault"
+opencodePath='opencode'
+dryRun='no'
+filesPattern=''     # e.g. --files=./src/app/Tasks/*.php
+containsText=''     # e.g. --contains='function getCMSFields'
+apiKeyEnvName='LLM_API_KEY' # --api-key-env=NAME (source env var to read key from)
+
+# optional overrides
+providerOverride='' # --provider=PROVIDER
+modelOverride=''    # --model=model-id
+apiEnvOverride=''   # --api-env=OPENAI_API_KEY
+apiKeyOverride=''   # --api-key=... (avoid; prefer env)
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    --prompt=*)
+        prompt="${1#*=}"
+        shift
+        ;;
+    --opencode-path=*)
+        opencodePath="${1#*=}"
+        shift
+        ;;
+    --dry-run)
+        dryRun='yes'
+        shift
+        ;;
+    --files=*)
+        filesPattern="${1#*=}"
+        shift
+        ;;
+    --contains=*)
+        containsText="${1#*=}"
+        shift
+        ;;
+    --contains)
+        if [[ $# -lt 2 ]]; then
+            echobad "Error: --contains requires a value."
+            exit 1
+        fi
+        containsText="$2"
+        shift 2
+        ;;
+    --provider=*)
+        providerOverride="${1#*=}"
+        shift
+        ;;
+    --model=*)
+        modelOverride="${1#*=}"
+        shift
+        ;;
+    --api-env=*)
+        apiEnvOverride="${1#*=}"
+        shift
+        ;;
+    --api-key=*)
+        apiKeyOverride="${1#*=}"
+        shift
+        ;;
+    --api-key-env=*)
+        apiKeyEnvName="${1#*=}"
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        shift
+        ;;
+    esac
+done
+
+
+############################################ HELP
+
+help_and_exit() {
+
+    local apiKeyEnvValue="${!apiKeyEnvName-}"
+
+    ECHOHEAD "OpenCode runner"
+    echonice "Directory is always the first argument (kept for compatibility): $dir"
+    echonice "File selection is via --files=GLOB (supports *), e.g. --files=./src/app/Tasks/*.php"
+
+    ECHOHEAD "Current settings:"
+    echonice "working dir:                     $WORKING_DIR"
+    echonice "selected dir:                    $dir"
+    echonice "files:                           ${filesPattern:-'(not set)'}"
+    echonice "contains filter:                 ${containsText:-'(not set)'}"
+    echonice "prompt file:                     ${prompt:-"$promptDefault"}"
+    echonice "opencode path:                   $opencodePath"
+    echonice "dry run:                         $dryRun"
+    echonice "provider (override/env/default): ${providerOverride:-${LLM_PROVIDER:-$DEFAULT_PROVIDER}}"
+    echonice "model (override/env/default):    ${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
+    echonice "api env override:                ${apiEnvOverride:-'(not set)'}"
+    echonice "api key source env:              $apiKeyEnvName"
+    echonice "key value:                       $(mask_api_key "${apiKeyEnvValue-}")"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                    show help information"
+    echonice "--files=GLOB                  files to include (required)"
+    echonice "--contains=STRING             only include files that contain STRING"
+    echonice "--prompt=FILE                 prompt file path (default: $promptDefault)"
+    echonice "--opencode-path=PATH          opencode binary/path (default: opencode)"
+    echonice "--provider=PROVIDER           model to use (default: $DEFAULT_PROVIDER)"
+    echonice "--model=MODEL                 model to use (default: $DEFAULT_MODEL)"
+    echonice "--api-env=ENVVAR              force which env var to pass the key into"
+    echonice "--api-key-env=ENVVAR          which env var to read the key from (default: LLM_API_KEY)"
+    echonice "--dry-run                     list files + print final command, do not run"
+
+    ECHOHEAD "Notes:"
+    echonice "For any provider, you can run once: opencode auth login  (stores creds in ~/.local/share/opencode/auth.json)"
+    echonice "If you set LLM_API_KEY, this script maps it to PROVIDER_API_KEY (or uses --api-env)."
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-llm-opencode . --files=./src/app/Tasks/*.php"
+    echonice "sake-llm-opencode . --files=./src/**/*.php --contains='function getCMSFields' --dry-run"
+    echonice "sake-llm-opencode . --files=./client/src/js/**/*.js --dry-run"
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+############################################ FUNCTIONS
+
+add_to_git_ignore() {
+    set +e
+
+    local ignoreLine='.agents/'
+
+    touch .gitignore
+    grep -Fqx "$ignoreLine" .gitignore || printf '%s\n' "$ignoreLine" >> .gitignore
+
+    git rm -r --cached "${ignoreLine%/}/" >/dev/null 2>&1 || true
+    git add .gitignore >/dev/null 2>&1 || true
+
+    if ! git diff --cached --quiet >/dev/null 2>&1; then
+        git commit -m 'FIX: Ignore local agent prompts' >/dev/null 2>&1 || true
+    fi
+
+    return 0
+}
+
+resolve_opencode_path() {
+    local preferred="$1"
+
+    if [[ -n "$preferred" && -f "$preferred" && -x "$preferred" ]]; then
+        printf '%s' "$preferred"
+        return 0
+    fi
+
+    local bin="$preferred"
+    [[ -n "$bin" ]] || bin='opencode'
+
+    local found
+    found="$(command -v "$bin" 2>/dev/null || true)"
+    [[ -n "$found" ]] || return 1
+    printf '%s' "$found"
+}
+
+install_opencode() {
+    bash -c "$OPEN_CODE_INSTALL_CMD"
+}
+
+provider_to_api_env() {
+    local provider="$1"
+
+    # common/known exceptions
+    case "$provider" in
+        google|gemini) printf '%s' 'GEMINI_API_KEY'; return 0 ;;
+    esac
+
+    # generic convention: PROVIDER_API_KEY
+    local upper
+    upper="$(printf '%s' "$provider" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g')"
+    printf '%s_API_KEY' "$upper"
+}
+
+############################################ INPUT RESOLUTION
+
+cd "$WORKING_DIR"
+cd "$dir"
+
+prompt="${prompt:-"$SCRIPT_DIR/prompt.txt"}"
+
+if [[ -z "${filesPattern:-}" ]]; then
+    echobad "Error: --files=... is required (supports * globs)."
+    help_and_exit
+fi
+
+if [[ ! -r "$prompt" ]]; then
+    echobad "Error: cannot read prompt file: $prompt"
+    exit 1
+fi
+
+echonice "Using prompt file: $prompt"
+add_to_git_ignore
+
+# Expand the glob safely (supports ** via globstar)
+shopt -s nullglob globstar
+matches=( $filesPattern )
+shopt -u nullglob globstar
+
+if (( ${#matches[@]} == 0 )); then
+    echobad "Error: no files matched: $filesPattern"
+    exit 1
+fi
+
+# Optional contains filter
+selectedFiles=( "${matches[@]}" )
+if [[ -n "${containsText:-}" ]]; then
+    filteredFiles=()
+    for f in "${selectedFiles[@]}"; do
+        if grep -Fq -- "$containsText" "$f" 2>/dev/null; then
+            filteredFiles+=( "$f" )
+        fi
+    done
+    selectedFiles=( "${filteredFiles[@]}" )
+
+    if (( ${#selectedFiles[@]} == 0 )); then
+        echobad "Error: no files matched --contains='$containsText' (after glob: $filesPattern)"
+        exit 1
+    fi
+fi
+
+############################################ OPENCODE RESOLUTION
+
+opencodeResolved="$(resolve_opencode_path "$opencodePath" 2>/dev/null || true)"
+if [[ -z "$opencodeResolved" ]]; then
+    echonice "opencode not found; installing..."
+    install_opencode || { echobad "Error: failed to install opencode."; exit 1; }
+    opencodeResolved="$(resolve_opencode_path "$opencodePath" 2>/dev/null || true)"
+fi
+
+if [[ -z "$opencodeResolved" ]]; then
+    echobad "Error: opencode binary not found or not executable ($opencodePath)."
+    exit 1
+fi
+
+############################################ MODEL / PROVIDER / AUTH
+
+provider="${providerOverride:-${LLM_PROVIDER:-$DEFAULT_PROVIDER}}"
+model="${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
+
+# Ensure provider/model format (OpenCode expects this format)
+if [[ "$model" != */* ]]; then
+    model="$provider/$model"
+fi
+provider="${model%%/*}"
+
+# Determine which env var to populate (optional)
+apiEnv="${apiEnvOverride:-$(provider_to_api_env "$provider")}"
+
+# Pick an API key, if available (optional)
+apiKey=''
+
+# value from chosen source env var (default LLM_API_KEY)
+sourceApiKey="${!apiKeyEnvName:-}"
+
+if [[ -n "${apiKeyOverride:-}" ]]; then
+    apiKey="$apiKeyOverride"
+elif [[ -n "${apiEnvOverride:-}" && -n "${!apiEnvOverride:-}" ]]; then
+    apiKey="${!apiEnvOverride}"
+elif [[ -n "${!apiEnv:-}" ]]; then
+    apiKey="${!apiEnv}"
+elif [[ -n "$sourceApiKey" ]]; then
+    apiKey="$sourceApiKey"
+fi
+
+promptText="$(cat "$prompt")"
+
+# Build the command (no stdbuf — it deadlocks TUI apps like opencode)
+cmd=( env )
+if [[ -n "$apiKey" ]]; then
+    cmd+=( "$apiEnv=$apiKey" )
+fi
+cmd+=( "$opencodeResolved" run --agent build -m "$model" )
+
+# Add files
+for f in "${selectedFiles[@]}"; do
+    cmd+=( -f "$f" )
+done
+
+# Add prompt
+cmd+=( -- "$promptText" )
+
+# Build a display-safe version with masked API key
+print_cmd_masked() {
+    local piece
+    for piece in "${cmd[@]}"; do
+        if [[ "$piece" == "$apiEnv="* && -n "$apiKey" ]]; then
+            printf '%s ' "$apiEnv=$(mask_api_key "$apiKey")"
+        else
+            printf '%s ' "$piece"
+        fi
+    done
+    printf '\n'
+}
+
+if [[ "$dryRun" == "yes" ]]; then
+    ECHOHEAD "Command:"
+    print_cmd_masked
+
+    ECHOHEAD "Files included (${#selectedFiles[@]}):"
+    for f in "${selectedFiles[@]}"; do
+        echonice "$f"
+    done
+
+    ECHOHEAD "Prompt content:"
+    echonice "$promptText"
+
+    echoend
+    exit 0
+fi
+
+ECHOHEAD "Command:"
+print_cmd_masked
+
+ECHOHEAD "Working directory:"
+echonice "$(pwd)"
+
+ECHOHEAD "Files included (${#selectedFiles[@]}):"
+for f in "${selectedFiles[@]}"; do
+    echonice "$f"
+done
+
+ECHOHEAD "Prompt content"
+echonice "$promptText"
+
+echo ""
+"${cmd[@]}"
+echoend

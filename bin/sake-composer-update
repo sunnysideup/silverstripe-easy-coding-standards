@@ -1,85 +1,228 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+source "$SCRIPT_DIR/sake-self-methods"
 
-force='no'
-commit='yes'
-help='no'
+############################################ DIR
 dir='./'
+############################################ SETTINGS
+force='no'
+minimalChangesOnly='no'
+commit='yes'
+sortPackages='yes'
+help='no'
 
-while (( $# )); do
-  case $1 in
-    -f|--force)        force=$2;shift ;;
-    -c|--commit)       commit=$2;shift ;;
-    -h|--help)         help='yes';shift ;;
-    -*)                printf 'Unknown option: %q\n\n' "$1";
-                       help_and_exit 1 ;;
-    *)                 dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -f | --force)
+        force="yes"
+        shift
+        ;;
+    -m | --minimal)
+        minimalChangesOnly="yes"
+        shift
+        ;;
+    -c | --commit)
+        commit=$2
+        shift
+        ;;
+    -s | --sort)
+        sortPackages=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
 done
 
+############################################ HELP
 help_and_exit() {
-    echohead "Composer Update";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Composer Update"
+    echonice "Directory of script:         $SCRIPT_DIR"
+    echonice "Directory to analyse:        $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Force (-f|--force):            $force";
-    echonice "Commit result:                 $commit";
+    ECHOHEAD "Current settings:"
+    echonice "Force (-f|--force):          $force"
+    echonice "Minimal only (-m|--minimal): $minimalChangesOnly"
+    echonice "Commit result (-c|--commit): $commit"
+    echonice "Sort packages (-s|--sort):   $sortPackages"
 
-    echohead "Available settings:";
-    echonice "-f, --force                    delete vendor folder, default: 'no'"
-    echonice "-c, --commit                   also commit, default: 'yes'"
-    echonice "-h, --help                     show help information"
+    ECHOHEAD "Available settings:"
+    echonice "-f, --force                  delete vendor folder, default: 'no'"
+    echonice "-m, --minimal                minimal changes only, default: 'no'"
+    echonice "-c, --commit                 also commit, default: 'yes'"
+    echonice "-s, --sort                   sort packages, default: 'yes'"
+    echonice "-h, --help                   show help information"
 
-    echohead "Example usage:"
-    echonice "sake-composer-update . -f 'yes' -c 'no'";
+    ECHOHEAD "Example usage:"
+    echonice "sake-composer-update . -f 'yes' -c 'no'"
 
     echofunctions
-    exit;
+    exit
 }
 
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
+
+sake_check_help_and_exit
 
 ############################################ CODE
+# Ensure jq is installed
+if ! command -v jq &>/dev/null; then
+    echobad "Error: jq is not installed. Please install jq to proceed."
+    exit 1
+fi
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
+echonice "Updating composer.lock ..."
+git add composer.lock
+git commit -m 'MNT: update composer.lock before composer update'
+
+echonice "Updating composer.json ..."
+git add composer.json
+git commit -m 'MNT: update composer.json before composer update'
+
+if ! git fetch --quiet && git status | grep -q 'Your branch is up to date'; then
+    echobad "The repository is not up-to-date. Stopping."
+    exit 1
+fi
+
+echonice "Running composer install to get the already installed packages ..."
+git pull origin $(git branch --show-current)
+git push origin $(git branch --show-current)
+composer install --prefer-source
+
+# Step: Capture the current package info before the update
+oldPackageInfo=$(composer info --format=json)
+
+# Run composer update
+echonice "Running composer update..."
+if ([[ "$force" == "yes" ]]); then
+    read -p 'Are you sure to force (deleting the whole vendor folder!)? (y/n): ' -n 1 answer
+    if [[ $answer =~ ^[Yy]$ ]]; then
+        echo 'Confirmed.'
+        rm vendor -rf
+        rm composer.lock -f
+    else
+        echo 'Cancelled force option.'
+    fi
+fi
+
+if ([[ "$minimalChangesOnly" == "yes" ]]); then
+    composer update --minimal-changes --prefer-source
 else
-    echonice "Could not change to $WORKING_DIR/$dir"
+    composer update --with-all-dependencies --prefer-source
 fi
 
-if [[ "$force" == "yes" ]]; then
-    rm vendor -rf
-fi
+# Capture the new package info after the update
+newPackageInfo=$(composer info --format=json)
 
-composer update --prefer-source
+# Parse both old and new package info
+# Extract version and commit hash from the version field
+oldPackages=$(echo "$oldPackageInfo" | jq -r '.installed[] | "\(.name) \(.version)"')
+newPackages=$(echo "$newPackageInfo" | jq -r '.installed[] | "\(.name) \(.version)"')
 
-if [[ "$commit" == "yes" ]]; then
-    sake-git-commit-and-push . -m "MINOR: composer update"
-fi
+# Initialize an empty commit message
+commitMessage=""
 
-echoline;
-
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
-else
-    echonice "Could not change to $WORKING_DIR/$dir"
-fi
-
-find 'vendor' -mindepth 2 -maxdepth 2 -type d -print0 |
-    while IFS= read -r -d '' line; do
-        if [ ! -d "$line/.git" ]; then
-            echobad "CHECKED OUT AS DIST: $line ... consider --prefer-source if you want to change them."  ;
+# Function to detect added packages
+detect_added_packages() {
+    echo "Detecting added packages..."
+    while read -r newPackage; do
+        packageName=$(echo "$newPackage" | awk '{print $1}')
+        if ! echo "$oldPackages" | grep -q "^$packageName "; then
+            echonice "ENH: Package added: $newPackage"
+            commitMessage+=$(echo -e "\n\n+++ Package added: $newPackage \n\n")
         fi
-    done
+    done <<<"$newPackages"
+}
 
-echoend;
+# Function to detect deleted packages
+detect_deleted_packages() {
+    echo "Detecting deleted packages..."
+    while read -r oldPackage; do
+        packageName=$(echo "$oldPackage" | awk '{print $1}')
+        if ! echo "$newPackages" | grep -q "^$packageName "; then
+            echonice "API: Package deleted: $oldPackage"
+            commitMessage+=$(echo -e "\n\n--- Package deleted: $oldPackage \n\n")
+        fi
+    done <<<"$oldPackages"
+}
+
+# Detect added and deleted packages
+detect_added_packages
+detect_deleted_packages
+
+# Compare the packages and identify version/reference changes
+while read -r oldPackage; do
+    packageName=$(echo "$oldPackage" | awk '{print $1}')
+    oldVersion=$(echo "$oldPackage" | awk '{print $2}')
+    oldRef=$(echo "$oldPackage" | awk '{print $3}')
+
+    newPackage=$(echo "$newPackages" | grep "^$packageName ")
+    newVersion=$(echo "$newPackage" | awk '{print $2}')
+    newRef=$(echo "$newPackage" | awk '{print $3}')
+
+    if [[ "$oldVersion" != "$newVersion" || "$oldRef" != "$newRef" ]]; then
+        oldRef=${oldRef:-$oldVersion}
+        newRef=${newRef:-$newVersion}
+        echonice "Package $packageName updated from $oldVersion ($oldRef) to $newVersion ($newRef)"
+        commitMessage+=$(echo -e "\n\n==== $packageName changed from $oldRef to $newRef: \n\n")
+        # Fetch the commits between the two references
+        packagePath="vendor/$packageName"
+        if [ -d vendor ]; then
+            if [ -d "$packagePath" ]; then
+                cd "$packagePath" || continue
+                if [ -d .git ]; then
+                    git fetch --tags &>/dev/null
+                    commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef")
+                    if [ -n "$commits" ]; then
+                        commitMessage+=$(echo -e "\n\n$commits \n\n")
+                    else
+                        commitMessage+=$(echo -e "\n\nNo new commits between $oldRef and $newRef. \n\n")
+                    fi
+                else
+                    commitMessage+=$(echo -e "\n\nNo git repository found in $packagePath. \n\n")
+                fi
+                cd - >/dev/null
+            else
+                commitMessage+=$(echo -e "\n\n$packageName: Package folder not found in vendor/. \n\n")
+            fi
+        else
+            commitMessage+=$(echo -e "\n\nNo further information available. \n\n")
+        fi
+    fi
+done <<<"$oldPackages"
+
+# Print the final commit message or fallback message
+if [[ -z "$commitMessage" ]]; then
+    echonice "No meaningful vendor package changes detected."
+else
+    echonice "Committing changes to composer.json and composer.lock..."
+    echo -e "$commitMessage"
+
+    # Stage composer.json and composer.lock
+    git add composer.json composer.lock
+
+    # Use a here-document to handle multi-line commit messages correctly
+    git commit -F - <<EOF
+DEP: composer update:
+
+$commitMessage
+EOF
+
+    git push
+fi
+
+sake-composer-available-updates
+
+composer dump-autoload -o
+
+composer audit
+
+echoend

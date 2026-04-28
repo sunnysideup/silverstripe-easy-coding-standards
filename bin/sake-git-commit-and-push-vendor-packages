@@ -1,138 +1,301 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
-if [ "$1" != "" ]; then
-    dir=$1;
-else
-    dir='vendor'
-fi
+dir=${1:-'vendor'}
 
 ############################################ SETTINGS
 commitAndPush='yes'
-message='WIP'
+message=''
 newVersion='no'
 statusOnly='no'
 fullUpdate='yes'
 help='no'
-while (( $# )); do
-  case $1 in
-    -m|--message)          message=$2;shift ;;
-    -c|--commit-and-push)  commitAndPush=$2;shift ;;
-    -v|--new-version)      newVersion=$2;shift ;;
-    -s|--status-only)      statusOnly=$2;shift ;;
-    -f|--full-update)      fullUpdate=$2;shift ;;
-    -h|--help)             help='yes';shift ;;
-    -*)                    printf 'Unknown option: %q\n\n' "$1";
-                           help_and_exit 1 ;;
-    *)                     dir=$1;;
-  esac
-  shift
+moreInfo='no'
+quiet='no'
+pullPush='yes' # New option to control auto pull-push
+
+while (($#)); do
+    case $1 in
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -c | --commit-and-push)
+        commitAndPush=$2
+        shift
+        ;;
+    -v | --new-version)
+        newVersion=$2
+        shift
+        ;;
+    -s | --status-only)
+        statusOnly='yes'
+        shift
+        ;;
+    -f | --full-update)
+        fullUpdate=$2
+        shift
+        ;;
+    -i | --moreInfo)
+        moreInfo='yes'
+        shift
+        ;;
+    -q | --quiet)
+        quiet='yes'
+        shift
+        ;;
+    -p | --pull-push)
+        pullPush='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
 done
 
-if [[ "$message" == "" ]]; then
-    read -p "Commit message: " message
-fi
-if [[ "$message" == "" ]]; then
-    message="WIP"
-fi
-
 help_and_exit() {
+    ECHOHEAD "Checking Vendor Packages for Changes"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Checking Vendor Packages for Changes";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Current settings:"
+    echonice "Message (-m):                  $message"
+    echonice "Commit and Push (-c):          $commitAndPush"
+    echonice "Create New tag (-v):           $newVersion"
+    echonice "Status Only (-s):              $statusOnly"
+    echonice "Full Composer Update (-f):     $fullUpdate"
+    echonice "Verbose (-i):                  $moreInfo"
+    echonice "Quiet (-q):                    $quiet"
+    echonice "Pull-Push (-p):                $pullPush"
 
-    echohead "Current settings:";
-    echonice "Message (-m):                  $message";
-    echonice "Commit and Push (-c):          $commitAndPush";
-    echonice "Create New tag (-v):           $newVersion";
-    echonice "Status Only (-s):              $statusOnly";
-    echonice "Full Composer Update (-f):     $statusOnly";
-
-    echohead "Available settings:";
-    echonice "-m, --message                  message - e.g. Lint, default: WIP";
-    echonice "-c, --commit-and-push          commit and push also? default: yes";
-    echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no";
+    ECHOHEAD "Available settings:"
+    echonice "-m, --message                  message - e.g. MNT: Lint, defaults to last message"
+    echonice "-c, --commit-and-push          commit and push also? default: yes"
+    echonice "-v, --new-version              create new tag (no|patch|minor|major), default: no"
     echonice "-s, --status-only              check if there are changes git folder present, default: no"
     echonice "-f, --full-update              run a full composer update afterwards and commit, default: yes"
+    echonice "-i, --more-info                show detailed information about each repository"
+    echonice "-q, --quiet                    show less detailed information about each repository"
+    echonice "-p, --pull-push                try git pull; git push to resolve false positives"
     echonice "-h, --help                     show help information"
 
-    echohead "Example usage:"
-    echonice "sake-git-commit-and-push-vendor-packages  -m 'PATCH: lint'   -c yes  -v patch -f no   vendor/my-vendor-name";
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-commit-and-push-vendor-packages  -m 'MNT: lint'   -c yes  -v patch -f no   vendor/my-vendor-name"
 
     echofunctions
-    exit;
+    exit
 }
 
+sake_check_help_and_exit
 
+if [[ "$statusOnly" != "yes" ]]; then
+    # prompt user for message
+    if [[ -z "$message" && "$quiet" != 'no' ]]; then
+        message='MNT: WIP'
+    fi
+    message=$(check_commit_message "$message")
+    retVal=$?
 
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
+    if [[ $retVal -ne 0 ]]; then
+        echobad "Invalid commit message. Exiting script."
+        exit 1
+    fi
 fi
+
+# quick cleanup
+# find ./ -name ".php-cs-fixer.dist.php" -exec rm "{}" \;
+
 
 ############################################ CODE
+[[ ! -d "$WORKING_DIR" ]] && echobad "Could not change directory to $WORKING_DIR" && help_and_exit
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
+installpackage "jq"
+
+# if [[ "$statusOnly" != "yes" ]]; then
+#     ECHOHEAD "Removing vendor folders that do not need to be there ..."
+#     find "$WORKING_DIR/$dir" -mindepth 2 -maxdepth 2 -type d -name "vendor" -exec rm -rf {} \;
+#     ECHOHEAD "Removing orig files"
+#     sake-lint-remove-origs "$dir"
+# fi
+
+# Function to try pull/push and check if it resolves the changes
+try_pull_push() {
+    local directory="$1"
+    local current_branch=$(git -C "$directory" rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+    # Skip if not on a branch (detached HEAD)
+    if [[ "$current_branch" == "HEAD" ]]; then
+        echonice "Repository $directory is in detached HEAD state, skipping pull/push"
+        return 1
+    fi
+
+    # Save current status before pull/push
+    local before_status=$(git -C "$directory" status --porcelain)
+    local before_ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+    local before_behind=$(git -C "$directory" rev-list HEAD..@{u} --count 2>/dev/null)
+
+    # Try pull and push
+    echonice "Trying git pull for $directory..."
+    git -C "$directory" pull --quiet
+
+    echonice "Trying git push for $directory..."
+    git -C "$directory" push --quiet
+
+    # Check status after pull/push
+    local after_status=$(git -C "$directory" status --porcelain)
+    local after_ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+    local after_behind=$(git -C "$directory" rev-list HEAD..@{u} --count 2>/dev/null)
+
+    # Compare before and after
+    if [[ "$after_status" == "" && "$after_ahead" == "0" && "$after_behind" == "0" ]]; then
+        echonice "✅ Pull/push resolved changes in $directory"
+        return 0
+    else
+        echonice "❌ Pull/push did not fully resolve changes in $directory"
+        return 1
+    fi
+}
+
+has_git_changes() {
+    local directory="$1"
+    local try_fix="${2:-no}" # Whether to try auto pull-push
+
+    # Check if the directory is a git repository
+    if [[ ! -d "$directory/.git" ]]; then
+        [[ "$moreInfo" == "yes" ]] && echobad "$directory is not a git repository"
+        return 1
+    fi
+
+    local has_changes=0
+
+    # Check for uncommitted changes (including untracked files)
+    if [[ -n "$(git -C "$directory" status --porcelain)" ]]; then
+        [[ "$moreInfo" == "yes" ]] && echonice "$directory has uncommitted changes"
+        has_changes=1
+    fi
+
+    # Only check for remote related issues if we don't already have local changes
+    if [[ $has_changes -eq 0 ]]; then
+        # Check if tracking a remote branch
+        if git -C "$directory" rev-parse @{u} >/dev/null 2>&1; then
+            # Check for unpushed commits
+            local ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+            if [[ "$ahead" != "0" ]]; then
+                [[ "$moreInfo" == "yes" ]] && echonice "$directory is ahead of remote by $ahead commits"
+                has_changes=1
+            fi
+
+            # Check for unpulled commits (this might be causing false positives)
+            local behind=$(git -C "$directory" rev-list HEAD..@{u} --count 2>/dev/null)
+            if [[ "$behind" != "0" ]]; then
+                [[ "$moreInfo" == "yes" ]] && echonice "$directory is behind remote by $behind commits"
+                has_changes=1
+            fi
+        fi
+    fi
+
+    # If we have changes and pull-push is enabled, try to fix it
+    if [[ $has_changes -eq 1 && "$try_fix" == "yes" ]]; then
+        if try_pull_push "$directory"; then
+            has_changes=0 # Changes resolved by pull/push
+        fi
+    fi
+
+    # Return the result (0=true, 1=false in bash)
+    if [[ $has_changes -eq 1 ]]; then
+        return 0 # Changes found
+    else
+        [[ "$moreInfo" == "yes" ]] && echonice "$directory has no changes to commit or push"
+        return 1 # No changes
+    fi
+}
+
+process_directory() {
+    local directory=$1
+    local message=$2
+
+    if [[ ! -d "$directory" ]]; then
+        [[ "$moreInfo" == "yes" ]] && echobad "Directory does not exist: $directory"
+        return
+    fi
+
+    # Check if this is a git repository
+    if [[ ! -d "$directory/.git" ]]; then
+        [[ "$moreInfo" == "yes" ]] && echobad "$directory IS NOT A GIT REPO"
+        return
+    fi
+
+    # Check for changes, with pull-push if enabled
+    if has_git_changes "$directory" "$pullPush"; then
+        ECHOHEAD "Changes detected in $directory"
+        if [[ "$statusOnly" == "yes" ]]; then
+            echobad "Git status for $directory:"
+            git -C "$directory" status --short
+
+            # Show more detailed information about what's ahead/behind
+            if git -C "$directory" rev-parse @{u} >/dev/null 2>&1; then
+                local ahead=$(git -C "$directory" rev-list @{u}..HEAD --count 2>/dev/null)
+                local behind=$(git -C "$directory" rev-list HEAD..@{u} --count 2>/dev/null)
+                if [[ "$ahead" != "0" || "$behind" != "0" ]]; then
+                    ECHOHEAD "Branch status:"
+                    [[ "$ahead" != "0" ]] && echonice "  $ahead commit(s) ahead of remote"
+                    [[ "$behind" != "0" ]] && echonice "  $behind commit(s) behind remote"
+                fi
+            fi
+        else
+            echonice "Running git commit and push for $directory with message: $message"
+            rel=${directory#"$PWD"}
+            $SCRIPT_DIR/sake-git-commit-and-push "$rel" -m "$message" -q $quiet
+        fi
+    else
+        [[ "$moreInfo" == "yes" ]] && echonice "No changes in $directory"
+    fi
+}
+
+# Use both get_my_repos (if it exists) and direct directory scanning
+ECHOHEAD "Looking for repositories using get_my_repos function"
+if type get_my_repos >/dev/null 2>&1; then
+    matchingDirs=$(get_my_repos "$WORKING_DIR")
+    for repo in $matchingDirs; do
+        process_directory "$repo" "$message"
+    done
 else
-    echonice "Could not change to $WORKING_DIR/$dir"
+    echobad "get_my_repos function not found, falling back to directory scanning only"
 fi
 
-echohead "Removing folders that do not need to be there ..."
+# Always scan vendor directories directly to ensure we don't miss any
+ECHOHEAD "Scanning for git repositories in $WORKING_DIR/$dir"
+find "$WORKING_DIR/$dir" -type d -name ".git" -exec dirname {} \; | while read repo; do
+    process_directory "$repo" "$message"
+done
 
-find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"
-find $WORKING_DIR/$dir  -mindepth 2 -maxdepth 2 -type d -name "vendor"  -exec rm "{}" -rf  \;
-sake-lint-remove-origs $dir
-
-echohead "going to look for folders in $WORKING_DIR/$dir"
-
-find $WORKING_DIR/themes -mindepth 1 -maxdepth 1 -type d -print0 |
-    while IFS= read -r -d '' line; do
-
-        echohead "DOING: $line"  ;
-        cd "$line";
-        if [[ "$statusOnly" == "yes" ]]; then
-            if test -f "./.git/config"; then
-                git status -s
-            else
-                echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
-                echobad "Also, $GIT_DIR IS is not a git repo";
-            fi
-        else
-            $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
-        fi
-        cd -
+# Check themes directory if it exists
+if [[ -d "$WORKING_DIR/themes" ]]; then
+    ECHOHEAD "Scanning for git repositories in $WORKING_DIR/themes"
+    find "$WORKING_DIR/themes" -type d -name ".git" -exec dirname {} \; | while read repo; do
+        process_directory "$repo" "$message"
     done
-
-find $WORKING_DIR/$dir -mindepth 1 -maxdepth 1 -type d -print0 |
-    while IFS= read -r -d '' line; do
-
-        echohead "DOING: $line"  ;
-        cd "$line";
-        if [[ "$statusOnly" == "yes" ]]; then
-            if test -f "./.git/config"; then
-                git status -s
-            else
-                echobad "$WORKING_DIR/$dir IS NOT A GIT REPO";
-                echobad "Also, $GIT_DIR IS is not a git repo";
-            fi
-        else
-            $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion ;
-        fi
-        cd -
-    done
-
-if [[ "$fullUpdate" == "yes" ]]; then
-    composer update
-    composer update
-
-    $SCRIPT_DIR/sake-git-commit-and-push . -m "$message" -c $commitAndPush -s $statusOnly  -v $newVersion
 fi
 
-echoend;
+# Return to the original directory
+cd "$WORKING_DIR" || exit
+
+# Perform composer update if needed
+if [[ "$statusOnly" != "yes" && "$fullUpdate" == "yes" ]]; then
+    ECHOHEAD "Running composer update"
+    sake-composer-update
+    process_directory "$WORKING_DIR"
+fi
+
+echoend

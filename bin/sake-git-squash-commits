@@ -1,95 +1,258 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
-WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
-# : ${ecsConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/ecs.yml}
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
 dir='./'
 
 ############################################ SETTINGS
 numberOfCommits=0
-message="WIP"
+message=""
 doToday="no"
 help='no'
-while (( $# )); do
-  case $1 in
-    -n|--number-of-commits)      numberOfCommits=$2;shift ;;
-    -m|--message)                message=$2;shift ;;
-    -t|--today)                  doToday='yes';shift ;;
-    -h|--help)                   help='yes';shift ;;
-    -*)                          printf 'Unknown option: %q\n\n' "$1";
-                                 help_and_exit 1 ;;
-    *)                           dir=$1;;
-  esac
-  shift
+allCommitsInBranch='no'
+intoBranch='HEAD'
+allCommits='no'
+confirmAll='no'
+while (($#)); do
+    case $1 in
+    -n | --number-of-commits)
+        numberOfCommits=$2
+        shift
+        ;;
+    -m | --message)
+        message=$2
+        shift
+        ;;
+    -t | --today)
+        doToday='yes'
+        shift
+        ;;
+    -b | --branch--merge-all-commits)
+        allCommitsInBranch="yes"
+        shift
+        ;;
+    -i | --into-branch)
+        intoBranch=$2
+        shift
+        ;;
+    -y | --no-interaction)
+        confirmAll='yes'
+        shift
+        ;;
+    -z | --ze-entire-project)
+        if [ "$2" = "yes" ]; then
+            allCommits="yes"
+        fi
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
 done
 
+
+############################################ HELP
+
 help_and_exit() {
-    echohead "Merge previous commits";
-    echonice "Directory of script:                 $SCRIPT_DIR";
+    ECHOHEAD "Merge previous commits"
+    echonice "Directory of script:                 $SCRIPT_DIR"
 
-    echohead "Current settings:";
-    echonice "Directory to analyse:                $WORKING_DIR/$dir";
-    echonice "Number of commits to merge:          $numberOfCommits";
-    echonice "Message (-m):                        $message";
-    echonice "Do Today (-t):                       $doToday";
+    ECHOHEAD "Current settings:"
+    echonice "Directory to analyse:                $WORKING_DIR/$dir"
+    echonice "Number of commits to merge (n):      $numberOfCommits"
+    echonice "Message (-m):                        $message"
+    echonice "Do today (-t):                       $doToday"
+    echonice "Do all commits of branch (-b):       $allCommitsInBranch"
+    echonice "Into Branch (-i) (merging branch):   $intoBranch"
+    echonice "Do all commits (-z) (RISKY!):        $allCommits"
+    echonice "Skip confirmations (-y):             $confirmAll"
 
-    echohead "Available settings:";
-    echonice "-t, --today                          message for new commit, default: WIP"
+    ECHOHEAD "Available settings:"
     echonice "-n, --number-of-commits              number of commits to merge, default: 0"
-    echonice "-m, --message                        message for new commit, default: WIP"
+    echonice "-m, --message                        message for new commit, defaults to last message"
+    echonice "-t, --today                          squash commits today, default: no"
+    echonice "-b, --branch--merge-all-commits      merge all commits for current branch, MUST BE SET TO yes, default: no"
+    echonice "-i, --into-branch                    target branch, default: origin/HEAD"
+    echonice "-y, --no-interaction                 automatically confirm all prompts, default: no"
+    echonice "-z, --ze-entire-project              merge all commits, MUST BE SET TO yes, default: no"
     echonice "-h, --help                           show help information"
 
-    echohead "Example usage:"
-    echonice "sake-git-squash-commits ./ -t 'yes' -m 'MAJOR: overhaul of everything'";
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-squash-commits ./ -t 'yes' -m 'ENH: my new features of the day'"
+    echonice "sake-git-squash-commits ./ -z 'yes' -m 'MERGE ALL COMMITS'"
+    echonice "sake-git-squash-commits ./ -b 'yes' -i 5.0 -m 'ENH: my new feature description'"
 
     echofunctions
-    exit;
+    exit
 }
 
-if [[ "$message" == "" ]]; then
-    read -p "Commit message: " message
-fi
-if [[ "$message" == "" ]]; then
-    message="WIP"
+
+sake_check_help_and_exit
+
+############################################ HELPERS
+
+confirm_or_skip() {
+    local promptText="$1"
+    if [[ "$confirmAll" == "yes" ]]; then
+        return 0
+    fi
+    local answer
+    read -p "$promptText (yes/no): " answer
+    [[ "$answer" == "yes" ]]
+}
+
+############################################ VALIDATION
+
+message=$(check_commit_message "$message")
+retVal=$?
+
+if [[ $retVal -ne 0 ]]; then
+    echobad "Invalid commit message. Exiting script."
+    exit 1
 fi
 
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
+if ! [[ "$numberOfCommits" =~ ^[0-9]+$ ]]; then
+    echobad "Error: number-of-commits must be a positive integer, got: $numberOfCommits"
+    exit 1
+fi
+
+# Get the current Git branch
+currentBranch="$(git branch --show-current)"
+
+if [[ -z "$currentBranch" ]]; then
+    currentBranch="$(git symbolic-ref --short HEAD)"
+    if [[ -z "$currentBranch" ]]; then
+        echobad "No current branch found."
+        exit 1
+    fi
+fi
+
+ECHOHEAD "Current branch: $currentBranch"
+
+git checkout "$currentBranch"
+git pull origin "$currentBranch"
+
+############################################ ALL
+if [[ "$allCommits" == "yes" ]]; then
+
+    if ! confirm_or_skip "Do you want to squash all commits on this project?"; then
+        ECHOHEAD "Operation cancelled."
+        echoend
+        exit 0
+    fi
+
+    git checkout "$currentBranch"
+
+    # Reset to the initial commit
+    initialCommit="$(git rev-list --max-parents=0 HEAD)"
+    git reset "$initialCommit"
+
+    # Recommit everything as a single commit
+    git add .
+    git commit -m "$message"
+
+    if ! confirm_or_skip "Do you want to force push the changes to the remote?"; then
+        ECHOHEAD "Force push cancelled."
+        echoend
+        exit 0
+    fi
+
+    git push origin "$currentBranch" --force-with-lease
+    echonice "All commits in $currentBranch have been squashed into one."
+
+    # Delete local tags (only if any exist)
+    tags="$(git tag -l)"
+    if [[ -n "$tags" ]]; then
+        git tag -d $tags
+        git fetch --tags
+        git tag -l | xargs -I {} git push origin :refs/tags/{}
+    fi
+
+    ECHOHEAD "Amending final commit"
+    git reset --soft HEAD~1
+    git commit --amend -m "$message"
+    git push origin "$currentBranch" --force-with-lease
+
+    ECHOHEAD "All local and remote tags have been deleted."
+    echoend
+    exit
+fi
+
+# IMPORTANT - DO THIS FIRST
+git fetch origin
+
+############################################ BRANCH
+if [[ "$allCommitsInBranch" == "yes" ]]; then
+
+    # Merge origin/$intoBranch into the current branch
+    if ! git merge "origin/$intoBranch"; then
+        echobad "Merge failed!"
+        exit 1
+    fi
+
+    # List commits that are ahead of origin/$intoBranch
+    echo "Commits ahead of 'origin/$intoBranch':"
+    git log --oneline "origin/$intoBranch..$currentBranch"
+
+    if ! confirm_or_skip "Would you like to squash these commits into a single commit?"; then
+        ECHOHEAD "Operation cancelled."
+        echoend
+        exit 0
+    fi
+
+    echonice "Squashing commits..."
+    mergeBase="$(git merge-base "origin/$intoBranch" "$currentBranch")"
+    git reset --soft "$mergeBase"
+    git commit -m "$message"
+
+    if ! confirm_or_skip "Do you want to force push the changes to the remote?"; then
+        ECHOHEAD "Operation cancelled."
+        echoend
+        exit 0
+    fi
+
+    git push origin "$currentBranch" --force-with-lease
+    echonice "Changes have been force pushed."
+
+    echoend
+    exit 0
 fi
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
-else
-    echonice "Could not change to $WORKING_DIR/$dir"
-fi
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
-todaysCount=`git log --since="4am"  --oneline | wc -l`
+todaysCount="$(git log --since="4am" --oneline | wc -l)"
 
-echohead "List of commits for today"
+ECHOHEAD "List of commits for today"
 git log --since="4am" --oneline
 
-echohead "Number of commits today:"
+ECHOHEAD "Number of commits today:"
 git shortlog -s -n --all --no-merges --since="4am"
 
 if [[ "$doToday" == "yes" ]]; then
-    $numberOfCommits=$todaysCount
+    numberOfCommits="$todaysCount"
 fi
 
-
-if [ $numberOfCommits \> 0 ]; then
-    git reset --soft HEAD~$numberOfCommits
-    git commit . -m "$message"
-    git add . -A
+if [[ "$numberOfCommits" -gt 0 ]]; then
+    git reset --soft "HEAD~$numberOfCommits"
+    git add .
+    git commit -m "$message"
     git push --force-with-lease
 else
-    echohead "Nothing to squash, please use -t or -n option"
+    ECHOHEAD "Nothing to squash, please use -t or -n option"
 fi
 
-echoend;
+echoend

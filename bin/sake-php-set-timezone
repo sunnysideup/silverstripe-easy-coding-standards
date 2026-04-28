@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+timeZone='Pacific/Auckland'
+help='no'
+while (($#)); do
+    case $1 in
+    -t | --timezone)
+        timeZone=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+
+help_and_exit() {
+    ECHOHEAD "Set PHP timezone"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+    echonice "Find string (-t|--timezone):       $find"
+
+    ECHOHEAD "Available settings:"
+    echonice "-t, --timezone               PHP timezone (e.g. Pacific/Auckland)"
+    echonice "-h, --help                   show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-php-set-timezone app/src"
+
+    echofunctions
+    exit
+}
+
+
+
+############################################ CODE
+
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
+
+# dev-build
+sudo find /etc/php/ -name php.ini -exec sh -c 'grep -q "date.timezone = '\"'$timeZone'\"'" "$1" || echo "date.timezone = '\''$timeZone'\''" >> "$1"' sh {} \;
+sudo find /etc/php/ -name php.ini -exec sh -c 'ECHOHEAD "File: $1"; grep "date.timezone" $1' sh {} \;
+
+echoend

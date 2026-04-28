@@ -1,8 +1,76 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
-cd $SCRIPT_DIR
-cd ..
-cd ..
-pwd
-composer update sunnysideup/easy-coding-standards
+echo ""
+echo "===================================================="
+echo " SELF-UPDATING (this happens from time to time)"
+echo "===================================================="
+echo ""
+
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+COMPOSER_DIR="$SCRIPT_DIR/../.."
+
+if ! test -f "$COMPOSER_DIR/composer.json"; then
+    echo "===================================================="
+    echo " ERROR: could not find composer file in: $COMPOSER_DIR/composer.json"
+    echo "===================================================="
+    exit 1
+fi
+
+# Resolve to an absolute path so we can always return reliably
+COMPOSER_DIR="$(cd "$COMPOSER_DIR" && pwd)"
+
+echo "===================================================="
+echo " UPDATING IN:"
+echo " $COMPOSER_DIR"
+echo "===================================================="
+
+commit_and_push() {
+    local dir="$1"
+    local resolved
+    resolved="$(cd "$COMPOSER_DIR" && cd "$dir" && pwd)" || {
+        echo " !! Skipping $dir — directory not found"
+        return 0
+    }
+    echo " -> Committing $resolved"
+    (cd "$resolved" && sake-git-commit-and-push . -m "MNT: automated commit") || {
+        echo " !! sake-git-commit-and-push failed in $resolved (continuing)"
+    }
+}
+
+# Commit vendored repos before updating them
+commit_and_push "vendor/sunnysideup/easy-coding-standards"
+commit_and_push "vendor/wernerkrauss/silverstripe-rector"
+
+# Composer updates (run from project root)
+cd "$COMPOSER_DIR"
+
+echo " -> composer update sunnysideup/easy-coding-standards --prefer-source"
+composer update sunnysideup/easy-coding-standards --prefer-source || {
+    echo " !! composer update (easy-coding-standards) failed (continuing)"
+}
+
+echo " -> composer update"
+composer update || {
+    echo " !! composer update failed (continuing)"
+}
+
+echo " -> sake-composer-available-updates"
+sake-composer-available-updates || {
+    echo " !! sake-composer-available-updates failed (continuing)"
+}
+
+# Commit the upgrader repo
+if [[ -d /upgrader ]]; then
+    echo " -> Committing /upgrader"
+    (cd /upgrader && sake-git-commit-and-push . -m "MNT: automated commit") || {
+        echo " !! sake-git-commit-and-push failed in /upgrader (continuing)"
+    }
+else
+    echo " !! /upgrader directory not found — skipping"
+fi
+
+echo ""
+echo "===================================================="
+echo " SELF-UPDATE COMPLETE"
+echo "===================================================="

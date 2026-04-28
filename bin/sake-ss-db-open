@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+skipComposer="no"
+help='no'
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -*)
+        printf 'Unknown option: %q\n\n' "$1"
+        help='yes'
+        ;;
+    *) dir=$1 ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Open Silverstripe MySQL database"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to use:              $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-db-open."
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+############################################ CODE
+
+cd_or_fail "$WORKING_DIR" help_and_exit
+
+if [ -f ".env" ]; then
+    export $(grep -v '^#' .env | xargs)
+else
+    echobad ".env file not found!"
+    exit 1
+fi
+
+# Check if required variables are set
+if [[ -z "$SS_DATABASE_NAME" || -z "$SS_DATABASE_SERVER" || -z "$SS_DATABASE_USERNAME" || -z "$SS_DATABASE_PASSWORD" ]]; then
+    echobad "Missing required database credentials in .env file!"
+    exit 1
+fi
+
+# Open the MySQL database using the credentials
+mysql -h "$SS_DATABASE_SERVER" -u "$SS_DATABASE_USERNAME" -p"$SS_DATABASE_PASSWORD" -A "$SS_DATABASE_NAME"
+
+echoend

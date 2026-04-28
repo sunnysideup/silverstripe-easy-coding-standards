@@ -1,61 +1,61 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ############################################ BASICS
-SCRIPT_DIR="$COMPOSER_RUNTIME_BIN_DIR"
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
-source $SCRIPT_DIR/sake-self-methods
+source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
 dir='./'
 
 ############################################ SETTINGS
 help='no'
-while (( $# )); do
-  case $1 in
-    -f|--find)               find=$2;shift ;;
-    -h|--help)               help='yes';shift ;;
-    -*)                      printf 'Unknown option: %q\n\n' "$1";
-                             help_and_exit 1 ;;
-    *)                       dir=$1;;
-  esac
-  shift
+while (($#)); do
+    case $1 in
+    -f | --find)
+        find=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
 done
 
+
+############################################ HELP
 help_and_exit() {
-    echohead "Grep search - find in files";
-    echonice "Directory of script:           $SCRIPT_DIR";
-    echonice "Directory to analyse:          $WORKING_DIR/$dir";
+    ECHOHEAD "Grep search - find in files"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
-    echohead "Current settings:";
-    echonice "Find string (-f|--find):       $find";
+    ECHOHEAD "Current settings:"
+    echonice "Find string (-f|--find):       $find"
 
-    echohead "Available settings:";
+    ECHOHEAD "Available settings:"
     echonice "-f, --find                   string you are looking for"
     echonice "-h, --help                   show help information"
 
-    echohead "Example usage:"
-    echonice "e.g. sake-find-in-files app/src -f 'piece of code'";
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-find-in-files app/src -f 'piece of code'"
 
     echofunctions
-    exit;
+    exit
 }
 
 
-
-############################################ HELP ONLY
-if [[ "$help" == "yes" ]]; then
-    help_and_exit
-fi
+sake_check_help_and_exit
 
 ############################################ CODE
 
-if [ -d "$WORKING_DIR/$dir" ]; then
-    cd $WORKING_DIR/$dir
-else
-    echonice "Could not change to $WORKING_DIR/$dir"
-fi
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 # dev-build
 grep -rnw ./ -e "'$find'"
 
-echoend;
+echoend

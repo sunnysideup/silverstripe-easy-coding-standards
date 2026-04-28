@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ SETTINGS
+server=''
+toServer=''
+help='no'
+reverse='no'
+envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
+
+############################################ ARGUMENTS
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -r | --reverse)
+        reverse='yes'
+        shift
+        ;;
+    -t | --to)
+        toServer=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        server=$1
+        ;;
+    esac
+    shift
+done
+
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
+
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
+    help_and_exit
+fi
+server="$(normalize_server "$server")"
+TO_NORMALIZED=''
+if [[ -n "${toServer:-}" ]]; then
+    TO_NORMALIZED="$(normalize_server "$toServer")"
+fi
+############################################ HELPERS
+
+help_and_exit() {
+    ECHOHEAD "Sync Database and Assets"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Working Directory:             $WORKING_DIR"
+    echonice "Server to sync with:           ${server:-"(not set)"}"
+    echonice "Do reverse sync:               $reverse"
+    echonice "To server (if any):            ${TO_NORMALIZED:-"(not set)"}"
+
+    ECHOHEAD "Available settings:"
+    echonice "-r, --reverse                  sync FROM local TO server"
+    echonice "-t, --to SERVER[:/path]        after pulling, also push to another server"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-sync-all my-server:/var/www/website-root"
+    echonice "sake-ss-sync-all my-server # default path is /container/application"
+    echonice "sake-ss-sync-all my-server --reverse # sync from local to server - put reverse last"
+    echonice "sake-ss-sync-all my-server --to other-server:/var/www/website-root"
+
+    ECHOHEAD "Setting defaults:"
+    echonice "Set default server in .env with key $envServerKey,"
+    echonice " e.g. $envServerKey=my-server:/var/www/website-root"
+    echofunctions
+    exit
+}
+sake_check_help_and_exit
+
+
+
+
+
+############################################ RUN COMMANDS
+ECHOHEAD "Starting full sync from server: $server"
+[[ -n "$TO_NORMALIZED" ]] && echonice "To server: $TO_NORMALIZED"
+
+dbArgs=("$server")
+assetArgs=("$server")
+
+[[ "$reverse" == "yes" ]] && dbArgs+=("--reverse") && assetArgs+=("--reverse")
+[[ -n "$TO_NORMALIZED" && "$reverse" != "yes" ]] && dbArgs+=("--to" "$TO_NORMALIZED") && assetArgs+=("--to" "$TO_NORMALIZED")
+
+sake-ss-rsync-db "${dbArgs[@]}"
+sake-ss-rsync-assets "${assetArgs[@]}"
+
+ECHOHEAD "Syncing all to/from server: $server COMPLETED"
+echoend

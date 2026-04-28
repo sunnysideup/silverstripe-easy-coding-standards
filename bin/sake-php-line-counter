@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir="./"
+
+############################################ SETTINGS
+divisor=250
+minutesPerPackage=20
+help='no'
+
+while (($#)); do
+    case $1 in
+    -d | --divisor)
+        divisor=$2
+        shift
+        ;;
+    -m | --minutes-per-package)
+        minutesPerPackage=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "PHP Line Counter"
+    echonice "Directory of script:            $SCRIPT_DIR"
+    echonice "Directory to scan:              $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+    echonice "Divisor (-d):                   $divisor"
+    echonice "Minutes per package (-m):       $minutesPerPackage"
+
+    ECHOHEAD "Available settings:"
+    echonice "-d, --divisor <num>             divisor to convert weighted lines into minutes"
+    echonice "-m, --minutes-per-package <num> minutes allocated per direct package"
+    echonice "-h, --help                      show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-php-line-counter -d 120 -m 30 "
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+############################################ CODE
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
+
+echonice "Finding excluded folders …"
+
+# Find folders containing _manifest_exclude
+excludePatterns=$(find . -type f -name '_manifest_exclude' -printf '%h\n')
+
+excludeArgs=()
+while IFS= read -r folder; do
+    excludeArgs+=(-not -path "$folder/*")
+done <<< "$excludePatterns"
+
+
+echo "Scanning direct packages…"
+packages=$(composer show --no-dev | awk '{print $1}')
+
+total=0
+ssPackages=0
+ss6Ready=0
+ss6NotReady=0
+
+for pkg in $packages; do
+    total=$((total+1))
+
+
+    if [[ -z "$data" ]]; then
+        continue
+    fi
+
+    # Check type field
+    type=$(echo "$data" | jq -r '.type // ""')
+
+    # Only process SS modules
+    if [[ "$type" == silverstripe-* ]]; then
+        packageCount=$((packageCount+1))
+
+    fi
+done
+
+echonice "Counting lines …"
+
+# Non-vendor PHP lines (excluding vendor + excluded folders)
+nonVendorLines=$(find . -type f -name '*.php' \
+  ! -path './vendor/*' \
+  "${excludeArgs[@]}" \
+  -print0 | xargs -0 cat | wc -l)
+
+# Vendor PHP lines (always count all vendor PHP files)
+vendorLines=$(find vendor -type f -name '*.php' -print0 \
+  | xargs -0 cat | wc -l)
+
+totalLines=$((nonVendorLines))
+minutes=$(( (totalLines / divisor) + (packageCount * minutesPerPackage) ))
+hours=$(( (minutes) / 60 ))
+
+ECHOHEAD "Results"
+echonice "Divisor:                      $divisor - number of lines per minute"
+echonice "Minutes per package:          $minutesPerPackage"
+echonice "Non-vendor PHP lines:         $nonVendorLines"
+echonice "Total Lines:                  $totalLines"
+echonice "Direct packages:              $packageCount"
+echonice "Vendor Lines:                 $vendorLines"
+echonice "Minutes:                      $minutes"
+echonice "Hours:                        $hours"
+
+
+
+echoend
