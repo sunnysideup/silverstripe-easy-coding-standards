@@ -20,80 +20,15 @@ promptDefault="$WORKING_DIR/.agents/prompt.txt"
 prompt="$promptDefault"
 opencodePath='opencode'
 dryRun='no'
-filesPattern=''     # e.g. --files=./src/app/Tasks/*.php
-containsText=''     # e.g. --contains='function getCMSFields'
-apiKeyEnvName='LLM_API_KEY' # --api-key-env=NAME (source env var to read key from)
+filesPattern=''     # e.g. --files ./src/app/Tasks/*.php
+containsText=''     # e.g. --contains 'function getCMSFields'
+apiKeyEnvName='LLM_API_KEY' # --api-key-env NAME (source env var to read key from)
 
 # optional overrides
-providerOverride='' # --provider=PROVIDER
-modelOverride=''    # --model=model-id
-apiEnvOverride=''   # --api-env=OPENAI_API_KEY
-apiKeyOverride=''   # --api-key=... (avoid; prefer env)
-
-while (($#)); do
-    case $1 in
-    -h | --help)
-        help='yes'
-        shift
-        ;;
-    --prompt=*)
-        prompt="${1#*=}"
-        shift
-        ;;
-    --opencode-path=*)
-        opencodePath="${1#*=}"
-        shift
-        ;;
-    --dry-run)
-        dryRun='yes'
-        shift
-        ;;
-    --files=*)
-        filesPattern="${1#*=}"
-        shift
-        ;;
-    --contains=*)
-        containsText="${1#*=}"
-        shift
-        ;;
-    --contains)
-        if [[ $# -lt 2 ]]; then
-            echobad "Error: --contains requires a value."
-            exit 1
-        fi
-        containsText="$2"
-        shift 2
-        ;;
-    --provider=*)
-        providerOverride="${1#*=}"
-        shift
-        ;;
-    --model=*)
-        modelOverride="${1#*=}"
-        shift
-        ;;
-    --api-env=*)
-        apiEnvOverride="${1#*=}"
-        shift
-        ;;
-    --api-key=*)
-        apiKeyOverride="${1#*=}"
-        shift
-        ;;
-    --api-key-env=*)
-        apiKeyEnvName="${1#*=}"
-        shift
-        ;;
-    *)
-        if sake_handle_help_flag "$1"; then
-            shift
-            continue
-        fi
-        dir=$1
-        shift
-        ;;
-    esac
-done
+providerOverride='' # --provider PROVIDER
+modelOverride=''    # --model model-id
+apiEnvOverride=''   # --api-env OPENAI_API_KEY
+apiKeyOverride=''   # --api-key ... (avoid; prefer env)
 
 
 ############################################ HELP
@@ -103,8 +38,11 @@ help_and_exit() {
     local apiKeyEnvValue="${!apiKeyEnvName-}"
 
     ECHOHEAD "OpenCode runner"
-    echonice "Directory is always the first argument (kept for compatibility): $dir"
-    echonice "File selection is via --files=GLOB (supports *), e.g. --files=./src/app/Tasks/*.php"
+    echonice "Directory is always the FIRST positional argument (kept for compatibility): $dir"
+    echonice "File selection is via --files GLOB (supports *), e.g. --files ./src/app/Tasks/*.php"
+    echonice "NOTE: file globs are interpreted relative to the directory you pass as the first arg,"
+    echonice "      because the script does 'cd <dir>' before globbing. Don't include the dir prefix"
+    echonice "      twice in your --files pattern."
 
     ECHOHEAD "Current settings:"
     echonice "working dir:                     $WORKING_DIR"
@@ -120,32 +58,147 @@ help_and_exit() {
     echonice "api key source env:              $apiKeyEnvName"
     echonice "key value:                       $(mask_api_key "${apiKeyEnvValue-}")"
 
-    ECHOHEAD "Available settings:"
-    echonice "-h, --help                    show help information"
-    echonice "--files=GLOB                  files to include (required)"
-    echonice "--contains=STRING             only include files that contain STRING"
-    echonice "--prompt=FILE                 prompt file path (default: $promptDefault)"
-    echonice "--opencode-path=PATH          opencode binary/path (default: opencode)"
-    echonice "--provider=PROVIDER           model to use (default: $DEFAULT_PROVIDER)"
-    echonice "--model=MODEL                 model to use (default: $DEFAULT_MODEL)"
-    echonice "--api-env=ENVVAR              force which env var to pass the key into"
-    echonice "--api-key-env=ENVVAR          which env var to read the key from (default: LLM_API_KEY)"
-    echonice "--dry-run                     list files + print final command, do not run"
+    ECHOHEAD "Available settings (both 'space' and '=' forms accepted):"
+    echonice "-h, --help                            show help information"
+    echonice "-f, --files GLOB                      files to include (required; supports *)"
+    echonice "-c, --contains STRING                 only include files that contain STRING"
+    echonice "-p, --prompt FILE                     prompt file path (default: $promptDefault)"
+    echonice "-o, --opencode-path PATH              opencode binary/path (default: opencode)"
+    echonice "    --provider PROVIDER               provider to use (default: $DEFAULT_PROVIDER)"
+    echonice "-m, --model MODEL                     model to use (default: $DEFAULT_MODEL)"
+    echonice "    --api-env ENVVAR                  force which env var to pass the key into"
+    echonice "    --api-key VALUE                   pass key value directly (avoid; prefer env)"
+    echonice "    --api-key-env ENVVAR              which env var to read the key from (default: LLM_API_KEY)"
+    echonice "-d, --dry-run                         list files + print final command, do not run"
 
     ECHOHEAD "Notes:"
     echonice "For any provider, you can run once: opencode auth login  (stores creds in ~/.local/share/opencode/auth.json)"
     echonice "If you set LLM_API_KEY, this script maps it to PROVIDER_API_KEY (or uses --api-env)."
 
     ECHOHEAD "Example usage:"
-    echonice "sake-llm-opencode . --files=./src/app/Tasks/*.php"
-    echonice "sake-llm-opencode . --files=./src/**/*.php --contains='function getCMSFields' --dry-run"
-    echonice "sake-llm-opencode . --files=./client/src/js/**/*.js --dry-run"
+    echonice "sake-llm-opencode . --files ./src/app/Tasks/*.php"
+    echonice "sake-llm-opencode . --files './src/**/*.php' --contains 'function getCMSFields' --dry-run"
+    echonice "sake-llm-opencode vendor/sunnysideup/ --files '**/*.php' --contains 'extends BuildTask' --dry-run"
+    echonice "sake-llm-opencode . --files=./client/src/js/**/*.js --dry-run     # = form also accepted"
     echofunctions
     exit
 }
 
 
+############################################ ARG PARSING
+# Each value-taking option is supported in BOTH forms:
+#   --foo VALUE    (space form, like git/npm)
+#   --foo=VALUE    (equals form, like GNU long options)
+#
+# Pattern: option cases that consume a value do `shift` once inside (skipping
+# past the value). Boolean flags don't shift inside. The single `shift` at the
+# bottom of the loop consumes the option/positional itself.
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        ;;
+
+    -p | --prompt)
+        prompt=$2
+        shift
+        ;;
+    --prompt=*)
+        prompt="${1#*=}"
+        ;;
+
+    -o | --opencode-path)
+        opencodePath=$2
+        shift
+        ;;
+    --opencode-path=*)
+        opencodePath="${1#*=}"
+        ;;
+
+    -d | --dry-run)
+        dryRun='yes'
+        ;;
+
+    -f | --files)
+        filesPattern=$2
+        shift
+        ;;
+    --files=*)
+        filesPattern="${1#*=}"
+        ;;
+
+    -c | --contains)
+        containsText=$2
+        shift
+        ;;
+    --contains=*)
+        containsText="${1#*=}"
+        ;;
+
+    --provider)
+        providerOverride=$2
+        shift
+        ;;
+    --provider=*)
+        providerOverride="${1#*=}"
+        ;;
+
+    -m | --model)
+        modelOverride=$2
+        shift
+        ;;
+    --model=*)
+        modelOverride="${1#*=}"
+        ;;
+
+    --api-env)
+        apiEnvOverride=$2
+        shift
+        ;;
+    --api-env=*)
+        apiEnvOverride="${1#*=}"
+        ;;
+
+    --api-key)
+        apiKeyOverride=$2
+        shift
+        ;;
+    --api-key=*)
+        apiKeyOverride="${1#*=}"
+        ;;
+
+    --api-key-env)
+        apiKeyEnvName=$2
+        shift
+        ;;
+    --api-key-env=*)
+        apiKeyEnvName="${1#*=}"
+        ;;
+
+    *)
+        # Defensive: anything starting with '-' must be a known flag.
+        # Otherwise it's the positional dir argument.
+        if [[ "$1" == -* ]]; then
+            if ! sake_handle_help_flag "$1"; then
+                echobad "Unknown option: $1"
+                exit 1
+            fi
+        else
+            dir=$1
+        fi
+        ;;
+    esac
+    shift
+done
+
+
+# Honour -h / --help and any help flag handled by sake helpers.
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
 sake_check_help_and_exit
+
 
 ############################################ FUNCTIONS
 
@@ -205,12 +258,16 @@ provider_to_api_env() {
 ############################################ INPUT RESOLUTION
 
 cd "$WORKING_DIR"
+if [[ ! -d "$dir" ]]; then
+    echobad "Error: directory not found (relative to $WORKING_DIR): $dir"
+    exit 1
+fi
 cd "$dir"
 
 prompt="${prompt:-"$SCRIPT_DIR/prompt.txt"}"
 
 if [[ -z "${filesPattern:-}" ]]; then
-    echobad "Error: --files=... is required (supports * globs)."
+    echobad "Error: --files ... is required (supports * globs)."
     help_and_exit
 fi
 
@@ -229,6 +286,7 @@ shopt -u nullglob globstar
 
 if (( ${#matches[@]} == 0 )); then
     echobad "Error: no files matched: $filesPattern"
+    echonice "(remember the glob runs from inside '$dir' — don't double up the path prefix)"
     exit 1
 fi
 
@@ -244,7 +302,7 @@ if [[ -n "${containsText:-}" ]]; then
     selectedFiles=( "${filteredFiles[@]}" )
 
     if (( ${#selectedFiles[@]} == 0 )); then
-        echobad "Error: no files matched --contains='$containsText' (after glob: $filesPattern)"
+        echobad "Error: no files matched --contains '$containsText' (after glob: $filesPattern)"
         exit 1
     fi
 fi
@@ -326,6 +384,12 @@ print_cmd_masked() {
 if [[ "$dryRun" == "yes" ]]; then
     ECHOHEAD "Command:"
     print_cmd_masked
+
+    ECHOHEAD "Resolved settings:"
+    echonice "working dir:    $WORKING_DIR"
+    echonice "selected dir:   $dir   (cwd is now: $(pwd))"
+    echonice "files pattern:  $filesPattern"
+    echonice "contains:       ${containsText:-'(not set)'}"
 
     ECHOHEAD "Files included (${#selectedFiles[@]}):"
     for f in "${selectedFiles[@]}"; do
