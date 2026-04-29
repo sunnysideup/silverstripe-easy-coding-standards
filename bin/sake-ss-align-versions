@@ -70,12 +70,17 @@ help_and_exit() {
     echonice "       - numeric version branches      → 'N.x-dev' (e.g. 6.x-dev)"
     echonice "     Commits the change on each branch if anything was modified."
     echonice ""
-    echonice "  5. MERGES ONLY the default branch (main) into the highest numeric branch"
-    echonice "     (one-way merge) using a 'merge + re-pin' strategy:"
+    echonice "  5. MERGES the default branch (main) into the TARGET version branch —"
+    echonice "     i.e. the branch matching the SS version detected from main's"
+    echonice "     composer.json (e.g. main → branch '6' for an SS6 module)."
+    echonice "     NOT the highest numeric branch present on the remote: that would"
+    echonice "     drag newer code backwards into older-version branches when the"
+    echonice "     target branch hasn't been created on the remote yet."
+    echonice "     Uses a 'merge + re-pin' strategy:"
     echonice "       - perform the merge normally"
     echonice "       - if composer.json conflicts, take the incoming version"
-    echonice "       - re-pin \$GITHUB_ORG/* deps to the current branch's own"
-    echonice "         constraint (dev-main on default, N.x-dev on numeric)"
+    echonice "       - re-pin \$GITHUB_ORG/* deps to the target branch's"
+    echonice "         constraint (N.x-dev)"
     echonice "     This ensures main remains the only source of truth and prevents backward contamination."
     echonice "     Any non-composer.json conflict aborts the merge and skips the repo."
     echonice "     These conflicts are listed at the end of script for manual resolution."
@@ -157,18 +162,6 @@ get_branch_constraint() {
     fi
 }
 
-get_highest_existing_numeric_branch() {
-    local highest=0
-
-    for b in 4 5 6 7; do
-        if git show-ref --verify --quiet "refs/remotes/origin/$b"; then
-            highest=$b
-        fi
-    done
-
-    echo "$highest"
-}
-
 # Rewrites any $GITHUB_ORG/* packages in require and require-dev to the given constraint.
 update_org_deps() {
     local file="composer.json"
@@ -185,6 +178,8 @@ update_org_deps() {
 }
 
 ############################################ MAIN SCRIPT
+
+echowarn "BUILD-MARKER: KAKAPO-2026-04-29 (if you don't see this line, you're running an old copy of the script)"
 
 if [[ "$dry_run" == "yes" ]]; then
     echowarn "RUNNING IN DRY-RUN MODE. NO PUSHES WILL BE MADE."
@@ -360,59 +355,45 @@ while read -r repo; do
     done
 
     # ----------------------------------------------------
-    # ONE-WAY MERGE (main → highest EXISTING version branch)
+    # ONE-WAY MERGE (default_branch → target_branch)
     # ----------------------------------------------------
+    # The target branch is the SS version detected from the default branch's
+    # composer.json. By definition, that branch is the one that should mirror
+    # the default branch's content. Merging into any *other* numeric branch
+    # (e.g. the highest existing one on the remote) risks pushing newer-version
+    # code backwards into older-version branches — for example, on an SS6
+    # module where branch '6' doesn't exist remotely yet and only '5' does,
+    # the merge target must be '6' (newly created from main), NOT '5'.
 
-    highest_branch="$(get_highest_existing_numeric_branch)"
-
-    if (( highest_branch == 0 )); then
-        echonice "No numeric branches found, skipping merge step."
-        highest_branch=""
-    fi
-
-    if [[ -n "$highest_branch" && "$default_branch" != "$highest_branch" ]]; then
-        echonice "Merging $default_branch → $highest_branch (repo-scoped latest version)"
-        git checkout "$highest_branch" -q
-
-        # Track if we actually made changes to this branch.
-        # Note: no `local` — this code is in the script body, not a function.
-        branch_modified=0
+    if [[ "$default_branch" != "$target_branch" ]]; then
+        echonice "Merging $default_branch → $target_branch (target version branch)"
+        git checkout "$target_branch" -q
 
         if ! git merge --no-edit "$default_branch" -q; then
             conflicts=$(git diff --name-only --diff-filter=U | grep -v '^composer.json$' || true)
             if [[ -n "$conflicts" ]]; then
                 git merge --abort
-                echobad "Conflict in $highest_branch (non-composer.json). Skipping."
-                conflict_report+=("$org_repo: non-composer.json conflict merging $default_branch → $highest_branch ($(echo "$conflicts" | tr '\n' ' '))")
+                echobad "Conflict in $target_branch (non-composer.json). Skipping."
+                conflict_report+=("$org_repo: non-composer.json conflict merging $default_branch → $target_branch ($(echo "$conflicts" | tr '\n' ' '))")
                 cd "$TMP_DIR"
                 continue
             fi
             git checkout --theirs composer.json
             git add composer.json
             git commit --no-edit -q
-            branch_modified=1
-        else
-            # Even if merge was clean, check if HEAD moved
-            if [[ $(git rev-parse HEAD) != $(git rev-parse HEAD@{1}) ]]; then
-                branch_modified=1
-            fi
         fi
 
-        pin_constraint=$(get_branch_constraint "$highest_branch")
+        # Re-pin $GITHUB_ORG/* deps to target_branch's own constraint.
+        pin_constraint=$(get_branch_constraint "$target_branch")
         update_org_deps "$pin_constraint"
 
         if ! git diff --quiet composer.json; then
             git add composer.json
-            git commit -m "MNT Re-pin deps on $highest_branch" -q
-            branch_modified=1
+            git commit -m "MNT Re-pin deps on $target_branch" -q
         fi
 
-        # Ensure it's marked for pushing if it's not the target/default branch
-        if [[ $branch_modified -eq 1 ]]; then
-            if [[ "$highest_branch" != "$target_branch" && "$highest_branch" != "$default_branch" ]]; then
-                extra_branches_to_push+=("$highest_branch")
-            fi
-        fi
+        # target_branch is pushed by the main push step below — no need to
+        # add it to extra_branches_to_push.
     fi
 
     # ----------------------------------------------------
