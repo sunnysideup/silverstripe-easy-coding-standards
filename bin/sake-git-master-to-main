@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+
+# Exit on undefined variables and pipe failures
+set -euo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ SETTINGS
+dry_run="no"
+single_repo=""
+
+while (($#)); do
+    case $1 in
+    -d | --dry-run)
+        dry_run="yes"
+        ;;
+    -r | --repo)
+        shift
+        if [[ $# -eq 0 || -z "${1:-}" ]]; then
+            echobad "--repo requires a repository name (e.g. --repo silverstripe-blog)"
+            exit 1
+        fi
+        single_repo="$1"
+        ;;
+
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "sake-git-master-to-main"
+    echonice "Renames the 'master' branch to 'main' and sets 'main' as the default branch"
+    echonice "across every repository in a GitHub organization (or just one with --repo)."
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Working directory:             $WORKING_DIR"
+
+    ECHOHEAD "What this script does:"
+    echonice "For every repository in \$GITHUB_USER_NAME (or just the one given via --repo):"
+    echonice ""
+    echonice "  1. READS the repo's default branch and the SHAs of 'master' and 'main'"
+    echonice "     via the GitHub API. No clone is performed — this script never touches"
+    echonice "     your working directory or any local checkout."
+    echonice ""
+    echonice "  2. SKIPS the repo if:"
+    echonice "       - 'master' does not exist AND default is already 'main' (already migrated)"
+    echonice "       - 'master' does not exist and default is something else (manual case)"
+    echonice "       - 'main' already exists at a DIFFERENT commit than 'master' (diverged;"
+    echonice "         requires manual reconciliation)"
+    echonice ""
+    echonice "  3. CREATES 'main' pointing at master's HEAD via POST /git/refs, unless"
+    echonice "     'main' already exists at the same commit (in which case this is a no-op)."
+    echonice ""
+    echonice "  4. SETS 'main' as the default branch via the GitHub API, then RE-READS the"
+    echonice "     default branch to confirm the change took effect. If the verification"
+    echonice "     fails, the script does NOT delete 'master'."
+    echonice ""
+    echonice "  5. DELETES the remote 'master' branch via DELETE /git/refs/heads/master."
+    echonice "     If branch-protection rules block deletion, the failure is reported and"
+    echonice "     the repo is added to the failed-list at the end of the run."
+    echonice ""
+    echonice "  6. AT THE END, prints a summary: migrated count, already-done count, and"
+    echonice "     itemised lists of any skipped or failed repos."
+
+    ECHOHEAD "Available settings:"
+    echonice "-d, --dry-run                  inspect every repo, print what would change,"
+    echonice "                               make no API writes"
+    echonice "-r, --repo NAME                process only the single repository NAME inside"
+    echonice "                               \$GITHUB_USER_NAME (bare repo name, no owner"
+    echonice "                               prefix). Useful for testing on one repo first."
+    echonice "-h, --help                     show this help information"
+    echonice "-q, --quiet                    suppress visual output"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-master-to-main --dry-run"
+    echonice "... walk every repo in the org, report what would happen, change nothing"
+    echonice ""
+    echonice "sake-git-master-to-main --repo my-repo --dry-run"
+    echonice "... dry-run against a single repo"
+    echonice ""
+    echonice "sake-git-master-to-main --repo my-repo"
+    echonice "... migrate just one repo"
+    echonice ""
+    echonice "sake-git-master-to-main"
+    echonice "... migrate every repo in the org"
+
+    ECHOHEAD "Requirements:"
+    echonice "gh                             GitHub CLI, authenticated (gh auth login)"
+    echonice "                               with admin permission on the target repos"
+
+    ECHOHEAD "Environment Variables Required:"
+    echonice "GITHUB_USER_NAME               GitHub organization name to process."
+    echonice "                               Define this in ~/.config/composer/.env"
+
+    ECHOHEAD "Warnings:"
+    echowarn "- This script DELETES the remote 'master' branch once 'main' is default."
+    echowarn "- The default-branch change may break CI configs, deploy targets, badges,"
+    echowarn "  and local clones that still track 'origin/master'. Coordinate accordingly."
+    echowarn "- Always run with --dry-run first on a new organization."
+
+    echofunctions
+    exit 1
+}
+
+sake_check_help_and_exit
+
+check_for_env_var "GITHUB_USER_NAME" || exit 1
+GITHUB_ORG="$GITHUB_USER_NAME"
+
+############################################ MAIN SCRIPT
+
+echowarn "BUILD-MARKER: TUI-2026-04-29 (sake-git-master-to-main initial version)"
+
+if [[ "$dry_run" == "yes" ]]; then
+    echowarn "RUNNING IN DRY-RUN MODE. NO CHANGES WILL BE MADE."
+else
+    echowarn "Running in real mode. Branches and default-branch settings will be modified on GitHub."
+fi
+
+if [[ -n "$single_repo" ]]; then
+    echonice "Single-repo mode: only processing $GITHUB_ORG/$single_repo"
+fi
+
+if ! gh auth status &>/dev/null; then
+    echobad "You are not logged in to GitHub CLI. Please run: gh auth login"
+    exit 1
+fi
+
+# If single-repo mode, verify the repo exists before doing any work.
+if [[ -n "$single_repo" ]]; then
+    if ! gh api "repos/$GITHUB_ORG/$single_repo" &>/dev/null; then
+        echobad "Repository $GITHUB_ORG/$single_repo not found (or not accessible with current gh auth)."
+        exit 1
+    fi
+fi
+
+migrated=0
+already_done=0
+skipped=()
+failed=()
+
+if [[ -n "$single_repo" ]]; then
+    ECHOHEAD "Processing single repo: $GITHUB_ORG/$single_repo"
+else
+    ECHOHEAD "Fetching repositories for $GITHUB_ORG..."
+fi
+
+while read -r repo; do
+    [[ -z "$repo" ]] && continue
+
+    org_repo="$GITHUB_ORG/$repo"
+    echoline
+    echonice "Analyzing: $org_repo"
+
+    # ----------------------------------------------------
+    # READ STATE FROM GITHUB API
+    # ----------------------------------------------------
+    default_branch=$(gh api "repos/$org_repo" --jq '.default_branch' 2>/dev/null || echo "")
+    if [[ -z "$default_branch" ]]; then
+        echobad "Could not read default branch via API. Skipping."
+        failed+=("$org_repo: could not read default branch")
+        continue
+    fi
+
+    master_sha=$(gh api "repos/$org_repo/git/refs/heads/master" --jq '.object.sha' 2>/dev/null || echo "")
+    main_sha=$(gh api "repos/$org_repo/git/refs/heads/main"   --jq '.object.sha' 2>/dev/null || echo "")
+
+    # ----------------------------------------------------
+    # SHORT-CIRCUITS
+    # ----------------------------------------------------
+
+    # Already migrated: no master, default is main.
+    if [[ -z "$master_sha" && "$default_branch" == "main" ]]; then
+        echogood "Already on 'main' with no 'master' branch. Nothing to do."
+        already_done=$((already_done + 1))
+        continue
+    fi
+
+    # No master and default is something else (e.g. 'develop', '3', etc.)
+    if [[ -z "$master_sha" ]]; then
+        echonice "No 'master' branch present and default is '$default_branch'. Skipping."
+        skipped+=("$org_repo: no master branch (default is $default_branch)")
+        continue
+    fi
+
+    # main exists at a different commit than master — diverged, manual review.
+    if [[ -n "$main_sha" && "$main_sha" != "$master_sha" ]]; then
+        echobad "'main' exists at a different commit than 'master'. Skipping (manual review)."
+        echobad "  master: $master_sha"
+        echobad "  main:   $main_sha"
+        skipped+=("$org_repo: main ($main_sha) diverged from master ($master_sha)")
+        continue
+    fi
+
+    # ----------------------------------------------------
+    # MIGRATION STEPS
+    # ----------------------------------------------------
+    echonice "Default branch: $default_branch"
+    echonice "master HEAD:    $master_sha"
+    if [[ -n "$main_sha" ]]; then
+        echonice "main HEAD:      $main_sha (matches master — no create needed)"
+    fi
+
+    # Step 1: Create main if it doesn't exist
+    if [[ -z "$main_sha" ]]; then
+        if [[ "$dry_run" == "yes" ]]; then
+            echonice "DRY RUN: would create 'main' at $master_sha"
+        else
+            echonice "Creating 'main' at $master_sha..."
+            if ! gh api "repos/$org_repo/git/refs" \
+                    --method POST \
+                    -f ref="refs/heads/main" \
+                    -f sha="$master_sha" >/dev/null 2>&1; then
+                echobad "Failed to create 'main' ref. Skipping repo."
+                failed+=("$org_repo: could not create main ref")
+                continue
+            fi
+        fi
+    fi
+
+    # Step 2: Set main as default branch
+    if [[ "$default_branch" != "main" ]]; then
+        if [[ "$dry_run" == "yes" ]]; then
+            echonice "DRY RUN: would set 'main' as default branch"
+        else
+            echonice "Setting 'main' as default branch..."
+            if ! gh repo edit "$org_repo" --default-branch main >/dev/null 2>&1; then
+                echobad "Failed to set 'main' as default. Skipping (NOT deleting master)."
+                failed+=("$org_repo: could not set main as default")
+                continue
+            fi
+            # Verify the change actually took effect before we touch master.
+            new_default=$(gh api "repos/$org_repo" --jq '.default_branch' 2>/dev/null || echo "")
+            if [[ "$new_default" != "main" ]]; then
+                echobad "Default did not flip to 'main' (still: $new_default). NOT deleting master."
+                failed+=("$org_repo: default did not flip to main (still $new_default)")
+                continue
+            fi
+            echogood "Default branch is now 'main'."
+        fi
+    else
+        echonice "Default branch is already 'main' — only 'master' deletion needed."
+    fi
+
+    # Step 3: Delete remote master
+    if [[ "$dry_run" == "yes" ]]; then
+        echonice "DRY RUN: would delete remote branch 'master'"
+        migrated=$((migrated + 1))
+        continue
+    fi
+
+    echonice "Deleting remote 'master'..."
+    if ! gh api "repos/$org_repo/git/refs/heads/master" --method DELETE >/dev/null 2>&1; then
+        echowarn "Failed to delete remote 'master' (branch protection? insufficient perms?)."
+        failed+=("$org_repo: 'main' is default but 'master' could not be deleted")
+        continue
+    fi
+
+    echogood "Migrated $org_repo: master → main."
+    migrated=$((migrated + 1))
+
+done < <(
+    if [[ -n "$single_repo" ]]; then
+        echo "$single_repo"
+    else
+        gh repo list "$GITHUB_ORG" --limit 1000 --json name --jq '.[].name'
+    fi
+)
+
+# ----------------------------------------------------
+# SUMMARY
+# ----------------------------------------------------
+ECHOHEAD "Summary"
+if [[ "$dry_run" == "yes" ]]; then
+    echonice "DRY RUN: $migrated repo(s) would be migrated."
+else
+    echogood "$migrated repo(s) migrated."
+fi
+echonice "$already_done repo(s) already on main with no master."
+
+if (( ${#skipped[@]} > 0 )); then
+    ECHOHEAD "Skipped (no action taken):"
+    for entry in "${skipped[@]}"; do
+        echowarn "$entry"
+    done
+fi
+
+if (( ${#failed[@]} > 0 )); then
+    ECHOHEAD "Failed (need attention):"
+    for entry in "${failed[@]}"; do
+        echobad "$entry"
+    done
+fi
+
+echoend
