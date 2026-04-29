@@ -51,24 +51,29 @@ help_and_exit() {
     echonice "     via the GitHub API. No clone is performed — this script never touches"
     echonice "     your working directory or any local checkout."
     echonice ""
-    echonice "  2. SKIPS the repo if:"
-    echonice "       - 'master' does not exist AND default is already 'main' (already migrated)"
-    echonice "       - 'master' does not exist and default is something else (manual case)"
-    echonice "       - 'main' already exists at a DIFFERENT commit than 'master' (diverged;"
-    echonice "         requires manual reconciliation)"
+    echonice "  2. CHOOSES one of three paths based on which branches exist:"
     echonice ""
-    echonice "  3. CREATES 'main' pointing at master's HEAD via POST /git/refs, unless"
-    echonice "     'main' already exists at the same commit (in which case this is a no-op)."
+    echonice "       (a) No 'master' branch:"
+    echonice "             - if default is already 'main', counted as already-migrated"
+    echonice "             - otherwise reported as skipped (default is something else)"
     echonice ""
-    echonice "  4. SETS 'main' as the default branch via the GitHub API, then RE-READS the"
-    echonice "     default branch to confirm the change took effect. If the verification"
-    echonice "     fails, the script does NOT delete 'master'."
+    echonice "       (b) 'master' exists, 'main' does not:"
+    echonice "             create 'main' pointing at master's HEAD via POST /git/refs"
     echonice ""
-    echonice "  5. DELETES the remote 'master' branch via DELETE /git/refs/heads/master."
+    echonice "       (c) Both 'master' and 'main' exist:"
+    echonice "             - if they're already at the same commit, no merge is needed"
+    echonice "             - otherwise merge 'master' into 'main' via POST /merges"
+    echonice "               (server-side merge; no clone required)"
+    echonice "             - if the merge conflicts, the repo is skipped for manual review"
+    echonice ""
+    echonice "  3. SETS 'main' as the default branch via the GitHub API, then RE-READS"
+    echonice "     the default to confirm. If verification fails, 'master' is NOT deleted."
+    echonice ""
+    echonice "  4. DELETES the remote 'master' branch via DELETE /git/refs/heads/master."
     echonice "     If branch-protection rules block deletion, the failure is reported and"
     echonice "     the repo is added to the failed-list at the end of the run."
     echonice ""
-    echonice "  6. AT THE END, prints a summary: migrated count, already-done count, and"
+    echonice "  5. AT THE END, prints a summary: migrated count, already-done count, and"
     echonice "     itemised lists of any skipped or failed repos."
 
     ECHOHEAD "Available settings:"
@@ -116,9 +121,33 @@ sake_check_help_and_exit
 check_for_env_var "GITHUB_USER_NAME" || exit 1
 GITHUB_ORG="$GITHUB_USER_NAME"
 
+############################################ UTILITY FUNCTIONS
+
+# Returns the SHA of $branch on $org_repo, or empty string if the branch does
+# not exist or the API call fails.
+#
+# Why the explicit SHA-shape validation: when the branch is missing, `gh api`
+# returns a non-zero exit code AND prints the GitHub error JSON to stdout
+# (e.g. `{"message":"Not Found",...,"status":"404"}`). The `--jq` filter just
+# evaluates against that, so a naive `var=$(gh api ... --jq '.object.sha')`
+# leaves the variable holding the whole error blob — non-empty, but obviously
+# not a real SHA. Validating the result is a 40-char hex string makes this
+# robust regardless of how gh CLI surfaces errors in the version installed.
+get_branch_sha() {
+    local org_repo="$1"
+    local branch="$2"
+    local sha
+    sha=$(gh api "repos/$org_repo/git/refs/heads/$branch" --jq '.object.sha' 2>/dev/null || true)
+    if [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "$sha"
+    else
+        echo ""
+    fi
+}
+
 ############################################ MAIN SCRIPT
 
-echowarn "BUILD-MARKER: TUI-2026-04-29 (sake-git-master-to-main initial version)"
+echowarn "BUILD-MARKER: KIWI-2026-04-29 (sake-git-master-to-main with API-side merge)"
 
 if [[ "$dry_run" == "yes" ]]; then
     echowarn "RUNNING IN DRY-RUN MODE. NO CHANGES WILL BE MADE."
@@ -171,46 +200,35 @@ while read -r repo; do
         continue
     fi
 
-    master_sha=$(gh api "repos/$org_repo/git/refs/heads/master" --jq '.object.sha' 2>/dev/null || echo "")
-    main_sha=$(gh api "repos/$org_repo/git/refs/heads/main"   --jq '.object.sha' 2>/dev/null || echo "")
+    master_sha=$(get_branch_sha "$org_repo" "master")
+    main_sha=$(get_branch_sha   "$org_repo" "main")
 
     # ----------------------------------------------------
-    # SHORT-CIRCUITS
+    # CASE A: No 'master' branch — nothing to migrate.
     # ----------------------------------------------------
-
-    # Already migrated: no master, default is main.
-    if [[ -z "$master_sha" && "$default_branch" == "main" ]]; then
-        echogood "Already on 'main' with no 'master' branch. Nothing to do."
-        already_done=$((already_done + 1))
-        continue
-    fi
-
-    # No master and default is something else (e.g. 'develop', '3', etc.)
     if [[ -z "$master_sha" ]]; then
-        echonice "No 'master' branch present and default is '$default_branch'. Skipping."
-        skipped+=("$org_repo: no master branch (default is $default_branch)")
+        if [[ "$default_branch" == "main" ]]; then
+            echogood "Already on 'main' with no 'master' branch. Nothing to do."
+            already_done=$((already_done + 1))
+        else
+            echonice "No 'master' branch present (default is '$default_branch'). Skipping."
+            skipped+=("$org_repo: no master branch (default is $default_branch)")
+        fi
         continue
     fi
 
-    # main exists at a different commit than master — diverged, manual review.
-    if [[ -n "$main_sha" && "$main_sha" != "$master_sha" ]]; then
-        echobad "'main' exists at a different commit than 'master'. Skipping (manual review)."
-        echobad "  master: $master_sha"
-        echobad "  main:   $main_sha"
-        skipped+=("$org_repo: main ($main_sha) diverged from master ($master_sha)")
-        continue
-    fi
-
-    # ----------------------------------------------------
-    # MIGRATION STEPS
-    # ----------------------------------------------------
+    # master exists. Print state.
     echonice "Default branch: $default_branch"
     echonice "master HEAD:    $master_sha"
     if [[ -n "$main_sha" ]]; then
-        echonice "main HEAD:      $main_sha (matches master — no create needed)"
+        echonice "main HEAD:      $main_sha"
+    else
+        echonice "main HEAD:      (does not exist)"
     fi
 
-    # Step 1: Create main if it doesn't exist
+    # ----------------------------------------------------
+    # CASE B: 'main' does not exist — create it at master's HEAD.
+    # ----------------------------------------------------
     if [[ -z "$main_sha" ]]; then
         if [[ "$dry_run" == "yes" ]]; then
             echonice "DRY RUN: would create 'main' at $master_sha"
@@ -224,10 +242,54 @@ while read -r repo; do
                 failed+=("$org_repo: could not create main ref")
                 continue
             fi
+            echogood "Created 'main' at $master_sha."
+        fi
+
+    # ----------------------------------------------------
+    # CASE C1: 'main' exists at the same commit as 'master' — no merge needed.
+    # ----------------------------------------------------
+    elif [[ "$main_sha" == "$master_sha" ]]; then
+        echonice "'main' is already at the same commit as 'master'. No merge needed."
+
+    # ----------------------------------------------------
+    # CASE C2: 'main' exists at a different commit — server-side merge.
+    # ----------------------------------------------------
+    else
+        if [[ "$dry_run" == "yes" ]]; then
+            echonice "DRY RUN: would merge 'master' into 'main' via API"
+            echonice "         (main: ${main_sha:0:7}, master: ${master_sha:0:7})"
+        else
+            echonice "Merging 'master' into 'main' via GitHub API..."
+            # POST /merges:
+            #   201 + JSON body  → merge happened, gh exits 0
+            #   204 + empty body → already up to date, gh exits 0
+            #   409              → conflict, gh exits non-zero with error JSON
+            #   other 4xx/5xx    → other error, gh exits non-zero
+            if merge_output=$(gh api "repos/$org_repo/merges" \
+                                    --method POST \
+                                    -f base="main" \
+                                    -f head="master" 2>&1); then
+                if [[ -z "$merge_output" ]]; then
+                    echonice "'main' already contained 'master' (server-side no-op)."
+                else
+                    echogood "Merged 'master' into 'main'."
+                fi
+            else
+                if echo "$merge_output" | grep -q "Merge conflict"; then
+                    echobad "Merge conflict between 'master' and 'main'. Skipping (manual review)."
+                    skipped+=("$org_repo: merge conflict between master and main (main $main_sha, master $master_sha)")
+                else
+                    echobad "Merge API call failed: $merge_output"
+                    failed+=("$org_repo: merge api call failed")
+                fi
+                continue
+            fi
         fi
     fi
 
-    # Step 2: Set main as default branch
+    # ----------------------------------------------------
+    # SET 'main' AS DEFAULT BRANCH (and verify before deleting master)
+    # ----------------------------------------------------
     if [[ "$default_branch" != "main" ]]; then
         if [[ "$dry_run" == "yes" ]]; then
             echonice "DRY RUN: would set 'main' as default branch"
@@ -238,7 +300,6 @@ while read -r repo; do
                 failed+=("$org_repo: could not set main as default")
                 continue
             fi
-            # Verify the change actually took effect before we touch master.
             new_default=$(gh api "repos/$org_repo" --jq '.default_branch' 2>/dev/null || echo "")
             if [[ "$new_default" != "main" ]]; then
                 echobad "Default did not flip to 'main' (still: $new_default). NOT deleting master."
@@ -251,7 +312,9 @@ while read -r repo; do
         echonice "Default branch is already 'main' — only 'master' deletion needed."
     fi
 
-    # Step 3: Delete remote master
+    # ----------------------------------------------------
+    # DELETE REMOTE 'master'
+    # ----------------------------------------------------
     if [[ "$dry_run" == "yes" ]]; then
         echonice "DRY RUN: would delete remote branch 'master'"
         migrated=$((migrated + 1))

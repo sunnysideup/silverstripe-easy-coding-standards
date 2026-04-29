@@ -179,8 +179,6 @@ update_org_deps() {
 
 ############################################ MAIN SCRIPT
 
-echowarn "BUILD-MARKER: TUI-2026-04-29 (cwd-safe build; no git-reset on user CWD)"
-
 if [[ "$dry_run" == "yes" ]]; then
     echowarn "RUNNING IN DRY-RUN MODE. NO PUSHES WILL BE MADE."
 else
