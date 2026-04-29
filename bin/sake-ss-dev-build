@@ -10,11 +10,16 @@ dir='./'
 
 ############################################ SETTINGS
 skipComposer="no"
+ss6="no"
 help='no'
 while (($#)); do
     case $1 in
     -s | --skip-composer)
         skipComposer=$2
+        shift
+        ;;
+    -x | --ss6)
+        ss6='yes'
         shift
         ;;
     *)
@@ -36,13 +41,17 @@ help_and_exit() {
 
     ECHOHEAD "Current settings:"
     echonice "-s, --skip-composer            $skipComposer"
+    echonice "-x, --ss6                      $ss6"
 
     ECHOHEAD "Available settings:"
     echonice "-s, --skip-composer            skip composer install, default: no !!!"
+    echonice "-x, --ss6                      run as silverstripe 6 project"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
     echonice "sake-ss-dev-build ."
+    echonice "sake-ss-dev-build . --skip-composer yes"
+    echonice "sake-ss-dev-build . -x"
 
     echofunctions
     exit
@@ -89,6 +98,10 @@ if [ -f public/admin.types.graphql ]; then
 fi
 
 # dev-build
-sudo -u www-data vendor/bin/sake dev/build flush=all
+if [[ "$ss6" == "yes" ]]; then
+    sudo -u www-data vendor/bin/sake db:build --flush
+else
+    sudo -u www-data vendor/bin/sake dev/build flush=all
+fi
 
 echoend

@@ -10,9 +10,14 @@ dir='./'
 
 ############################################ SETTINGS
 skipComposer="no"
+ss6="no"
 help='no'
 while (($#)); do
     case $1 in
+    -x | --ss6)
+        ss6='yes'
+        shift
+        ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
@@ -31,10 +36,11 @@ help_and_exit() {
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
     ECHOHEAD "Available settings:"
+    echonice "-x, --ss6                      run as silverstripe 6 project"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-ss-flush ."
+    echonice "sake-ss-flush . -x"
 
     echofunctions
     exit
@@ -75,6 +81,10 @@ if [ -f public/admin.types.graphql ]; then
 fi
 
 # dev-build
-sudo -u www-data vendor/bin/sake dev flush=all
+if [[ "$ss6" == "yes" ]]; then
+    sudo -u www-data vendor/bin/sake db:build --flush
+else
+    sudo -u www-data vendor/bin/sake dev/build flush=all
+fi
 
 echoend

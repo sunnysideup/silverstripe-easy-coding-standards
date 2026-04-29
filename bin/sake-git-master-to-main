@@ -147,7 +147,6 @@ get_branch_sha() {
 
 ############################################ MAIN SCRIPT
 
-echowarn "BUILD-MARKER: KIWI-2026-04-29 (sake-git-master-to-main with API-side merge)"
 
 if [[ "$dry_run" == "yes" ]]; then
     echowarn "RUNNING IN DRY-RUN MODE. NO CHANGES WILL BE MADE."
