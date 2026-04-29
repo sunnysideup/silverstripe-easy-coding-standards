@@ -11,6 +11,7 @@ source "$SCRIPT_DIR/sake-self-methods"
 ############################################ SETTINGS
 dry_run="no"
 fail_on_drift="no"
+single_repo=""
 
 while (($#)); do
     case $1 in
@@ -19,6 +20,14 @@ while (($#)); do
         ;;
     -f | --fail-on-drift)
         fail_on_drift="yes"
+        ;;
+    -r | --repo)
+        shift
+        if [[ $# -eq 0 || -z "${1:-}" ]]; then
+            echobad "--repo requires a repository name (e.g. --repo silverstripe-blog)"
+            exit 1
+        fi
+        single_repo="$1"
         ;;
 
     *)
@@ -61,12 +70,17 @@ help_and_exit() {
     echonice "       - numeric version branches      → 'N.x-dev' (e.g. 6.x-dev)"
     echonice "     Commits the change on each branch if anything was modified."
     echonice ""
-    echonice "  5. MERGES ONLY the default branch (main) into the highest numeric branch"
-    echonice "     (one-way merge) using a 'merge + re-pin' strategy:"
+    echonice "  5. MERGES the default branch (main) into the TARGET version branch —"
+    echonice "     i.e. the branch matching the SS version detected from main's"
+    echonice "     composer.json (e.g. main → branch '6' for an SS6 module)."
+    echonice "     NOT the highest numeric branch present on the remote: that would"
+    echonice "     drag newer code backwards into older-version branches when the"
+    echonice "     target branch hasn't been created on the remote yet."
+    echonice "     Uses a 'merge + re-pin' strategy:"
     echonice "       - perform the merge normally"
     echonice "       - if composer.json conflicts, take the incoming version"
-    echonice "       - re-pin \$GITHUB_ORG/* deps to the current branch's own"
-    echonice "         constraint (dev-main on default, N.x-dev on numeric)"
+    echonice "       - re-pin \$GITHUB_ORG/* deps to the target branch's"
+    echonice "         constraint (N.x-dev)"
     echonice "     This ensures main remains the only source of truth and prevents backward contamination."
     echonice "     Any non-composer.json conflict aborts the merge and skips the repo."
     echonice "     These conflicts are listed at the end of script for manual resolution."
@@ -88,6 +102,11 @@ help_and_exit() {
     echonice "-d, --dry-run                  run through all steps locally without pushing"
     echonice "                               anything to GitHub (no merges pushed, no branch"
     echonice "                               migrations, no default-branch changes)"
+    echonice "-r, --repo NAME                process only the single repository NAME inside"
+    echonice "                               \$GITHUB_USER_NAME, instead of iterating the whole"
+    echonice "                               organization. NAME is the bare repo name (no owner"
+    echonice "                               prefix). Useful for testing this script against one"
+    echonice "                               module before running it org-wide."
     echonice "-h, --help                     show this help information"
     echonice "-q, --quiet                    suppress visual output"
     echonice "-f, --fail-on-drift            fail if any lower numeric version branch has commits not present in a higher numeric version branch"
@@ -96,6 +115,12 @@ help_and_exit() {
     echonice "sake-ss-align-versions --dry-run"
     echonice "... clone and attempt all changes locally, report what would happen,"
     echonice "    but push nothing to GitHub"
+    echonice ""
+    echonice "sake-ss-align-versions --repo silverstripe-blog --dry-run"
+    echonice "... run against just the silverstripe-blog repo, no pushes"
+    echonice ""
+    echonice "sake-ss-align-versions --repo silverstripe-blog"
+    echonice "... run for real against just the silverstripe-blog repo"
     echonice ""
     echonice "sake-ss-align-versions"
     echonice "... run for real: push merges, align dependencies, migrate master→main"
@@ -137,18 +162,6 @@ get_branch_constraint() {
     fi
 }
 
-get_highest_existing_numeric_branch() {
-    local highest=0
-
-    for b in 4 5 6 7; do
-        if git show-ref --verify --quiet "refs/remotes/origin/$b"; then
-            highest=$b
-        fi
-    done
-
-    echo "$highest"
-}
-
 # Rewrites any $GITHUB_ORG/* packages in require and require-dev to the given constraint.
 update_org_deps() {
     local file="composer.json"
@@ -164,43 +177,9 @@ update_org_deps() {
     ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
 }
 
-# # Merges $source into the currently-checked-out branch, then re-pins $GITHUB_ORG/* deps
-# # to $pin. Resolves any composer.json conflicts by taking the incoming version (which
-# # gets overwritten by the re-pin step anyway). Aborts on any non-composer.json conflict.
-# #
-# # Usage:  merge_and_repin <source_branch> <pin_constraint>
-# # Returns 0 on success, 1 on real (non-composer.json) conflict.
-# merge_and_repin() {
-#     local source="$1"
-#     local pin="$2"
-#     local target
-#     target=$(git branch --show-current)
-
-#     if ! git merge --no-edit "$source" -m "MNT Merge branch '$source' into $target" -q; then
-#         # Only accept conflicts in composer.json; anything else is a real conflict.
-#         local other_conflicts
-#         other_conflicts=$(git diff --name-only --diff-filter=U | grep -v '^composer.json$' || true)
-#         if [[ -n "$other_conflicts" ]]; then
-#             git merge --abort
-#             return 1
-#         fi
-#         # Take incoming composer.json; we'll re-pin immediately.
-#         git checkout --theirs composer.json
-#         git add composer.json
-#         git commit --no-edit -q
-#     fi
-
-#     # Re-pin $GITHUB_ORG/* deps to this branch's correct constraint.
-#     update_org_deps "$pin"
-#     if ! git diff --quiet composer.json; then
-#         git add composer.json
-#         git commit -m "MNT Re-pin $GITHUB_ORG/* deps to $pin on $target" -q
-#     fi
-
-#     return 0
-# }
-
 ############################################ MAIN SCRIPT
+
+echowarn "BUILD-MARKER: TUI-2026-04-29 (cwd-safe build; no git-reset on user CWD)"
 
 if [[ "$dry_run" == "yes" ]]; then
     echowarn "RUNNING IN DRY-RUN MODE. NO PUSHES WILL BE MADE."
@@ -208,21 +187,40 @@ else
     echowarn "Running in real mode. Changes will be pushed to GitHub. Add --dry-run to test without pushing."
 fi
 
+if [[ -n "$single_repo" ]]; then
+    echonice "Single-repo mode: only processing $GITHUB_ORG/$single_repo"
+fi
+
 if ! gh auth status &>/dev/null; then
     echobad "You are not logged in to GitHub CLI. Please run: gh auth login"
     exit 1
+fi
+
+# If single-repo mode, verify the repo exists before doing any work.
+if [[ -n "$single_repo" ]]; then
+    if ! gh api "repos/$GITHUB_ORG/$single_repo" &>/dev/null; then
+        echobad "Repository $GITHUB_ORG/$single_repo not found (or not accessible with current gh auth)."
+        exit 1
+    fi
 fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 successful_syncs=0
-ahead_report=()   # lines describing lower branches ahead of higher branches
+ahead_report=()      # lines describing lower branches ahead of higher branches
 conflict_report=()   # repos skipped due to non-composer.json merge conflicts
 
-ECHOHEAD "Fetching repositories for $GITHUB_ORG..."
-git reset --hard >/dev/null 2>&1 || true
-git clean -fd >/dev/null 2>&1 || true
+if [[ -n "$single_repo" ]]; then
+    ECHOHEAD "Processing single repo: $GITHUB_ORG/$single_repo"
+else
+    ECHOHEAD "Fetching repositories for $GITHUB_ORG..."
+fi
+# NOTE: do NOT run `git reset --hard` / `git clean -fd` here. At this point
+# we have not cd'd anywhere, so those commands would execute in the user's
+# current working directory and silently destroy uncommitted work if the
+# user happens to be standing in any git repository. The equivalent cleanup
+# inside the per-repo loop (after `cd "$repo_dir"`) is safe and sufficient.
 while read -r repo; do
     [[ -z "$repo" ]] && continue
 
@@ -360,57 +358,45 @@ while read -r repo; do
     done
 
     # ----------------------------------------------------
-    # ONE-WAY MERGE (main → highest EXISTING version branch)
+    # ONE-WAY MERGE (default_branch → target_branch)
     # ----------------------------------------------------
+    # The target branch is the SS version detected from the default branch's
+    # composer.json. By definition, that branch is the one that should mirror
+    # the default branch's content. Merging into any *other* numeric branch
+    # (e.g. the highest existing one on the remote) risks pushing newer-version
+    # code backwards into older-version branches — for example, on an SS6
+    # module where branch '6' doesn't exist remotely yet and only '5' does,
+    # the merge target must be '6' (newly created from main), NOT '5'.
 
-    highest_branch="$(get_highest_existing_numeric_branch)"
-
-    if (( highest_branch == 0 )); then
-        echonice "No numeric branches found, skipping merge step."
-        highest_branch=""
-    fi
-
-    if [[ -n "$highest_branch" && "$default_branch" != "$highest_branch" ]]; then
-        echonice "Merging $default_branch → $highest_branch (repo-scoped latest version)"
-        git checkout "$highest_branch" -q
-
-        # Track if we actually made changes to this branch
-        local branch_modified=0
+    if [[ "$default_branch" != "$target_branch" ]]; then
+        echonice "Merging $default_branch → $target_branch (target version branch)"
+        git checkout "$target_branch" -q
 
         if ! git merge --no-edit "$default_branch" -q; then
             conflicts=$(git diff --name-only --diff-filter=U | grep -v '^composer.json$' || true)
             if [[ -n "$conflicts" ]]; then
                 git merge --abort
-                echobad "Conflict in $highest_branch (non-composer.json). Skipping."
+                echobad "Conflict in $target_branch (non-composer.json). Skipping."
+                conflict_report+=("$org_repo: non-composer.json conflict merging $default_branch → $target_branch ($(echo "$conflicts" | tr '\n' ' '))")
                 cd "$TMP_DIR"
                 continue
             fi
             git checkout --theirs composer.json
             git add composer.json
             git commit --no-edit -q
-            branch_modified=1
-        else
-            # Even if merge was clean, check if HEAD moved
-            if [[ $(git rev-parse HEAD) != $(git rev-parse HEAD@{1}) ]]; then
-                branch_modified=1
-            fi
         fi
 
-        pin_constraint=$(get_branch_constraint "$highest_branch")
+        # Re-pin $GITHUB_ORG/* deps to target_branch's own constraint.
+        pin_constraint=$(get_branch_constraint "$target_branch")
         update_org_deps "$pin_constraint"
 
         if ! git diff --quiet composer.json; then
             git add composer.json
-            git commit -m "MNT Re-pin deps on $highest_branch" -q
-            branch_modified=1
+            git commit -m "MNT Re-pin deps on $target_branch" -q
         fi
 
-        # Ensure it's marked for pushing if it's not the target/default branch
-        if [[ $branch_modified -eq 1 ]]; then
-            if [[ "$highest_branch" != "$target_branch" && "$highest_branch" != "$default_branch" ]]; then
-                extra_branches_to_push+=("$highest_branch")
-            fi
-        fi
+        # target_branch is pushed by the main push step below — no need to
+        # add it to extra_branches_to_push.
     fi
 
     # ----------------------------------------------------
@@ -467,7 +453,13 @@ while read -r repo; do
 
     cd "$TMP_DIR"
 
-done < <(gh repo list "$GITHUB_ORG" --limit 1000 --json name --jq '.[].name')
+done < <(
+    if [[ -n "$single_repo" ]]; then
+        echo "$single_repo"
+    else
+        gh repo list "$GITHUB_ORG" --limit 1000 --json name --jq '.[].name'
+    fi
+)
 
 ECHOHEAD "All Repositories Processed."
 if [[ "$dry_run" == "no" ]]; then

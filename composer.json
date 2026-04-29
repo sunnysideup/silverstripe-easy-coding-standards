@@ -55,6 +55,7 @@
     "bin/sake-git-fork-comparison",
     "bin/sake-git-find-any-changes",
     "bin/sake-git-info",
+    "bin/sake-git-master-to-main",
     "bin/sake-git-merge-towards-production",
     "bin/sake-git-my-pull-request",
     "bin/sake-git-remove-stale-branches",
