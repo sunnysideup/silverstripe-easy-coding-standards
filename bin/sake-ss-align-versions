@@ -179,7 +179,7 @@ update_org_deps() {
 
 ############################################ MAIN SCRIPT
 
-echowarn "BUILD-MARKER: KAKAPO-2026-04-29 (if you don't see this line, you're running an old copy of the script)"
+echowarn "BUILD-MARKER: TUI-2026-04-29 (cwd-safe build; no git-reset on user CWD)"
 
 if [[ "$dry_run" == "yes" ]]; then
     echowarn "RUNNING IN DRY-RUN MODE. NO PUSHES WILL BE MADE."
@@ -216,8 +216,11 @@ if [[ -n "$single_repo" ]]; then
 else
     ECHOHEAD "Fetching repositories for $GITHUB_ORG..."
 fi
-git reset --hard >/dev/null 2>&1 || true
-git clean -fd >/dev/null 2>&1 || true
+# NOTE: do NOT run `git reset --hard` / `git clean -fd` here. At this point
+# we have not cd'd anywhere, so those commands would execute in the user's
+# current working directory and silently destroy uncommitted work if the
+# user happens to be standing in any git repository. The equivalent cleanup
+# inside the per-repo loop (after `cd "$repo_dir"`) is safe and sufficient.
 while read -r repo; do
     [[ -z "$repo" ]] && continue
 
