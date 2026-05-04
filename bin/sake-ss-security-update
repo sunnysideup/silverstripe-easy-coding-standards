@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ STEPS
+# Each entry: "Label ::: command"
+# Add / remove / reorder steps here -- everything else adapts.
+STEPS=(
+    'Checkout develop branch ::: git checkout develop'
+    'Show git status ::: git status'
+    'Quick commit (cleanup) ::: sake-git-quick -m "FIX: cleanup"'
+    'Commit and push vendor packages ::: sake-git-commit-and-push-vendor-packages . -s "yes"'
+    'Merge production into develop ::: sake-git-merge-towards-production -r --from production --to develop'
+    'Rsync all ::: sake-ss-rsync-all'
+    'Dev build (pass 1) ::: sake-ss-dev-build'
+    'Apply patches (pass 1) ::: bin/apply-patches.sh'
+    'Composer update (pass 1) ::: sake-composer-update'
+    'Dev build (pass 2) ::: sake-ss-dev-build'
+    'Apply patches (pass 2) ::: bin/apply-patches.sh'
+    'Composer update (pass 2) ::: sake-composer-update'
+    'Lint app ::: sake-lint-all app'
+    'Commit and push security checker update ::: sake-git-commit-and-push -m "FIX: update security checker"'
+)
+
+TOTAL_STEPS=${#STEPS[@]}
+
+# Pull the label / command out of "Label ::: command".
+step_label() { local e="${STEPS[$1]}"; echo "${e%% :::*}"; }
+step_cmd()   { local e="${STEPS[$1]}"; echo "${e#*::: }"; }
+
+############################################ SETTINGS
+force="no"
+list_only="no"
+from_step=1
+to_step=$TOTAL_STEPS
+
+while (($#)); do
+    case $1 in
+    -f | --force)
+        force="yes"
+        ;;
+    -l | --list)
+        list_only="yes"
+        ;;
+    --from)
+        from_step=$2
+        shift
+        ;;
+    --to)
+        to_step=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Run the SilverStripe security update workflow"
+    echonice "Directory of script:          $SCRIPT_DIR"
+    echonice "Directory to analyse:         $WORKING_DIR/$dir"
+    echonice "Total steps:                  $TOTAL_STEPS"
+
+    ECHOHEAD "Available settings:"
+    echonice "-f, --force                   run all steps with no prompts"
+    echonice "-l, --list                    list all steps and exit"
+    echonice "    --from N                  start from step N (1..$TOTAL_STEPS)"
+    echonice "    --to N                    stop after step N"
+    echonice "-h, --help                    display this help message and exit"
+
+    ECHOHEAD "Per-step controls:"
+    echonice "Before each step you'll be prompted with:"
+    echonice "    [O]K           run the step"
+    echonice "    [S]kip         skip and move on"
+    echonice "    [Q]uit         exit the script"
+    echonice "After each step you'll be prompted with:"
+    echonice "    [O]K           continue to next step"
+    echonice "    [R]un again    run this step again"
+    echonice "    [C]ontinue     (only if the step failed) continue anyway"
+    echonice "    [Q]uit         exit the script"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-security-update ./"
+    echonice "sake-ss-security-update ./ -f"
+    echonice "sake-ss-security-update --list"
+    echonice "sake-ss-security-update --from 5"
+    echonice "sake-ss-security-update --from 3 --to 7"
+    exit 1
+}
+
+declare -A BRANCH_RESULTS
+
+sake_check_help_and_exit
+
+############################################ LIST STEPS (--list)
+if [[ "$list_only" == "yes" ]]; then
+    ECHOHEAD "All steps in this workflow:"
+    for ((i=0; i<TOTAL_STEPS; i++)); do
+        n=$((i+1))
+        echonice "$(printf '%2d' "$n"). $(step_label "$i")"
+        echonice "     \$ $(step_cmd "$i")"
+    done
+    exit 0
+fi
+
+############################################ VALIDATE RANGE
+if ! [[ "$from_step" =~ ^[0-9]+$ ]] || (( from_step < 1 || from_step > TOTAL_STEPS )); then
+    echo "Invalid --from value: '$from_step' (must be 1..$TOTAL_STEPS)" >&2
+    exit 1
+fi
+if ! [[ "$to_step" =~ ^[0-9]+$ ]] || (( to_step < from_step || to_step > TOTAL_STEPS )); then
+    echo "Invalid --to value: '$to_step' (must be $from_step..$TOTAL_STEPS)" >&2
+    exit 1
+fi
+
+############################################ HELPERS
+# prompt_choice "<prompt>" "<default-letter>" "<valid letters separated by |>"
+prompt_choice() {
+    local prompt="$1"
+    local default="$2"
+    local valid="$3"
+    local reply
+    while true; do
+        read -rp "$prompt " reply
+        reply="${reply,,}"
+        [[ -z "$reply" ]] && reply="$default"
+        if [[ "|$valid|" == *"|$reply|"* ]]; then
+            echo "$reply"
+            return
+        fi
+        echo "Please answer one of: $valid" >&2
+    done
+}
+
+############################################ RUN STEPS
+ECHOHEAD "Running steps $from_step..$to_step of $TOTAL_STEPS"
+
+for ((i=from_step-1; i<to_step; i++)); do
+    step_num=$((i+1))
+    label="$(step_label "$i")"
+    cmd="$(step_cmd "$i")"
+
+    while true; do
+        ECHOHEAD "Step $step_num/$TOTAL_STEPS: $label"
+        echonice "Command: $cmd"
+
+        if [[ "$force" == "yes" ]]; then
+            action="o"
+        else
+            action=$(prompt_choice "[O]K / [S]kip / [Q]uit (default O):" "o" "o|s|q")
+        fi
+
+        case "$action" in
+            s)
+                echonice "-> Skipped step $step_num."
+                break
+                ;;
+            q)
+                echonice "-> Quit at step $step_num."
+                exit 0
+                ;;
+            o)
+                eval "$cmd"
+                rc=$?
+                echo
+                if (( rc == 0 )); then
+                    echonice "OK  Step $step_num completed."
+                else
+                    echonice "ERR Step $step_num failed (exit $rc)."
+                fi
+
+                if [[ "$force" == "yes" ]]; then
+                    if (( rc != 0 )); then
+                        echonice "-> Stopping (force mode + non-zero exit)."
+                        exit "$rc"
+                    fi
+                    break
+                fi
+
+                if (( rc == 0 )); then
+                    after=$(prompt_choice "[O]K continue / [R]un again / [Q]uit (default O):" "o" "o|r|q")
+                else
+                    after=$(prompt_choice "[R]un again / [C]ontinue anyway / [Q]uit (default Q):" "q" "r|c|q")
+                fi
+                case "$after" in
+                    r) continue ;;
+                    q) exit "$rc" ;;
+                    o|c) break ;;
+                esac
+                ;;
+        esac
+    done
+done
+
+echoend
