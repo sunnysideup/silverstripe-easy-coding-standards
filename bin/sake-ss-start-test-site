@@ -64,12 +64,16 @@ grep -qE '^\s*127\.0\.0\.1\s+test\.ss4\s*$' /etc/hosts || echo "127.0.0.1 test.s
 composer create-project silverstripe/installer test
 cd test
 
+############################################ Composer install
+
 composer require sunnysideup/core-modules:dev-main
 composer require sunnysideup/core-modules-dev:dev-main --dev
 composer require sunnysideup/mock-me:dev-main --dev --prefer-source
 if ([ -n "$module" ]); then
     composer require "$module" --prefer-source
 fi
+
+############################################ .env File
 
 cat >app/_config/tmp.yml <<'EOF'
 
@@ -101,9 +105,15 @@ SS_ALLOW_AS_DEV_SITE=true
 SS_ALLOW_SMOKE_TEST=true
 EOF
 
+############################################ DELETE AND CREATE DATABASE
+
 mysql -h 127.0.0.1 -u root -px -e "DROP DATABASE IF EXISTS test; CREATE DATABASE test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
+############################################ DEV BUILD
+
 sake-ss-dev-build
+
+############################################ ADD MOCK DATAB
 
 sudo -u www-data vendor/bin/sake dev/tasks/CreateMockDataRunner
 

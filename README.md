@@ -88,6 +88,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-rsync-asset
  - sake-ss-start-new-module
  - sake-ss-start-new-feature
+ - sake-ss-start-test-site
 
 # rsync
 - sake-ss-rsync-all
