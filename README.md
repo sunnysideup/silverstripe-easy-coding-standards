@@ -35,11 +35,11 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-find-any-changes
  - sake-git-remove-stale-branches 
  - sake-git-merge-towards-production - take develop to production 
- - sake-git-master-to-main - take develop to production 
  - sake-git-my-pull-request
  - sake-git-squash-and-pr - squash and make a pull request
  - sake-git-squash-commits
  - sake-git-tag
+ - sake-git-pipeline-ssh
 
 
 # php

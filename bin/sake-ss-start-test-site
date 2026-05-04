@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+module=""
+
+while (($#)); do
+    case $1 in
+    -m | --module)
+        module=$2
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+
+    shift
+done
+
+help_and_exit() {
+    ECHOHEAD "Git commit and push"
+    echonice "directory of script:          $SCRIPT_DIR"
+    echonice "directory to commit:          $dir (relative to $WORKING_DIR)"
+
+    ECHOHEAD "Current settings:"
+    echonice "module (-m):                  $module"
+
+    ECHOHEAD "Available settings:"
+    echonice "-m, --module                  new module: ''"
+    echonice "-h, --help                    show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-ss-start-test-site -m sunnysideup/test"
+
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ GET MESSAGE
+
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit
+
+############################################ REMOVE OLD ONE
+
+rm ./test/ -rf
+
+############################################ SET UP
+
+grep -qE '^\s*127\.0\.0\.1\s+test\.ss4\s*$' /etc/hosts || echo "127.0.0.1 test.ss4" | sudo tee -a /etc/host
+composer create-project silverstripe/installer test
+cd test
+
+composer require sunnysideup/core-modules:dev-main
+composer require sunnysideup/core-modules-dev:dev-main --dev
+composer require sunnysideup/mock-me:dev-main --dev --prefer-source
+if ([ -n "$module" ]); then
+    composer require "$module" --prefer-source
+fi
+
+cat >app/_config/tmp.yml <<'EOF'
+
+Sunnysideup\BasicAuthBetter\AddOrRemoveBasicAuth:
+    # must set!
+    canonical_url: 'test.ss4' # this is the live site - check if it uses www by default?!
+
+EOF
+
+cat >.env <<'EOF'
+SS_ENVIRONMENT_TYPE=dev
+# Database
+SS_DATABASE_CLASS=MySQLDatabase
+SS_DATABASE_SERVER=127.0.0.1
+SS_DATABASE_USERNAME=root
+SS_DATABASE_PASSWORD=x
+SS_DATABASE_NAME=test
+# URL
+SS_BASE_URL=http://test.ss4
+
+# Optional defaults
+SS_DEFAULT_ADMIN_USERNAME=x
+SS_DEFAULT_ADMIN_PASSWORD=x
+
+SS_FLUSH_ON_DEPLOY=true
+
+SS_ALLOW_AS_DEV_SITE=true
+
+SS_ALLOW_SMOKE_TEST=true
+EOF
+
+mysql -h 127.0.0.1 -u root -px -e "DROP DATABASE IF EXISTS test; CREATE DATABASE test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+sake-ss-dev-build
+
+sudo -u www-data vendor/bin/sake dev/tasks/CreateMockDataRunner
+
+echoend
