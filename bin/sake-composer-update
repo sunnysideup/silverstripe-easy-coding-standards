@@ -221,7 +221,7 @@ fi
 
 sake-composer-available-updates
 
-composer dump-autoload -o
+composer dump-autoload -o 2>&1 | grep -E 'app/|vendor/sunnysideup'
 
 composer audit
 
