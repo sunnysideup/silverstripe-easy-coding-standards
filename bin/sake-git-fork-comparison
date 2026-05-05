@@ -45,23 +45,39 @@ class ForkDiffChecker
         }
         echo PHP_EOL;
 
+        $this->spin('Fetching forks...');
         $forks   = $this->getForks($this->baseOwner, $this->baseRepo);
+        $total   = count($forks);
         $results = [];
 
-        foreach ($forks as $fork) {
-            $forkOwner  = $fork['owner']['login'];
-            $forkBranch = $fork['default_branch'] ?? 'main';
+        foreach ($forks as $i => $fork) {
+            $forkOwner = $fork['owner']['login'];
 
-            $result = $this->compareFork($forkOwner, $forkBranch);
-            if ($result) {
-                $results[] = $result;
+            $this->spin(sprintf('Fetching branches for fork %d/%d: %s', $i + 1, $total, $forkOwner));
+            $branches = $this->getBranches($forkOwner, $this->baseRepo);
+
+            foreach ($branches as $branch) {
+                $this->spin(sprintf(
+                    'Checking fork %d/%d: %s @ %s',
+                    $i + 1,
+                    $total,
+                    $forkOwner,
+                    $branch
+                ));
+
+                $result = $this->compareFork($forkOwner, $branch);
+                if ($result) {
+                    $results[] = $result;
+                }
             }
         }
 
-        usort($results, fn(array $a, array $b): int => $b['aheadBy'] <=> $a['aheadBy']);
+        $this->clearSpinner();
+
+        usort($results, fn (array $a, array $b): int => $b['aheadBy'] <=> $a['aheadBy']);
 
         foreach ($results as $res) {
-            echo 'Fork: ' . $res['forkOwner'] . PHP_EOL;
+            echo 'Fork: ' . $res['forkOwner'] . ' @ ' . $res['forkBranch'] . PHP_EOL;
             echo '  Repo: ' . $res['forkRepoUrl'] . PHP_EOL;
             echo '  Package: ' . ($res['packageName'] ?? 'unknown') . PHP_EOL;
             echo '  Ahead by: ' . $res['aheadBy'] . ' commits' . PHP_EOL;
@@ -73,20 +89,39 @@ class ForkDiffChecker
         if (empty($results)) {
             echo 'No forks are ahead of base repo.' . PHP_EOL;
         }
-    }
 
+        $this->printSummary($results);
+    }
     private function getRepoInfo(string $owner, string $repo): ?array
     {
         return $this->fetchJson('https://api.github.com/repos/' . $owner . '/' . $repo);
     }
-
     private function getForks(string $owner, string $repo): array
     {
-        return $this->fetchJson(
-            'https://api.github.com/repos/' . $owner . '/' . $repo . '/forks?per_page=100'
-        ) ?? [];
-    }
+        $allForks = [];
+        $page     = 1;
 
+        while (true) {
+            $batch = $this->fetchJson(
+                'https://api.github.com/repos/' . $owner . '/' . $repo
+                . '/forks?per_page=100&page=' . $page
+            );
+
+            if (empty($batch)) {
+                break;
+            }
+
+            $allForks = array_merge($allForks, $batch);
+
+            if (count($batch) < 100) {
+                break;
+            }
+
+            $page++;
+        }
+
+        return $allForks;
+    }
     private function compareFork(string $forkOwner, string $forkBranch): ?array
     {
         $apiUrl     = 'https://api.github.com/repos/'
@@ -97,13 +132,10 @@ class ForkDiffChecker
             . $this->baseOwner . '/' . $this->baseRepo
             . '/compare/' . $this->baseBranch . '...'
             . $forkOwner . ':' . $forkBranch;
-        $data       = $this->fetchJson($apiUrl);
 
-        if (
-            ! $data
-            || ($data['ahead_by'] ?? 0) <= 0
-            || ($data['behind_by'] ?? 0) > ($data['ahead_by'] ?? 0)
-        ) {
+        $data = $this->fetchJson($apiUrl);
+
+        if (!$data || ($data['ahead_by'] ?? 0) <= 0) {
             return null;
         }
 
@@ -112,15 +144,15 @@ class ForkDiffChecker
         $lastCommit  = 'unknown';
 
         if ($lastRawDate) {
-            $dateTime = new DateTime($lastRawDate);
-            $now      = new DateTime('now');
-            $interval = $dateTime->diff($now);
-            $daysAgo  = $interval->days;
+            $dateTime   = new DateTime($lastRawDate);
+            $now        = new DateTime('now');
+            $interval   = $dateTime->diff($now);
+            $daysAgo    = $interval->days;
             $lastCommit = $daysAgo . ' day' . ($daysAgo === 1 ? '' : 's') . ' ago';
         }
 
-        $forkRepoUrl  = 'https://github.com/' . $forkOwner . '/' . $this->baseRepo;
-        $packageName  = $this->getComposerPackageNameForRepo(
+        $forkRepoUrl = 'https://github.com/' . $forkOwner . '/' . $this->baseRepo;
+        $packageName = $this->getComposerPackageNameForRepo(
             $forkOwner,
             $this->baseRepo,
             $forkBranch
@@ -128,6 +160,7 @@ class ForkDiffChecker
 
         return [
             'forkOwner'   => $forkOwner,
+            'forkBranch'  => $forkBranch,
             'forkRepoUrl' => $forkRepoUrl,
             'packageName' => $packageName,
             'aheadBy'     => $data['ahead_by'],
@@ -136,12 +169,17 @@ class ForkDiffChecker
             'diffUrl'     => $compareUrl,
         ];
     }
-
+    private array $packageNameCache = [];
     private function getComposerPackageNameForRepo(
         string $owner,
         string $repo,
         string $branch
     ): ?string {
+        $cacheKey = $owner . '/' . $repo;
+        if (array_key_exists($cacheKey, $this->packageNameCache)) {
+            return $this->packageNameCache[$cacheKey];
+        }
+
         $rawUrl = sprintf(
             'https://raw.githubusercontent.com/%s/%s/%s/composer.json',
             $owner,
@@ -160,25 +198,58 @@ class ForkDiffChecker
         $context = stream_context_create($contextOptions);
         $json    = @file_get_contents($rawUrl, false, $context);
         if (! $json) {
+            $this->packageNameCache[$cacheKey] = null;
             return null;
         }
 
         $data = json_decode($json, true);
-        return $data['name'] ?? null;
+        $this->packageNameCache[$cacheKey] = $data['name'] ?? null;
+        return $this->packageNameCache[$cacheKey];
     }
-
     private function fetchJson(string $url): ?array
     {
         $options = [
             'http' => [
-                'user_agent' => 'ForkDiffChecker',
+                'user_agent'    => 'ForkDiffChecker',
+                'ignore_errors' => true,
             ],
         ];
         if ($this->token) {
             $options['http']['header'] = 'Authorization: token ' . $this->token . "\r\n";
         }
+
         $context = stream_context_create($options);
         $json    = @file_get_contents($url, false, $context);
+
+        $statusLine = $http_response_header[0] ?? '';
+        preg_match('#HTTP/\S+ (\d+)#', $statusLine, $m);
+        $statusCode = (int) ($m[1] ?? 200);
+
+        if ($statusCode === 403 || $statusCode === 429) {
+            $resetAt = null;
+            foreach ($http_response_header as $header) {
+                if (stripos($header, 'X-RateLimit-Reset:') === 0) {
+                    $resetAt = (int) trim(explode(':', $header, 2)[1]);
+                    break;
+                }
+            }
+
+            $waitSeconds = $resetAt ? max(1, $resetAt - time()) : 60;
+            $this->clearSpinner();
+            echo PHP_EOL . 'Rate limited by GitHub. Waiting ' . $waitSeconds . 's for reset...' . PHP_EOL;
+            sleep($waitSeconds);
+
+            $json = @file_get_contents($url, false, $context);
+            $statusLine = $http_response_header[0] ?? '';
+            preg_match('#HTTP/\S+ (\d+)#', $statusLine, $m);
+            $statusCode = (int) ($m[1] ?? 200);
+        }
+
+        // Return null for any non-2xx response
+        if ($statusCode < 200 || $statusCode >= 300) {
+            return null;
+        }
+
         return $json ? json_decode($json, true) : null;
     }
 
@@ -214,6 +285,93 @@ class ForkDiffChecker
 
         return $repo;
     }
+
+    private function getBranches(string $owner, string $repo): array
+    {
+        $allBranches = [];
+        $page        = 1;
+
+        while (true) {
+            $batch = $this->fetchJson(
+                'https://api.github.com/repos/' . $owner . '/' . $repo
+                . '/branches?per_page=100&page=' . $page
+            );
+
+            if (empty($batch)) {
+                break;
+            }
+
+            foreach ($batch as $branch) {
+                $allBranches[] = $branch['name'];
+            }
+
+            if (count($batch) < 100) {
+                break;
+            }
+
+            $page++;
+        }
+
+        return $allBranches;
+    }
+
+
+    private array $spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    private int $spinnerIndex = 0;
+
+    private function spin(string $message): void
+    {
+        $frame = $this->spinnerFrames[$this->spinnerIndex % count($this->spinnerFrames)];
+        $this->spinnerIndex++;
+        $padded = str_pad($frame . ' ' . $message, 80);
+        echo "\r" . $padded;
+    }
+
+    private function clearSpinner(): void
+    {
+        echo "\r" . str_repeat(' ', 80) . "\r";
+    }
+
+    private function printSummary(array $results): void
+    {
+        if (empty($results)) {
+            return;
+        }
+
+        $top = fn (array $arr, int $n) => array_slice($arr, 0, min($n, count($arr)));
+        $label = fn (array $r) => $r['forkOwner'] . ' @ ' . $r['forkBranch'];
+
+        echo '─────────────────────────────────────────────────────────' . PHP_EOL;
+        echo 'SUMMARY' . PHP_EOL;
+        echo '─────────────────────────────────────────────────────────' . PHP_EOL . PHP_EOL;
+
+        // 1. Most ahead
+        $mostAhead = $results; // already sorted by aheadBy desc
+        echo 'Most ahead:' . PHP_EOL;
+        foreach ($top($mostAhead, 3) as $i => $r) {
+            echo '  ' . ($i + 1) . '. ' . $label($r) . ' (+' . $r['aheadBy'] . ' , -' . $r['behindBy'] . ' , ' . $r['lastCommit'] . ')' . PHP_EOL;
+        }
+        echo PHP_EOL;
+
+        // 2. Least behind
+        $leastBehind = $results;
+        usort($leastBehind, fn ($a, $b) => $a['behindBy'] <=> $b['behindBy']);
+        echo 'Least behind:' . PHP_EOL;
+        foreach ($top($leastBehind, 3) as $i => $r) {
+            echo '  ' . ($i + 1) . '. ' . $label($r) . ' (-' . $r['behindBy'] . ' , +' . $r['aheadBy'] . ' , ' . $r['lastCommit'] . ')' . PHP_EOL;
+        }
+        echo PHP_EOL;
+
+        // 3. Most recently changed
+        $recentlyChanged = $results;
+        usort($recentlyChanged, fn ($a, $b) => $a['lastCommitTimestamp'] <=> $b['lastCommitTimestamp']);
+        echo 'Most recently changed:' . PHP_EOL;
+        foreach ($top($recentlyChanged, 3) as $i => $r) {
+            echo '  ' . ($i + 1) . '. ' . $label($r) . ' (' . $r['lastCommit'] . ', +' . $r['aheadBy'] . ' , -' . $r['behindBy'] . ')' . PHP_EOL;
+        }
+        echo PHP_EOL;
+    }
+
 }
 
 function printHelp(): void
