@@ -27,6 +27,8 @@ EOL;
     exit;
 }
 
+#TODO: use env variable for sunnysideup
+
 class GitDiffAnalyzer
 {
     private $lineChangesPerMinute;

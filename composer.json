@@ -57,7 +57,8 @@
     "bin/sake-git-info",
     "bin/sake-git-master-to-main",
     "bin/sake-git-merge-towards-production",
-    "bin/sake-git-my-pull-request",
+    "bin/sake-git-my-pull-requests",
+    "bin/sake-git-my-work-being-forked",
     "bin/sake-git-pipeline-ssh",
     "bin/sake-git-quick",
     "bin/sake-git-remove-stale-branches",
@@ -110,6 +111,7 @@
     "bin/sake-ss-start-test-site",
     "bin/sake-test-site",
     "bin/sake-update-chromium",
+    "bin/sake-update-composer",
     "bin/sake-update-vs-code"
   ],
   "config": {

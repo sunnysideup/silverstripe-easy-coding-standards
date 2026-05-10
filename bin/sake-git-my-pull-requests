@@ -64,10 +64,9 @@ help_and_exit() {
     echonice '-r, --review-requested         show PRs where I am requested as a reviewer'
 
     ECHOHEAD 'Example usage:'
-    echonice 'sake-git-my-pull-request'
-    echonice 'sake-git-my-pull-request --filter-not upgrade'
-    echonice 'sake-git-my-pull-request --incoming'
-
+    echonice 'sake-git-my-pull-requests'
+    echonice 'sake-git-my-pull-requests --filter-not upgrade'
+    echonice 'sake-git-my-pull-requests --incoming'
 
     echofunctions
     exit

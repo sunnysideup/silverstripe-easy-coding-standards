@@ -4,7 +4,6 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-# : ${rectorConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rector.php}
 
 ############################################ DIR
 dir='app/src'
@@ -43,7 +42,6 @@ while (($#)); do
     esac
     shift
 done
-
 
 ############################################ HELP
 
@@ -86,7 +84,6 @@ help_and_exit() {
     echofunctions
     exit
 }
-
 
 sake_check_help_and_exit
 

@@ -20,37 +20,29 @@ while (($#)); do
         dir=$1
         ;;
     esac
+
     shift
 done
 
-############################################ HELP
 help_and_exit() {
 
-    ECHOHEAD "Composer Updates Available"
-    echonice "Directory of script:          $SCRIPT_DIR"
-    echonice "Directory to analyse:         $WORKING_DIR/$dir"
+    ECHOHEAD "Update VS Code"
 
     ECHOHEAD "Available settings:"
-    echonice "-h, --help                    show help information"
+    echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-composer-available-updates"
+    echonice "sake-update-vs-code"
 
     echofunctions
     exit
 }
+
 sake_check_help_and_exit
 
-############################################ CODE
-
-cd_or_fail "$WORKING_DIR/$dir" help_and_exit
-
-ECHOHEAD "Easy to update"
-composer show -oD
-
-ECHOHEAD "Directly required packages out of date in composer.lock"
-composer outdated -D --locked
-
-composer audit
+php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+php composer-setup.php
+sudo mv composer.phar /usr/local/bin/composer
+php -r "unlink('composer-setup.php');"
 
 echoend

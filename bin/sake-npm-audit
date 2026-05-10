@@ -5,8 +5,6 @@ SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 
-# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
-
 ############################################ DIR
 dir="./"
 
@@ -56,18 +54,15 @@ help_and_exit() {
     exit
 }
 
-
 sake_check_help_and_exit
 
 ############################################ CODE
-
 
 # Ensure jq is installed
 if ! command -v jq &>/dev/null; then
     echobad "Error: jq is not installed. Please install jq to proceed."
     exit 1
 fi
-
 
 cd $WORKING_DIR
 if [ "$themeDir" != "" ]; then
@@ -78,16 +73,22 @@ npm audit fix
 
 set -euo pipefail
 
-command -v npm >/dev/null || { echo "npm not found"; exit 1; }
-command -v jq  >/dev/null || { echo "jq not found";  exit 1; }
+command -v npm >/dev/null || {
+    echo "npm not found"
+    exit 1
+}
+command -v jq >/dev/null || {
+    echo "jq not found"
+    exit 1
+}
 
 # Cache the full tree once
 LS_JSON="$(npm ls --all --json 2>/dev/null || echo '{}')"
 
 # Find first installed version by traversing dependency KEYS recursively
 get_installed_ver() {
-  local name="$1"
-  printf '%s\n' "$LS_JSON" | jq -r --arg n "$name" '
+    local name="$1"
+    printf '%s\n' "$LS_JSON" | jq -r --arg n "$name" '
     def find($n):
       (.dependencies? // {} | to_entries[]) as $e
       | (select($e.key == $n) | $e.value.version),
@@ -100,10 +101,10 @@ get_installed_ver() {
 ############################################
 AUDIT_JSON="$(npm audit --json 2>/dev/null || true)"
 if [[ -n "${AUDIT_JSON}" && "${AUDIT_JSON}" != "null" ]]; then
-  echo "# Security Vulnerabilities"
-  echo
+    echo "# Security Vulnerabilities"
+    echo
 
-  printf '%s\n' "${AUDIT_JSON}" | jq -c '
+    printf '%s\n' "${AUDIT_JSON}" | jq -c '
     .vulnerabilities
     | to_entries[]
     | {
@@ -119,30 +120,30 @@ if [[ -n "${AUDIT_JSON}" && "${AUDIT_JSON}" != "null" ]]; then
         advisories: ([ .value.via[] | select(type=="object") | .url ] | unique)
       }
   ' | while IFS= read -r rec; do
-    name=$(jq -r '.name' <<<"$rec")
-    range=$(jq -r '.range' <<<"$rec")
-    severity=$(jq -r '.severity' <<<"$rec")
-    fixKind=$(jq -r '.fixKind' <<<"$rec")
-    fixedVersion=$(jq -r '.fixedVersion // empty' <<<"$rec")
-    installed="$(get_installed_ver "$name")"
+        name=$(jq -r '.name' <<<"$rec")
+        range=$(jq -r '.range' <<<"$rec")
+        severity=$(jq -r '.severity' <<<"$rec")
+        fixKind=$(jq -r '.fixKind' <<<"$rec")
+        fixedVersion=$(jq -r '.fixedVersion // empty' <<<"$rec")
+        installed="$(get_installed_ver "$name")"
 
-    case "$fixKind" in
-      none)    fixStatus="no fix available" ;;
-      auto)    fixStatus="fixable via 'npm audit fix'" ;;
-      version) fixStatus="update to ${fixedVersion}" ;;
-      *)       fixStatus="-" ;;
-    esac
+        case "$fixKind" in
+        none) fixStatus="no fix available" ;;
+        auto) fixStatus="fixable via 'npm audit fix'" ;;
+        version) fixStatus="update to ${fixedVersion}" ;;
+        *) fixStatus="-" ;;
+        esac
 
-    echo "## ${name}"
-    echo "  - installed: ${installed}"
-    echo "  - vulnerable range: ${range}"
-    echo "  - severity: ${severity}"
-    echo "  - fix: ${fixStatus}"
-    echo "  - advisories:"
-    jq -r '.advisories[]? | "    • \(. )"' <<<"$rec"
-    [[ $(jq -r '.advisories | length' <<<"$rec") -gt 0 ]] || echo "    • -"
-    echo
-  done
+        echo "## ${name}"
+        echo "  - installed: ${installed}"
+        echo "  - vulnerable range: ${range}"
+        echo "  - severity: ${severity}"
+        echo "  - fix: ${fixStatus}"
+        echo "  - advisories:"
+        jq -r '.advisories[]? | "    • \(. )"' <<<"$rec"
+        [[ $(jq -r '.advisories | length' <<<"$rec") -gt 0 ]] || echo "    • -"
+        echo
+    done
 fi
 
 ############################################
@@ -150,23 +151,21 @@ fi
 ############################################
 OUTDATED_JSON="$(npm outdated --json 2>/dev/null || true)"
 if [[ -n "${OUTDATED_JSON}" && "${OUTDATED_JSON}" != "null" ]]; then
-  echo "# Outdated Packages (non-security)"
-  echo
+    echo "# Outdated Packages (non-security)"
+    echo
 
-  printf '%s\n' "${OUTDATED_JSON}" \
-  | jq -r 'to_entries[] | "\(.key)\t\(.value.current)\t\(.value.wanted)\t\(.value.latest)\t\(.value.type // "-")"' \
-  | while IFS=$'\t' read -r name current wanted latest type; do
-      installed="$(get_installed_ver "$name")"
-      [[ -n "${current}" && "${current}" != "null" ]] && installed="${current}"
-      echo "## ${name}"
-      echo "  - installed: ${installed:-"-"}"
-      echo "  - wanted (fits your semver): ${wanted}"
-      echo "  - latest (newest release): ${latest}"
-      echo "  - type: ${type}"
-      echo
-    done
+    printf '%s\n' "${OUTDATED_JSON}" |
+        jq -r 'to_entries[] | "\(.key)\t\(.value.current)\t\(.value.wanted)\t\(.value.latest)\t\(.value.type // "-")"' |
+        while IFS=$'\t' read -r name current wanted latest type; do
+            installed="$(get_installed_ver "$name")"
+            [[ -n "${current}" && "${current}" != "null" ]] && installed="${current}"
+            echo "## ${name}"
+            echo "  - installed: ${installed:-"-"}"
+            echo "  - wanted (fits your semver): ${wanted}"
+            echo "  - latest (newest release): ${latest}"
+            echo "  - type: ${type}"
+            echo
+        done
 fi
-
-
 
 echoend

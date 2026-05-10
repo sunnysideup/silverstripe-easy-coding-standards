@@ -28,7 +28,6 @@ while (($#)); do
     shift
 done
 
-
 ############################################ HELP
 
 help_and_exit() {
@@ -46,7 +45,6 @@ help_and_exit() {
     exit
 }
 
-
 sake_check_help_and_exit
 
 ############################################ CODE
@@ -55,90 +53,89 @@ cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 rootDir="$WORKING_DIR/$dir"
 
-
 withTimeout() {
-  local seconds="$1"
-  shift
+    local seconds="$1"
+    shift
 
-  if command -v timeout >/dev/null 2>&1; then
-    timeout "${seconds}s" "$@" || true
-  else
-    "$@" || true
-  fi
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${seconds}s" "$@" || true
+    else
+        "$@" || true
+    fi
 }
-
+#TODO: use env variable for sunnysideup
 originMatches() {
-  local repoDir="$1"
-  local originUrl
+    local repoDir="$1"
+    local originUrl
 
-  originUrl="$(git -C "$repoDir" remote get-url origin 2>/dev/null || true)"
-  case "$originUrl" in
+    originUrl="$(git -C "$repoDir" remote get-url origin 2>/dev/null || true)"
+    case "$originUrl" in
     *sunnysideup*) return 0 ;;
-  esac
+    esac
 
-  return 1
+    return 1
 }
 
 gitStatusPorcelain() {
-  local repoDir="$1"
-  git -c core.filemode=false -C "$repoDir" status --porcelain 2>/dev/null || true
+    local repoDir="$1"
+    git -c core.filemode=false -C "$repoDir" status --porcelain 2>/dev/null || true
 }
 
 hasLocalChanges() {
-  local repoDir="$1"
-  [ -n "$(gitStatusPorcelain "$repoDir")" ]
+    local repoDir="$1"
+    [ -n "$(gitStatusPorcelain "$repoDir")" ]
 }
 
 hasUnpushedCommitsAfterPull() {
-  local repoDir="$1"
+    local repoDir="$1"
 
-  git -C "$repoDir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1 || return 1
+    git -C "$repoDir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1 || return 1
 
-  GIT_TERMINAL_PROMPT=0 withTimeout 8 git -C "$repoDir" fetch --quiet --prune >/dev/null 2>&1
+    GIT_TERMINAL_PROMPT=0 withTimeout 8 git -C "$repoDir" fetch --quiet --prune >/dev/null 2>&1
 
-  local ahead
-  ahead="$(git -C "$repoDir" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
-
-  if [ "${ahead:-0}" -gt 0 ]; then
-    GIT_TERMINAL_PROMPT=0 withTimeout 12 git -C "$repoDir" pull --rebase --autostash --quiet >/dev/null 2>&1
+    local ahead
     ahead="$(git -C "$repoDir" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
-    [ "${ahead:-0}" -gt 0 ] && return 0
-  fi
 
-  return 1
+    if [ "${ahead:-0}" -gt 0 ]; then
+        GIT_TERMINAL_PROMPT=0 withTimeout 12 git -C "$repoDir" pull --rebase --autostash --quiet >/dev/null 2>&1
+        ahead="$(git -C "$repoDir" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
+        [ "${ahead:-0}" -gt 0 ] && return 0
+    fi
+
+    return 1
 }
 
 canPush() {
-  local repoDir="$1"
+    local repoDir="$1"
 
-  local branch
-  branch="$(git -C "$repoDir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-  [ -n "$branch" ] && [ "$branch" != "HEAD" ] || return 1
+    local branch
+    branch="$(git -C "$repoDir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    [ -n "$branch" ] && [ "$branch" != "HEAD" ] || return 1
 
-  local -a cmd
-  if git -C "$repoDir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
-    cmd=(git -C "$repoDir" push --dry-run --porcelain)
-  else
-    return 1
-  fi
+    local -a cmd
+    if git -C "$repoDir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+        cmd=(git -C "$repoDir" push --dry-run --porcelain)
+    else
+        return 1
+    fi
 
-  GIT_TERMINAL_PROMPT=0 withTimeout 8 "${cmd[@]}" >/dev/null 2>&1
+    GIT_TERMINAL_PROMPT=0 withTimeout 8 "${cmd[@]}" >/dev/null 2>&1
 }
 
 find "$rootDir" -type d -name .git -prune 2>/dev/null | while IFS= read -r gitDir; do
-  repoDir="${gitDir%/.git}"
-  [ -d "$repoDir" ] || continue
+    repoDir="${gitDir%/.git}"
+    [ -d "$repoDir" ] || continue
 
-  git -C "$repoDir" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+    git -C "$repoDir" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
 
-  # Skip repos without origin containing "sunnysideup"
-  originMatches "$repoDir" || continue
+    # Skip repos without origin containing "sunnysideup"
+    originMatches "$repoDir" || continue
 
-  if hasLocalChanges "$repoDir" || hasUnpushedCommitsAfterPull "$repoDir"; then
-    if canPush "$repoDir"; then
-      echo "$repoDir"
+    if hasLocalChanges "$repoDir" || hasUnpushedCommitsAfterPull "$repoDir"; then
+        if canPush "$repoDir"; then
+            echo "$repoDir"
+        fi
     fi
-  fi
 done
 
 echoend

@@ -6,7 +6,7 @@ WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
-# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
+
 if [ "$1" != "" ]; then
     dir=$1
 else
@@ -43,7 +43,6 @@ while (($#)); do
     shift
 done
 
-
 ############################################ HELP
 
 help_and_exit() {
@@ -69,7 +68,6 @@ help_and_exit() {
     echofunctions
     exit
 }
-
 
 sake_check_help_and_exit
 

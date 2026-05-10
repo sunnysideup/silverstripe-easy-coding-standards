@@ -4,8 +4,6 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-# : ${stanConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-standards/phpstan.neon}
-
 
 ############################################ SETTINGS
 help='no'
@@ -36,11 +34,9 @@ help_and_exit() {
     exit
 }
 
-
 sake_check_help_and_exit
 
 ############################################ RUN
-
 
 # Set NVM repository
 nvm_repo="nvm-sh/nvm"
@@ -69,15 +65,12 @@ else
 fi
 
 # Verify installation
-if command -v nvm &> /dev/null; then
+if command -v nvm &>/dev/null; then
     echo "NVM installed successfully. Version: $(nvm --version)"
 else
     echo "Error: NVM installation failed."
     exit 1
 fi
-
-
-
 
 # Install the latest Node.js version and set it as default
 nvm install node
@@ -92,4 +85,3 @@ nvm use default
 # Display installed Node.js and npm versions
 echo "Node.js version: $(node -v)"
 echo "npm version: $(npm -v)"
-

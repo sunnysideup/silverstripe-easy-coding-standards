@@ -69,7 +69,6 @@ help_and_exit() {
     exit
 }
 
-
 sake_check_help_and_exit
 
 ############################################ CODE
@@ -221,6 +220,7 @@ fi
 
 sake-composer-available-updates
 
+#TODO: use env variable for sunnysideup
 composer dump-autoload -o 2>&1 | grep -E 'app/|vendor/sunnysideup'
 
 composer audit

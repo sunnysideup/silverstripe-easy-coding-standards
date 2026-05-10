@@ -72,6 +72,7 @@ if (!in_array($committerMode, ['author', 'committer'])) {
     echo "Invalid committer-mode. Allowed values are: author, committer.\n";
     exit(1);
 }
+#TODO: use env variable for sunnysideup
 $filter = $options['filter'] ?? 'sunnysideup';
 $minutesForFirstLineChange = isset($options['minutes-for-first-line']) ? (float)$options['minutes-for-first-line'] : 0;
 $showEstimatedEffort = isset($options['show-estimated-effort']) ? true : false;

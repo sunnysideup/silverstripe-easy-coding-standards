@@ -6,7 +6,7 @@ WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
-# : ${ide-annotatorConfig:=$SCRIPT_DIR/../sunnysideup/easy-coding-ide-annotatordards/phpide-annotator.neon}
+
 if [ "$1" != "" ]; then
     dir=$1
 else
@@ -45,7 +45,6 @@ help_and_exit() {
     echofunctions
     exit
 }
-
 
 sake_check_help_and_exit
 

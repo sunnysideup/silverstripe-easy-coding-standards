@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ SETTINGS
+owner=''
+limit=1000
+verbose='no'
+
+while (($#)); do
+    case $1 in
+    -o | --owner)
+        owner="${2:-}"
+        shift 2
+        ;;
+    -l | --limit)
+        limit="${2:-1000}"
+        shift 2
+        ;;
+    -v | --verbose)
+        verbose='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        shift
+        ;;
+    esac
+done
+
+############################################ HELP
+
+help_and_exit() {
+    ECHOHEAD 'Forks Ahead of My Repos'
+
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "working directory:             $WORKING_DIR"
+
+    ECHOHEAD 'Available settings:'
+    echonice '-h, --help                     show help information'
+    echonice '-o, --owner OWNER              GitHub username or org (default: authenticated user)'
+    echonice '-l, --limit NUMBER             max repos to scan (default: 1000)'
+    echonice '-v, --verbose                  print progress for every repo and branch'
+
+    ECHOHEAD 'Example usage:'
+    echonice 'sake-git-my-work-being-forked'
+    echonice 'sake-git-my-work-being-forked --owner myorg'
+    echonice 'sake-git-my-work-being-forked --limit 200'
+    echonice 'sake-git-my-work-being-forked --verbose'
+
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ RUN
+
+# resolve owner from gh auth if not provided
+if [[ -z "$owner" ]]; then
+    owner="$(gh api user --jq '.login')"
+fi
+
+ECHOHEAD "Forks Ahead of Your Repos"
+echonice "owner:   $owner"
+echonice "limit:   $limit"
+
+# fetch full repo list
+mapfile -t repos < <(
+    gh repo list "$owner" \
+        --limit "$limit" \
+        --json nameWithOwner \
+        --jq '.[].nameWithOwner'
+)
+
+total=${#repos[@]}
+echonice "repos found: $total"
+
+countForked=0
+countAhead=0
+countErrors=0
+aheadList=()
+
+for i in "${!repos[@]}"; do
+    repo="${repos[$i]}"
+    num=$((i + 1))
+
+    [[ "$verbose" == 'yes' ]] && echonice "(${num}/${total}) checking ${repo} ..."
+
+    # skip repos with no forks — one API call, then move on
+    forkCount=$(
+        gh api "repos/${repo}" --jq '.forks_count' 2>/dev/null
+    ) || {
+        echonice "could not fetch ${repo} — skipping."
+        countErrors=$((countErrors + 1))
+        continue
+    }
+
+    if [[ "$forkCount" -eq 0 ]]; then
+        [[ "$verbose" == 'yes' ]] && echonice "  └─ no forks"
+        continue
+    fi
+
+    countForked=$((countForked + 1))
+    [[ "$verbose" == 'yes' ]] && echonice "  └─ ${forkCount} fork(s) found"
+
+    # page through all forks (100 per page)
+    page=1
+    while :; do
+        forksJson=$(
+            gh api "repos/${repo}/forks?per_page=100&page=${page}" 2>/dev/null
+        ) || {
+            echonice "could not fetch forks for ${repo} (page ${page})."
+            break
+        }
+
+        [[ "$(echo "$forksJson" | jq 'length')" -eq 0 ]] && break
+
+        # for each fork, check ALL branches — not just the default
+        while IFS=$'\t' read -r forkName; do
+            [[ "$verbose" == 'yes' ]] && echonice "     ↳ ${forkName}: fetching branches ..."
+
+            bpage=1
+            while :; do
+                branchesJson=$(
+                    gh api "repos/${forkName}/branches?per_page=100&page=${bpage}" 2>/dev/null
+                ) || {
+                    echonice "could not fetch branches for ${forkName}."
+                    break
+                }
+
+                [[ "$(echo "$branchesJson" | jq 'length')" -eq 0 ]] && break
+
+                while IFS=$'\t' read -r branchName; do
+                    compareJson=$(
+                        gh api \
+                            "repos/${repo}/compare/HEAD...${forkName/\//:}:${branchName}" \
+                            --jq '{ahead_by, behind_by, status}' 2>/dev/null
+                    ) || {
+                        [[ "$verbose" == 'yes' ]] && echonice "       ✗ compare failed: ${forkName}:${branchName}"
+                        continue
+                    }
+
+                    aheadBy=$(echo "$compareJson" | jq '.ahead_by')
+                    behindBy=$(echo "$compareJson" | jq '.behind_by')
+                    status=$(echo "$compareJson" | jq -r '.status')
+
+                    if [[ "$aheadBy" -gt 0 ]]; then
+                        countAhead=$((countAhead + 1))
+                        aheadList+=("${repo}  |  +${aheadBy}/-${behindBy} [${status}]  |  https://github.com/${forkName}/tree/${branchName}")
+                        echonice "AHEAD  ${repo}"
+                        echonice "       fork:      https://github.com/${forkName}/tree/${branchName}"
+                        echonice "       branch:    ${branchName}"
+                        echonice "       ahead by:  ${aheadBy} commit(s)  |  behind by: ${behindBy}  |  status: ${status}"
+                    else
+                        [[ "$verbose" == 'yes' ]] && echonice "       ${forkName}:${branchName} not ahead"
+                    fi
+
+                done < <(echo "$branchesJson" | jq -r '.[].name')
+
+                bpage=$((bpage + 1))
+            done
+
+        done < <(echo "$forksJson" | jq -r '.[].full_name')
+
+        page=$((page + 1))
+    done
+done
+
+############################################ SUMMARY
+
+ECHOHEAD 'Summary'
+echonice "repos scanned:   $total"
+echonice "repos w/ forks:  $countForked"
+echonice "forks ahead:     $countAhead"
+[[ $countErrors -gt 0 ]] && echonice "errors/skipped:  $countErrors"
+
+if [[ ${#aheadList[@]} -gt 0 ]]; then
+    ECHOHEAD 'All forks ahead of you'
+    for item in "${aheadList[@]}"; do
+        echonice "$item"
+    done
+fi
+
+echoend
