@@ -46,6 +46,8 @@ help_and_exit() {
     exit
 }
 
+sake_check_help_and_exit
+
 installpackage "jq"
 installpackage "gh"
 check_gh_auth

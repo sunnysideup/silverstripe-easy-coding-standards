@@ -50,7 +50,7 @@ help_and_exit() {
     exit
 }
 
-
+sake_check_help_and_exit
 
 ############################################ CODE
 
