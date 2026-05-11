@@ -32,6 +32,9 @@ while (($#)); do
 done
 
 help_and_exit() {
+    ECHOHEAD "Easy Coding Standards (ECS) Linter"
+    echonice "Runs PHP ECS linter to check and fix code style issues"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

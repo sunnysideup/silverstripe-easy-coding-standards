@@ -224,8 +224,7 @@ echolistoffunctions() {
 
 echodetailedhelp() {
     ECHOHEAD 'Detailed Help for All Functions'
-    echonice "Showing full help information for all available scripts..."
-    echonice "This may take a moment..."
+    echonice "Compact summaries for all available scripts"
     echo "" >&2
 
     local categorized_scripts=()
@@ -275,32 +274,54 @@ echodetailedhelp() {
 
             # Show category header
             if [[ "$category" != "$current_category" ]]; then
-                printf '\n\n' >&2
-                _print_banner "$_COL_HEAD"
-                _print_col_stderr "$_COL_HEAD" "### $category ###"
-                _print_banner "$_COL_HEAD"
+                echo "" >&2
+                _print_col_stderr "$_COL_HEAD" "# $category"
                 current_category="$category"
             fi
 
-            # Show script name
-            printf '\n' >&2
-            _print_col_stderr "$_COL_NICE" "━━━ $script ━━━"
-            
-            # Run the script with -h flag to get help, suppress error output
+            # Extract compact summary
             if output=$("$path" -h 2>&1); then
-                # Filter out the footer sections (Available Functions, checkmark, COMPLETED)
-                echo "$output" | sed '/^.*Available Functions/,$d' | sed '/^[[:space:]]*$/N;/^\n$/d' >&2
-                echo "" >&2
+                # Remove ANSI color codes for cleaner processing
+                local clean_output=$(echo "$output" | sed 's/\x1b\[[0-9;]*m//g')
+                
+                # Extract title (first # line)
+                local title=$(echo "$clean_output" | grep -m 1 "^.*# " | sed 's/.*# //' | sed 's/^[[:space:]]*//')
+                
+                # Extract summary: lines between first header and next section
+                # Skip directory lines, empty lines, and separator lines
+                local summary=$(echo "$clean_output" | awk '
+                    /^.*# / { if (found_title) next; found_title=1; next }
+                    found_title && /^.*# / { exit }
+                    found_title && /^[-]+$/ { next }
+                    found_title && /Directory of script:/ { next }
+                    found_title && /Directory to [a-z]+:/ { next }
+                    found_title && /directory of script:/ { next }
+                    found_title && /directory to [a-z]+:/ { next }
+                    found_title && /^[[:space:]]*$/ { next }
+                    found_title && NF > 0 { 
+                        gsub(/^[[:space:]]+/, "");
+                        if (length($0) > 5 && $0 !~ /^[-]+$/) {
+                            print; 
+                            if (++count >= 1) exit 
+                        }
+                    }
+                ' | head -1 | sed 's/^[[:space:]]*//')
+                
+                # Show compact summary
+                if [[ -n "$summary" && ${#summary} -gt 5 ]]; then
+                    printf '  %-35s %s\n' "$script:" "$summary" >&2
+                elif [[ -n "$title" ]]; then
+                    printf '  %-35s %s\n' "$script:" "$title" >&2
+                else
+                    printf '  %-35s %s\n' "$script:" "(No summary - run $script -h for details)" >&2
+                fi
             else
-                echonice "  (No help available)"
+                printf '  %-35s %s\n' "$script:" "(No help available)" >&2
             fi
         done
     fi
 
-    printf '\n\n' >&2
-    echoline
-    echogood "End of detailed help"
-    echoline
+    echo "" >&2
 }
 
 ############################################ UTILITY FUNCTIONS

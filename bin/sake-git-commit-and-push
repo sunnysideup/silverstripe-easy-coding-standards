@@ -75,6 +75,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Git commit and push"
+    echonice "Commits changes to git and pushes to remote with optional tagging and review"
+    echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $dir (relative to $WORKING_DIR)"
 

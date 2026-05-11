@@ -14,8 +14,7 @@ help='no'
 while (($#)); do
     case $1 in
     -m | --more)
-        more=$2
-        shift
+        more="yes"
         ;;
     *)
         if sake_handle_help_flag "$1"; then
@@ -44,7 +43,7 @@ help_and_exit() {
     echonice "-m, --more                     show MORE help information"
 
     ECHOHEAD "Example usage:"
-    echonice "e.g. sake-help -m yes"
+    echonice "e.g. sake-help --more"
 
     echofunctions
     exit
