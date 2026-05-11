@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Squashes all commits in current branch and creates a pull request"
 
 ############################################ DIR
 dir='./'
@@ -81,7 +82,7 @@ GIT_DIR=$(git rev-parse --show-toplevel)
 if test -f "$GIT_DIR/.git/config"; then
 
     if [[ "$newVersion" == "yes" ]]; then
-        $SCRIPT_DIR/sake-git-tag $WORKING_DIR
+        $SCRIPT_DIR/sake-git-commit-tag $WORKING_DIR
     fi
 
     protected_branch="production"

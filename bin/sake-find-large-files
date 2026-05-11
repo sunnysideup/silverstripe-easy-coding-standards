@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Finds and lists files and directories larger than specified size"
 
 sudoCmd='sudo'  # default to using sudo
 

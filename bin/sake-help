@@ -4,12 +4,14 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Displays a list of all available sake commands and their descriptions"
 
 ############################################ DIR
 dir='./'
 
 ############################################ SETTINGS
 more="no"
+section=""
 help='no'
 while (($#)); do
     case $1 in
@@ -21,7 +23,9 @@ while (($#)); do
             shift
             continue
         fi
-        dir=$1
+        # Treat any other argument as a section name
+        section="${1^^}"  # Convert to uppercase
+        more="yes"  # Show detailed help for this section
         ;;
     esac
     shift
@@ -40,12 +44,17 @@ help_and_exit() {
 
     ECHOHEAD "Current settings:"
     echonice "More (-m|--more):              $more"
+    echonice "Section:                       ${section:-all}"
 
     ECHOHEAD "Available settings:"
-    echonice "-m, --more                     show MORE help information"
+    echonice "-m, --more                     show detailed help for all sections"
+    echonice "[section]                      show detailed help for specific section"
 
     ECHOHEAD "Example usage:"
-    echonice "e.g. sake-help --more"
+    echonice "sake-help                      # Basic list of all commands"
+    echonice "sake-help --more               # Detailed help for all sections"
+    echonice "sake-help git                  # Detailed help for GIT section only"
+    echonice "sake-help composer             # Detailed help for COMPOSER section only"
 
     echofunctions
     exit
@@ -59,7 +68,7 @@ sake_check_help_and_exit
 cd_or_fail "$WORKING_DIR" help_and_exit
 
 if [[ "$more" == "yes" ]]; then
-    echodetailedhelp
+    echodetailedhelp "$section"
 else
     echolistoffunctions
 fi

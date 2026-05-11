@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Removes local branches that have been merged, excluding protected branches"
 
 ############################################ DIR
 dir='./'
@@ -45,7 +46,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-remove-stale-branches ./"
+    echonice "sake-git-squash-stale-branches ./"
 
     echofunctions
     exit

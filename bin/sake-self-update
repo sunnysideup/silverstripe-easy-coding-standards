@@ -8,6 +8,7 @@ echo "===================================================="
 echo ""
 
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+SCRIPT_SUMMARY="Updates coding standards packages and related development tools"
 COMPOSER_DIR="$SCRIPT_DIR/../.."
 
 if ! test -f "$COMPOSER_DIR/composer.json"; then

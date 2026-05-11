@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Clones repo, creates fork, sets up remotes, and creates working branch"
 
 ############################################ DIR
 if [ "$1" != "" ]; then
@@ -44,7 +45,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-contribute-step-1 my-framework-patch"
+    echonice "sake-ss-contribute-step-1 my-framework-patch"
 
     echofunctions
     exit
@@ -116,7 +117,7 @@ git checkout --track origin/$targetVersion || {
 # Create your working branch
 git checkout -b "$branchName"
 
-ECHOHEAD "make your changes and then, from $dir run: sake-git-contribute-step-2"
+ECHOHEAD "make your changes and then, from $dir run: sake-ss-contribute-step-2"
 # Prompt the user to make their code changes
 echonice "Make your code changes, adhering to SilverStripe's guidelines."
 echonice "Remember to commit often and write descriptive commit messages."

@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Scans your repos and their forks to find branches ahead of originals"
 
 ############################################ SETTINGS
 owner=''
@@ -50,10 +51,10 @@ help_and_exit() {
     echonice '-v, --verbose                  print progress for every repo and branch'
 
     ECHOHEAD 'Example usage:'
-    echonice 'sake-git-my-work-being-forked'
-    echonice 'sake-git-my-work-being-forked --owner myorg'
-    echonice 'sake-git-my-work-being-forked --limit 200'
-    echonice 'sake-git-my-work-being-forked --verbose'
+    echonice 'sake-git-pm-my-work-being-forked'
+    echonice 'sake-git-pm-my-work-being-forked --owner myorg'
+    echonice 'sake-git-pm-my-work-being-forked --limit 200'
+    echonice 'sake-git-pm-my-work-being-forked --verbose'
 
     echofunctions
     exit

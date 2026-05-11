@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Quickly commits all changes and pushes with auto vendor checks"
 
 ############################################ DIR
 dir='./'
@@ -48,7 +49,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "e.g. sake-git-quick  -m 'FIX: something' "
+    echonice "e.g. sake-git-commit-quick  -m 'FIX: something' "
 
     echofunctions
     exit

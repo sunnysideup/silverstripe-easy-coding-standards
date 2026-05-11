@@ -388,11 +388,11 @@ function printHelp(): void
 {
     echo <<<'EOT'
 Usage:
-  sake-git-fork-comparison <GitHubRepoURL|PackagistPackage> [token]
+  sake-composer-fork-comparison <GitHubRepoURL|PackagistPackage> [token]
 
 Examples:
-  sake-git-fork-comparison https://github.com/vendor/repo
-  sake-git-fork-comparison vendor/repo
+  sake-composer-fork-comparison https://github.com/vendor/repo
+  sake-composer-fork-comparison vendor/repo
 
 EOT;
 }

@@ -270,7 +270,7 @@ if test -f "$GIT_DIR/.git/config"; then
     echoline
 
     if [[ "$newVersion" == "yes" ]]; then
-        $SCRIPT_DIR/sake-git-tag $WORKING_DIR
+        $SCRIPT_DIR/sake-git-commit-tag $WORKING_DIR
     fi
 
     if test -f "$WORKING_DIR/$also"; then

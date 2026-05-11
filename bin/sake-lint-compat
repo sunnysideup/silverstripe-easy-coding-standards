@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Checks code compatibility with specified PHP versions using PHPCompatibility"
 # composer global require squizlabs/php_codesniffer --dev
 # composer global require phpcompatibility/php-compatibility --dev
 

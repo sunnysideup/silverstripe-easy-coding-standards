@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Lists pull requests filtered by mode (mine/incoming/review) and criteria"
 
 ############################################ SETTINGS
 includeSnyk='no'
@@ -65,9 +66,9 @@ help_and_exit() {
     echonice '-r, --review-requested         show PRs where I am requested as a reviewer'
 
     ECHOHEAD 'Example usage:'
-    echonice 'sake-git-my-pull-requests'
-    echonice 'sake-git-my-pull-requests --filter-not upgrade'
-    echonice 'sake-git-my-pull-requests --incoming'
+    echonice 'sake-git-pm-my-pull-requests'
+    echonice 'sake-git-pm-my-pull-requests --filter-not upgrade'
+    echonice 'sake-git-pm-my-pull-requests --incoming'
 
     echofunctions
     exit

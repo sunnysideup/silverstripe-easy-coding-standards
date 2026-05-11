@@ -15,7 +15,7 @@ dir='./'
 STEPS=(
     'Checkout develop branch ::: git checkout develop'
     'Show git status ::: git status'
-    'Quick commit (cleanup) ::: sake-git-quick -m "FIX: cleanup"'
+    'Quick commit (cleanup) ::: sake-git-commit-quick -m "FIX: cleanup"'
     'Commit and push vendor packages ::: sake-git-commit-and-push-vendor-packages . -s "yes"'
     'Merge production into develop ::: sake-git-merge-towards-production -r'
     'Rsync all ::: sake-ss-rsync-all'

@@ -38,7 +38,7 @@ while (($#)); do
 done
 
 help_and_exit() {
-    ECHOHEAD "sake-git-master-to-main"
+    ECHOHEAD "sake-git-pm-master-to-main"
     echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Renames the 'master' branch to 'main' and sets 'main' as the default branch"
@@ -89,16 +89,10 @@ help_and_exit() {
     echonice "-q, --quiet                    suppress visual output"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-master-to-main --dry-run"
-    echonice "... walk every repo in the org, report what would happen, change nothing"
-    echonice ""
-    echonice "sake-git-master-to-main --repo my-repo --dry-run"
-    echonice "... dry-run against a single repo"
-    echonice ""
-    echonice "sake-git-master-to-main --repo my-repo"
-    echonice "... migrate just one repo"
-    echonice ""
-    echonice "sake-git-master-to-main"
+    echonice "sake-git-pm-master-to-main --dry-run"
+    echonice "sake-git-pm-master-to-main --repo my-repo --dry-run"
+    echonice "sake-git-pm-master-to-main --repo my-repo"
+    echonice "sake-git-pm-master-to-main"
     echonice "... migrate every repo in the org"
 
     ECHOHEAD "Requirements:"

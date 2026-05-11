@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Adds a new SilverStripe site to your environment"
 
 ############################################ DIR
 dir='./'
@@ -12,6 +13,10 @@ dir='./'
 help='no'
 while (($#)); do
     case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
@@ -23,34 +28,33 @@ while (($#)); do
     shift
 done
 
-############################################ HELP
-
 help_and_exit() {
-    ECHOHEAD "Git info"
-    echonice "Generates SSH key pair for git pipeline authentication and displays both private and public keys"
+
+    ECHOHEAD "add-site"
+    echonice "Adds a new SilverStripe site to your environment"
     echonice ""
-    echonice "directory of script:           $SCRIPT_DIR"
-    echonice "directory to commit:           $WORKING_DIR/$dir"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "e.g. sake-git-pipeline-ssh "
+    echonice "e.g. sake-ss-start-new-site ./  "
+    echonice "... run in the destination folder"
 
     echofunctions
     exit
 }
 
+
 sake_check_help_and_exit
 
 ############################################ CODE
 
-cd_or_fail "$WORKING_DIR/$dir" help_and_exit
+cd_or_fail "$WORKING_DIR" help_and_exit
 
-mkdir -p /tmp/bb
-ssh-keygen -t ed25519 -f /tmp/bb/id_ed25519 -N "" -C "pipelines@bitbucket.com"
-cat /tmp/bb/id_ed25519
-cat /tmp/bb/id_ed25519.pub
+# dev-build
+echo "TO BE COMPLETED"
 
 echoend
