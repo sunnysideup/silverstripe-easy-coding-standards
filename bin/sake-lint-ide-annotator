@@ -31,6 +31,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "PHP IDE-ANNOTATOR"
+    echonice "Generates IDE annotations and DocBlock hints for DataObjects and related classes."
+    echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
     echonice "Directory to analyse:         $WORKING_DIR/$dir"
 

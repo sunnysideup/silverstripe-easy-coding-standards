@@ -35,6 +35,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "NPM auditing script"
+    echonice "Audits npm packages for security vulnerabilities and outdated dependencies"
+    echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
     echonice "Directory to install:         $WORKING_DIR/$dir"
 

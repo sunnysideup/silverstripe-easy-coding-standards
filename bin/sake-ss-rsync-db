@@ -53,6 +53,8 @@ server="$(normalize_server "$server")"
 
 if [[ -z "$server" || "$help" == "yes" ]]; then
     ECHOHEAD "Sync Database"
+    echonice "Syncs MySQL database between local and remote server via dump files"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Server to sync with:           $server"
     echonice "Do reverse sync:               $reverse"

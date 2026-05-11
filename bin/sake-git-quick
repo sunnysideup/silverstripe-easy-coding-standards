@@ -35,6 +35,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Git commit and push QUICK"
+    echonice "Quickly commits all changes and pushes to origin with minimal prompts and automatic vendor checks"
+    echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $dir (relative to $WORKING_DIR)"
 

@@ -71,6 +71,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Run the SilverStripe security update workflow"
+    echonice "Runs complete security update workflow including composer updates and testing"
+    echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
     echonice "Directory to analyse:         $WORKING_DIR/$dir"
     echonice "Total steps:                  $TOTAL_STEPS"

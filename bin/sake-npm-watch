@@ -35,6 +35,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "NPM watch"
+    echonice "Watches files and automatically rebuilds assets when changes are detected"
+    echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
     echonice "Directory to install:         $WORKING_DIR/$dir"
 

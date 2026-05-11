@@ -44,6 +44,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Check if a SilverStripe package is ready for $test"
+    echonice "Checks if a SilverStripe module is compatible with specified SS version"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

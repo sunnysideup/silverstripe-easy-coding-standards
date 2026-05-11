@@ -57,6 +57,8 @@ fi
 
 help_and_exit() {
     ECHOHEAD "Sync Database and Assets"
+    echonice "Syncs both database and assets between local and remote server"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Working Directory:             $WORKING_DIR"
     echonice "Server to sync with:           ${server:-"(not set)"}"

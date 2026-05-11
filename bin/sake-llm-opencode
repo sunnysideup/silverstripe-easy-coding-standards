@@ -38,6 +38,8 @@ help_and_exit() {
     local apiKeyEnvValue="${!apiKeyEnvName-}"
 
     ECHOHEAD "OpenCode runner"
+    echonice "Runs OpenCode LLM agent to process and transform files based on custom prompts"
+    echonice ""
     echonice "Directory is always the FIRST positional argument (kept for compatibility): $dir"
     echonice "File selection is via --files GLOB (supports *), e.g. --files ./src/app/Tasks/*.php"
     echonice "NOTE: file globs are interpreted relative to the directory you pass as the first arg,"

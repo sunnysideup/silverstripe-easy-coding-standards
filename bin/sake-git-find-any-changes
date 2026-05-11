@@ -32,6 +32,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Git find any changes in any child directories"
+    echonice "Recursively searches for git repositories with local changes or unpushed commits"
+    echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $WORKING_DIR/$dir"
 

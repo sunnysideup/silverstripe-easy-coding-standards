@@ -85,6 +85,8 @@ help_and_exit() {
 
 show_vars() {
     ECHOHEAD "Make a new module"
+    echonice "Creates new SilverStripe module from template with GitHub and Packagist setup"
+    echonice ""
     echonice "Directory of script:             $SCRIPT_DIR"
     echonice "Directory to analyse:            $WORKING_DIR/$dir"
 

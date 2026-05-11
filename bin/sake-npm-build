@@ -35,6 +35,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "NPM build"
+    echonice "Builds production-ready npm/webpack assets for deployment"
+    echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
     echonice "Directory to install:         $WORKING_DIR/$dir"
 

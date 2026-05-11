@@ -37,6 +37,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Remove Origs"
+    echonice "Finds and removes .orig files created by merge conflicts or patch operations."
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

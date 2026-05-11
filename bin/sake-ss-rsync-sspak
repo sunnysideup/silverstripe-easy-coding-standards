@@ -47,6 +47,8 @@ fi
 
 help_and_exit() {
     ECHOHEAD "Sync Database from Server"
+    echonice "Syncs database and assets from remote server using sspak format"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Remote server web root dir:    $server"
 

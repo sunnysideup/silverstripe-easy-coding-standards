@@ -29,7 +29,9 @@ done
 ############################################ HELP
 help_and_exit() {
 
-    ECHOHEAD "Composer Require"
+    ECHOHEAD "Composer Force Update"
+    echonice "Forces update of dev packages via Packagist API and updates dependencies"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

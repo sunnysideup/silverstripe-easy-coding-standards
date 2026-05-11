@@ -33,6 +33,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Composer Require"
+    echonice "Requires a composer package with specified branch using --prefer-source"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

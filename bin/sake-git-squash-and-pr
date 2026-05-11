@@ -33,20 +33,13 @@ while (($#)); do
     shift
 done
 
-message=$(check_commit_message "$message")
-
-retVal=$?
-
-if [[ $retVal -ne 0 ]]; then
-    echobad "Invalid commit message. Exiting script."
-    exit 1
-fi
-
 
 ############################################ HELP
 
 help_and_exit() {
     ECHOHEAD "Squash commits of current branch and make a pull request to develop"
+    echonice "Squashes all commits in current branch and creates a pull request to the target branch"
+    echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $dir (relative to $WORKING_DIR)"
 
@@ -68,6 +61,16 @@ help_and_exit() {
 
 
 sake_check_help_and_exit
+
+############################################ GET MESSAGE
+message=$(check_commit_message "$message")
+
+retVal=$?
+
+if [[ $retVal -ne 0 ]]; then
+    echobad "Invalid commit message. Exiting script."
+    exit 1
+fi
 
 ############################################ CODE
 

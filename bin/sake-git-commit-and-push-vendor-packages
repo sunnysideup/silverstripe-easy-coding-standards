@@ -66,6 +66,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Checking Vendor Packages for Changes"
+    echonice "Scans vendor directories for uncommitted or unpushed git changes and optionally commits them"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

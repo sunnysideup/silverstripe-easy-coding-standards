@@ -27,6 +27,9 @@ done
 help_and_exit() {
 
     ECHOHEAD "Update VS Code"
+    echonice "Updates Visual Studio Code to the latest stable version"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"

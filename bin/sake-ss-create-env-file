@@ -36,6 +36,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Create a .env file for Silverstripe based on a yml file of data"
+    echonice "Generates a SilverStripe .env file from YAML configuration data"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to use:              $WORKING_DIR/$dir"
 

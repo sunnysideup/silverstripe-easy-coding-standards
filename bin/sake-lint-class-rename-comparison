@@ -233,6 +233,10 @@ class SakeLintClassRenameComparison
 function help()
 {
     echo <<<EOL
+Class Rename Comparison
+
+Compares classes between git branches and identifies renamed classes by matching base names.
+
 Usage: sake-lint-class-rename-comparison <dir> <oldBranch> <newBranch>
   -h, --help                   Show this help message.
   -f, --fix                    Fix the files with the renames.

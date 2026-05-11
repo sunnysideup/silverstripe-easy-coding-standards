@@ -46,6 +46,8 @@ done
 ############################################ HELP
 help_and_exit() {
     ECHOHEAD "Composer Update"
+    echonice "Updates composer packages with optional force, minimal changes, and auto-commit"
+    echonice ""
     echonice "Directory of script:         $SCRIPT_DIR"
     echonice "Directory to analyse:        $WORKING_DIR/$dir"
 

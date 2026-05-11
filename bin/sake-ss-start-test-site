@@ -31,6 +31,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Git commit and push"
+    echonice "Creates fresh SilverStripe test site with mock data for module testing"
+    echonice ""
     echonice "directory of script:          $SCRIPT_DIR"
     echonice "directory to commit:          $dir (relative to $WORKING_DIR)"
 

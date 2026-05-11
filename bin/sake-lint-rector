@@ -48,6 +48,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Rector"
+    echonice "Automatically refactors and upgrades PHP code using configurable Rector rules."
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

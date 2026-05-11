@@ -27,6 +27,8 @@ done
 ############################################ HELP
 help_and_exit() {
     ECHOHEAD "Composer About a Package"
+    echonice "Shows which packages depend on a specific composer package"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

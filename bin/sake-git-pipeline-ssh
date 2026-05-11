@@ -27,6 +27,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Git info"
+    echonice "Generates SSH key pair for git pipeline authentication and displays both private and public keys"
+    echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $WORKING_DIR/$dir"
 

@@ -57,6 +57,8 @@ only_check=""
 
 help_and_exit() {
     ECHOHEAD "Security Scan"
+    echonice "Runs comprehensive security checks including composer audit, semgrep, and vulnerability scanning."
+    echonice ""
     ECHOHEAD "Current settings:"
     echonice "project dir:                 $WORKING_DIR"
 

@@ -26,7 +26,10 @@ done
 
 help_and_exit() {
 
-    ECHOHEAD "Update VS Code"
+    ECHOHEAD "Update Composer"
+    echonice "Updates Composer dependency manager to the latest version"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"

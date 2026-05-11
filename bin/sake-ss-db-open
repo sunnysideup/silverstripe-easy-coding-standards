@@ -29,6 +29,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Open Silverstripe MySQL database"
+    echonice "Opens MySQL CLI connected to SilverStripe database from .env credentials"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to use:              $WORKING_DIR/$dir"
 

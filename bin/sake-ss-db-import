@@ -29,6 +29,8 @@ done
 ############################################ HELP FUNCTION
 help_and_exit() {
     ECHOHEAD "Import Local Database File"
+    echonice "Imports a MySQL database dump file into local SilverStripe database"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Local .env file:               $localEnvFile"
     echonice "Database dump file:            the first parameter"

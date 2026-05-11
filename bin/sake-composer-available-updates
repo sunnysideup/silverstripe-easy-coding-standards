@@ -27,6 +27,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Composer Updates Available"
+    echonice "Lists all outdated packages and security audit results"
+    echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
     echonice "Directory to analyse:         $WORKING_DIR/$dir"
 

@@ -58,6 +58,8 @@ help_and_exit() {
 
 
     ECHOHEAD 'Rsync SilverStripe assets'
+    echonice "Syncs public/assets folder between local and remote server via rsync"
+    echonice ""
     echonice "Script dir:                    $SCRIPT_DIR"
     echonice "Working dir:                   $WORKING_DIR"
     echonice "Local assets dir:              $LOCAL_ASSETS_DIR"

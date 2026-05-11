@@ -31,6 +31,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Set PHP timezone"
+    echonice "Sets the PHP timezone in all php.ini configuration files"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

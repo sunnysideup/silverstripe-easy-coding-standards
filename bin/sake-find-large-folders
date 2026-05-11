@@ -24,6 +24,8 @@ EXCLUDES=()
 # ── Help ─────────────────────────────────────────────────────
 help_and_exit() {
     ECHOHEAD 'Folder Size Analyser'
+    echonice "Analyzes folder sizes with customizable depth and sorting options"
+    echonice ""
     echonice "Target:                        $dir"
     echonice "Depth:                         $MAX_DEPTH"
     echonice "Top:                           $TOP_N results"

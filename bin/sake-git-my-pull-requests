@@ -51,7 +51,8 @@ done
 
 help_and_exit() {
     ECHOHEAD 'My Pull Requests'
-
+    echonice "Lists open pull requests created by you, assigned to you, or on your repositories with filtering options"
+    echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
 
     ECHOHEAD 'Available settings:'

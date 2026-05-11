@@ -32,6 +32,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "flush Silverstripe CLI"
+    echonice "Clears all SilverStripe caches and runs dev/build with flush"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

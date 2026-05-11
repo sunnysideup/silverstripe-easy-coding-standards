@@ -78,6 +78,8 @@ fi
 help_and_exit() {
 
     ECHOHEAD "Lint All"
+    echonice "Runs all linting tools in sequence: compat, ide-annotator, ecs, rector, and stan."
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

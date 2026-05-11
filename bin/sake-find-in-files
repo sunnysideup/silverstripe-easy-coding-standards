@@ -31,6 +31,8 @@ done
 ############################################ HELP
 help_and_exit() {
     ECHOHEAD "Grep search - find in files"
+    echonice "Recursively searches for text string in all files using grep"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

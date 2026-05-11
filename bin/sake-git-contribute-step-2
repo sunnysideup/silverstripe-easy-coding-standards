@@ -34,6 +34,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Checking Vendor Packages for Changes"
+    echonice "Squashes commits, rebases onto target branch, and pushes to your fork for pull request creation"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

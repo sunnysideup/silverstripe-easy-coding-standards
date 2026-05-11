@@ -27,6 +27,9 @@ done
 help_and_exit() {
 
     ECHOHEAD "Update Chromium"
+    echonice "Updates Chromium browser to the latest available version"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"

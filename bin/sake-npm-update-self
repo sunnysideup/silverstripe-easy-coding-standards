@@ -22,6 +22,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "NPM Update Self (Update NVM, NPM, and Node to latest version)"
+    echonice "Updates NVM, Node.js, and npm to their latest stable versions"
+    echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
 
     ECHOHEAD "Available settings:"

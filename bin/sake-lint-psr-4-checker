@@ -145,6 +145,10 @@ class Psr4ComplianceChecker
 function printHelp(): void
 {
     echo <<<'EOL'
+PSR-4 Checker
+
+Validates and auto-corrects namespaces in PHP files to ensure PSR-4 compliance.
+
 Usage: psr4-checker <dir> <baseNamespace>
 -h, --help                   Show this help message.
 

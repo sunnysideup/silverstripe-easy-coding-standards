@@ -32,6 +32,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Remove Stale Branches"
+    echonice "Removes local branches that have been merged, excluding protected branches like master and develop"
+    echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
 

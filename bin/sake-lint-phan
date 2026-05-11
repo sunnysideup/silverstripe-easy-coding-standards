@@ -23,6 +23,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "PHP PHAN"
+    echonice "Performs static analysis on PHP code using Phan to detect potential bugs and issues."
+    echonice ""
     echonice "Directory to analyse:             $WORKING_DIR"
 
     ECHOHEAD "Current settings:"
