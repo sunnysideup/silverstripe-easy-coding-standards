@@ -57,6 +57,10 @@ sake_check_help_and_exit
 
 cd_or_fail "$WORKING_DIR" help_and_exit
 
-echolistoffunctions
+if [[ "$more" == "yes" ]]; then
+    echodetailedhelp
+else
+    echolistoffunctions
+fi
 
 echoend

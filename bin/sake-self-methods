@@ -222,6 +222,87 @@ echolistoffunctions() {
     echonice "e.g. sake-lint-all -h"
 }
 
+echodetailedhelp() {
+    ECHOHEAD 'Detailed Help for All Functions'
+    echonice "Showing full help information for all available scripts..."
+    echonice "This may take a moment..."
+    echo "" >&2
+
+    local categorized_scripts=()
+
+    # Collect all scripts
+    for entry in "$SCRIPT_DIR"/*; do
+        if [[ -f "$entry" && -x "$entry" ]]; then
+            local script
+            script="$(basename "$entry")"
+            
+            # Skip self-methods as it's not a user command
+            [[ "$script" == "sake-self-methods" ]] && continue
+            [[ "$script" == "ecs" ]] && continue
+            
+            local category label
+
+            if [[ "$script" == sake-*-* ]]; then
+                local without_sake="${script#sake-}"
+                category="${without_sake%%-*}"
+                category="${category^^}"
+                label="${without_sake#*-}"
+            else
+                category="GENERAL"
+                label="${script#sake-}"
+                [[ "$label" == "$script" ]] && label="$script"
+            fi
+
+            categorized_scripts+=("$category:$label:$script:$entry")
+        fi
+    done
+
+    if (( ${#categorized_scripts[@]} > 0 )); then
+        local sorted_scripts=()
+        while IFS= read -r line; do
+            sorted_scripts+=("$line")
+        done < <(printf "%s\n" "${categorized_scripts[@]}" | sort)
+
+        local current_category=""
+
+        for item in "${sorted_scripts[@]}"; do
+            local category="${item%%:*}"
+            local rest="${item#*:}"
+            local label="${rest%%:*}"
+            rest="${rest#*:}"
+            local script="${rest%%:*}"
+            local path="${rest#*:}"
+
+            # Show category header
+            if [[ "$category" != "$current_category" ]]; then
+                printf '\n\n' >&2
+                _print_banner "$_COL_HEAD"
+                _print_col_stderr "$_COL_HEAD" "### $category ###"
+                _print_banner "$_COL_HEAD"
+                current_category="$category"
+            fi
+
+            # Show script name
+            printf '\n' >&2
+            _print_col_stderr "$_COL_NICE" "━━━ $script ━━━"
+            
+            # Run the script with -h flag to get help, suppress error output
+            if output=$("$path" -h 2>&1); then
+                # Filter out the footer sections (Available Functions, checkmark, COMPLETED)
+                echo "$output" | sed '/^.*Available Functions/,$d' | sed '/^[[:space:]]*$/N;/^\n$/d' >&2
+                echo "" >&2
+            else
+                echonice "  (No help available)"
+            fi
+        done
+    fi
+
+    printf '\n\n' >&2
+    echoline
+    echogood "End of detailed help"
+    echoline
+}
+
 ############################################ UTILITY FUNCTIONS
 
 addtoscrutinizer() {
