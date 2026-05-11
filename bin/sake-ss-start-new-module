@@ -7,12 +7,7 @@ source "$SCRIPT_DIR/sake-self-methods"
 
 ############################################ DIR
 dir='./'
-installpackage "gh"
-installpackage "jq"
-check_gh_auth
-check_for_env_var "SCRUTINIZER_API_TOKEN"
-check_for_env_var "PACKAGIST_USERNAME"
-check_for_env_var "PACKAGIST_API_TOKEN"
+
 ############################################ SETTINGS
 packageName=''
 namespace=''
@@ -54,6 +49,50 @@ while (($#)); do
     shift
 done
 
+help_and_exit() {
+    ECHOHEAD "Make a new module"
+    echonice "Creates new SilverStripe module from template with GitHub and Packagist setup"
+    echonice ""
+    echonice "Directory of script:             $SCRIPT_DIR"
+    echonice "Directory to analyse:            $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-p, --package                    package name (e.g. sunnysideup/abc)"
+    echonice "-n, --namespace                  namespace (e.g. Sunnysideup\\Abc)"
+    echonice "-f, --fullName                   full name (e.g. My Abc Module)"
+    echonice "-d, --description                description (e.g. Does the ABC)"
+    echonice "-k, --keywords                   keywords, comma separated"
+    echonice "-h, --help                       show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\\App -f 'Hello World' -d 'This is a new module' -k 'foo, bar'"
+    echofunctions
+    exit
+}
+
+show_vars() {
+    echoline "Current settings:"
+    echonice "--package (-p):                  $packageName"
+    echonice "--namespace (-n):                $namespace"
+    echonice "--fullName (-f):                 $fullName"
+    echonice "--description (-d):              $description"
+    echonice "--keywords (-k):                 $keywords"
+    echonice "package short name:              $packageShortName"
+    echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
+    echonice "package with silverstripe:       $packageWithSilverstripe"
+}
+
+
+sake_check_help_and_exit
+
+############################################ SETUP
+installpackage "gh"
+installpackage "jq"
+check_gh_auth
+check_for_env_var "SCRUTINIZER_API_TOKEN"
+check_for_env_var "PACKAGIST_USERNAME"
+check_for_env_var "PACKAGIST_API_TOKEN"
+
 [ -z "$packageName" ] && read -p "Enter package name (e.g. sunnysideup/abc): " packageName || packageName=$packageName
 [ -z "$namespace" ] && read -r -p "Enter namespace (e.g. Sunnysideup\\Abc): " namespace || namespace=$namespace
 [ -z "$fullName" ] && read -p "Enter full name (e.g. My Abc Module): " fullName || fullName=$fullName
@@ -76,37 +115,6 @@ packageShortNameWithSilverstripe="silverstripe-$packageShortName"
 packageWithSilverstripe=$(echo $packageName | sed 's/\//\/silverstripe-/')
 escaped_namespace=$(echo "$namespace" | sed 's/\\/\\\\/g')
 double_escaped_namespace=$(echo "$escaped_namespace" | sed 's/\\/\\\\/g')
-
-help_and_exit() {
-    show_vars
-    echofunctions
-    exit
-}
-
-show_vars() {
-    ECHOHEAD "Make a new module"
-    echonice "Creates new SilverStripe module from template with GitHub and Packagist setup"
-    echonice ""
-    echonice "Directory of script:             $SCRIPT_DIR"
-    echonice "Directory to analyse:            $WORKING_DIR/$dir"
-
-    echoline "Current settings:"
-    echonice "--package (-p):                  $packageName"
-    echonice "--namespace (-n):                $namespace"
-    echonice "--fullName (-f):                 $fullName"
-    echonice "--description (-d):              $description"
-    echonice "--keywords (-k):                 $keywords"
-    echonice "package short name:              $packageShortName"
-    echonice "package short with silverstripe: $packageShortNameWithSilverstripe"
-    echonice "package with silverstripe:       $packageWithSilverstripe"
-
-    ECHOHEAD "Example usage:"
-    echonice "sake-ss-start-new-module ./  -p sunnysideup/new-module -n Sunnysideup\App -f 'Hello World' -d 'This is a new module' -k 'foo, bar'"
-    echofunctions
-}
-
-
-sake_check_help_and_exit
 
 ############################################ CODE
 

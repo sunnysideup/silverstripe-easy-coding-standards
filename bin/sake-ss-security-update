@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Runs complete security update workflow with tests and composer updates"
 
 ############################################ DIR
 dir='./'
@@ -71,6 +72,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Run the SilverStripe security update workflow"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
     echonice "Runs complete security update workflow including composer updates and testing"
     echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"

@@ -228,15 +228,19 @@ echodetailedhelp() {
     echo "" >&2
 
     local categorized_scripts=()
+    
+    # Use the directory where sake-self-methods actually is (not the composer bin wrapper dir)
+    local ACTUAL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
     # Collect all scripts
-    for entry in "$SCRIPT_DIR"/*; do
+    for entry in "$ACTUAL_SCRIPT_DIR"/*; do
         if [[ -f "$entry" && -x "$entry" ]]; then
             local script
             script="$(basename "$entry")"
             
-            # Skip self-methods as it's not a user command
+            # Skip self-methods and self-update as they're not user commands
             [[ "$script" == "sake-self-methods" ]] && continue
+            [[ "$script" == "sake-self-update" ]] && continue
             [[ "$script" == "ecs" ]] && continue
             
             local category label
@@ -279,17 +283,19 @@ echodetailedhelp() {
                 current_category="$category"
             fi
 
-            # Extract compact summary
-            if output=$("$path" -h 2>&1); then
-                # Remove ANSI color codes for cleaner processing
+            # Extract compact summary from SCRIPT_SUMMARY variable or help output
+            local summary=""
+            
+            # Try to extract SCRIPT_SUMMARY from the actual script file
+            # The $path variable contains the full script path
+            if [[ -f "$path" ]]; then
+                summary=$(grep -m 1 '^SCRIPT_SUMMARY=' "$path" 2>/dev/null | sed 's/^SCRIPT_SUMMARY=//' | tr -d '"' | tr -d "'")
+            fi
+            
+            # If no SCRIPT_SUMMARY found, try running -h and extracting from output
+            if [[ -z "$summary" ]] && output=$("$path" -h 2>&1); then
                 local clean_output=$(echo "$output" | sed 's/\x1b\[[0-9;]*m//g')
-                
-                # Extract title (first # line)
-                local title=$(echo "$clean_output" | grep -m 1 "^.*# " | sed 's/.*# //' | sed 's/^[[:space:]]*//')
-                
-                # Extract summary: lines between first header and next section
-                # Skip directory lines, empty lines, and separator lines
-                local summary=$(echo "$clean_output" | awk '
+                summary=$(echo "$clean_output" | awk '
                     /^.*# / { if (found_title) next; found_title=1; next }
                     found_title && /^.*# / { exit }
                     found_title && /^[-]+$/ { next }
@@ -306,17 +312,13 @@ echodetailedhelp() {
                         }
                     }
                 ' | head -1 | sed 's/^[[:space:]]*//')
-                
-                # Show compact summary
-                if [[ -n "$summary" && ${#summary} -gt 5 ]]; then
-                    printf '  %-35s %s\n' "$script:" "$summary" >&2
-                elif [[ -n "$title" ]]; then
-                    printf '  %-35s %s\n' "$script:" "$title" >&2
-                else
-                    printf '  %-35s %s\n' "$script:" "(No summary - run $script -h for details)" >&2
-                fi
+            fi
+            
+            # Show compact summary
+            if [[ -n "$summary" && ${#summary} -gt 5 ]]; then
+                printf '  %-35s %s\n' "$script:" "$summary" >&2
             else
-                printf '  %-35s %s\n' "$script:" "(No help available)" >&2
+                printf '  %-35s %s\n' "$script:" "(No summary - run $script -h for details)" >&2
             fi
         done
     fi

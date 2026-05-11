@@ -28,7 +28,6 @@ while (($#)); do
     shift
 done
 
-
 help_and_exit() {
     ECHOHEAD "Set PHP timezone"
     echonice "Sets the PHP timezone in all php.ini configuration files"
@@ -57,7 +56,10 @@ sake_check_help_and_exit
 cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
 # dev-build
-sudo find /etc/php/ -name php.ini -exec sh -c 'grep -q "date.timezone = '\"'$timeZone'\"'" "$1" || echo "date.timezone = '\''$timeZone'\''" >> "$1"' sh {} \;
-sudo find /etc/php/ -name php.ini -exec sh -c 'ECHOHEAD "File: $1"; grep "date.timezone" $1' sh {} \;
+sudo find /etc/php/ -name php.ini -exec sh -c '
+    sed -i "/^date\.timezone/d" "$1"
+    sed -i "s|^;date\.timezone.*|date.timezone = '"$timeZone"'|" "$1"
+' sh {} \;
+sudo find /etc/php/ -name php.ini -exec sh -c 'echo "File: $1"; grep "date.timezone" "$1"' sh {} \;
 
 echoend

@@ -4,6 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Checks if SilverStripe project meets version requirements and dependencies"
 
 ############################################ DIR
 dir='./'
@@ -44,6 +45,8 @@ done
 help_and_exit() {
 
     ECHOHEAD "Check if a SilverStripe package is ready for $test"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
     echonice "Checks if a SilverStripe module is compatible with specified SS version"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"

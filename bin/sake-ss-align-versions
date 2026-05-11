@@ -7,6 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR="$(pwd)"
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Aligns SilverStripe core package versions to match requirements"
 
 ############################################ SETTINGS
 dry_run="no"
@@ -42,6 +43,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "sake-ss-align-versions"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
     echonice "Aligns Silverstripe version branches across all repositories in a GitHub organization."
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"

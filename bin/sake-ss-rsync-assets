@@ -6,6 +6,7 @@ IFS=$'\n\t'
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Syncs public/assets folder between local and remote server via rsync"
 
 ############################################ CONSTANTS / DEFAULTS
 LOCAL_ASSETS_DIR="$WORKING_DIR/public/assets"
@@ -58,6 +59,8 @@ help_and_exit() {
 
 
     ECHOHEAD 'Rsync SilverStripe assets'
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
     echonice "Syncs public/assets folder between local and remote server via rsync"
     echonice ""
     echonice "Script dir:                    $SCRIPT_DIR"

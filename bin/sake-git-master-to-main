@@ -7,6 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR="$(pwd)"
 source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Renames master branch to main across GitHub organization repositories"
 
 ############################################ SETTINGS
 dry_run="no"
@@ -38,6 +39,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "sake-git-master-to-main"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
     echonice "Renames the 'master' branch to 'main' and sets 'main' as the default branch"
     echonice "across every repository in a GitHub organization (or just one with --repo)."
     echonice ""
