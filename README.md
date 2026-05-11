@@ -91,6 +91,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-security-update
  - sake-ss-start-new-feature
  - sake-ss-start-test-site
+ - sake-ss-template-check
 
 # rsync
 - sake-ss-rsync-all

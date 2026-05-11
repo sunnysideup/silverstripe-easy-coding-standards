@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+
+############################################ DIR
+dir='./themes/'
+
+############################################ SETTINGS
+skipComposer="no"
+dryRun="no"
+help='no'
+while (($#)); do
+    case $1 in
+    -d | --dry-run)
+        dryRun='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Check and fix Silverstripe template issues"
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Available settings:"
+    echonice "-d, --dry-run                  run in dry run mode (no changes will be made)"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-template-check themes/mytheme/template -d"
+
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ CODE
+
+SOURCE_DIR="${dir%/}"
+SEARCH_ROOT="$WORKING_DIR"
+
+if [ "$dryRun" == "yes" ]; then
+    DRY_RUN=true
+    echonice "==================================================================="
+    echonice " RUNNING IN DRY-RUN MODE: No files will be moved or deleted."
+    echonice "==================================================================="
+    echonice ""
+else
+    DRY_RUN=false
+fi
+
+# Setup temp files
+TMP_GROUP_A=$(mktemp)
+TMP_GROUP_B=$(mktemp)
+TMP_GROUP_B_LIST=$(mktemp)
+TMP_GROUP_C=$(mktemp)
+INDEX_SOURCE=$(mktemp)
+INDEX_OTHER=$(mktemp)
+
+trap 'rm -f "$TMP_GROUP_A" "$TMP_GROUP_B" "$TMP_GROUP_B_LIST" "$TMP_GROUP_C" "$INDEX_SOURCE" "$INDEX_OTHER"' EXIT
+
+# --- PHASE 1: INDEXING ---
+
+echonice "Indexing source files in $SOURCE_DIR..."
+find "$SOURCE_DIR" -type d -exec test -e "{}/_manifest_exclude" \; -prune -o -type f -print >"$INDEX_SOURCE"
+
+echonice "Indexing external files in $SEARCH_ROOT..."
+find "$SEARCH_ROOT" -type d \( -path "./$SOURCE_DIR" -o -path "$SOURCE_DIR" -o -exec test -e "{}/_manifest_exclude" \; \) -prune -o -type f -print >"$INDEX_OTHER"
+
+# --- PHASE 2: PROCESSING ---
+
+mapfile -t UNIQUE_FILENAMES < <(awk -F/ '{print $NF}' "$INDEX_SOURCE" | sort | uniq)
+
+echonice "Analyzing ${#UNIQUE_FILENAMES[@]} unique files..."
+
+for FILENAME in "${UNIQUE_FILENAMES[@]}"; do
+
+    # Special case skip for Page.ss
+    if [ "$FILENAME" == "Page.ss" ]; then
+        continue
+    fi
+
+    mapfile -t SOURCE_FILES < <(awk -F/ -v fname="$FILENAME" '$NF == fname' "$INDEX_SOURCE")
+    mapfile -t OTHER_FILES < <(awk -F/ -v fname="$FILENAME" '$NF == fname' "$INDEX_OTHER")
+
+    NUM_SOURCE=${#SOURCE_FILES[@]}
+    NUM_OTHER=${#OTHER_FILES[@]}
+    STATUS_NOTE=""
+
+    # Req 2: Source Conflicts
+    if [ "$NUM_SOURCE" -gt 1 ]; then
+        if cmp -s "${SOURCE_FILES[0]}" "${SOURCE_FILES[1]}"; then
+            if [ "$DRY_RUN" = false ]; then rm "${SOURCE_FILES[1]}"; fi
+            STATUS_NOTE="-> Status Note: Resolved source conflict (Deleted identical duplicate)\n"
+            SOURCE_FILES=("${SOURCE_FILES[0]}")
+            NUM_SOURCE=1
+        else
+            BLOCK_C="# $FILENAME\n"
+            for sf in "${SOURCE_FILES[@]}"; do BLOCK_C+="$sf\n"; done
+            BLOCK_C+="-> Status: CONFLICT! Multiple different versions in source.\n"
+
+            # Extract just the template sub-directory and format it
+            if [ "$NUM_OTHER" -gt 0 ]; then
+                for of in "${OTHER_FILES[@]}"; do
+                    BLOCK_C+="-> External Match: $of\n"
+                    if [[ "$of" == *"/templates/"* ]]; then
+                        SUB_PATH="${of#*/templates/}"
+                        REC_DIR="$(dirname "$SUB_PATH")"
+
+                        if [ "$REC_DIR" == "." ]; then
+                            BLOCK_C+="-> Recommended   : (root of templates)\n"
+                        else
+                            BLOCK_C+="-> Recommended   : ($REC_DIR/)\n"
+                        fi
+                    fi
+                done
+            fi
+            BLOCK_C+="\n"
+            echo -e "$BLOCK_C" >>"$TMP_GROUP_C"
+            continue
+        fi
+    fi
+
+    # Req 4 & 6c: Multiple outside matches
+    if [ "$NUM_OTHER" -gt 1 ]; then
+        BLOCK_C="# $FILENAME\n"
+        for sf in "${SOURCE_FILES[@]}"; do BLOCK_C+="$sf\n"; done
+        for of in "${OTHER_FILES[@]}"; do BLOCK_C+="$of\n"; done
+        BLOCK_C+="${STATUS_NOTE}-> Status: SKIP (Multiple external matches found)\n\n"
+        echo -e "$BLOCK_C" >>"$TMP_GROUP_C"
+        continue
+
+    # Req 6a: Only in themes folder
+    elif [ "$NUM_OTHER" -eq 0 ]; then
+        for sf in "${SOURCE_FILES[@]}"; do
+            echo "$sf" >>"$TMP_GROUP_A"
+        done
+        continue
+    fi
+
+    # Req 3 & 6b: Sync Logic & Alignment
+    if [ "$NUM_SOURCE" -eq 1 ] && [ "$NUM_OTHER" -eq 1 ]; then
+        SOURCE_FILE="${SOURCE_FILES[0]}"
+        OTHER_FILE="${OTHER_FILES[0]}"
+
+        if [[ "$OTHER_FILE" == *"/templates/"* ]]; then
+            SUB_PATH="${OTHER_FILE#*/templates/}"
+            NEW_DEST_PATH="$SOURCE_DIR/$SUB_PATH"
+            NEW_DEST_DIR=$(dirname "$NEW_DEST_PATH")
+
+            # --- ADD TO GROUP B FLAT LIST ---
+            echo "$NEW_DEST_PATH" >>"$TMP_GROUP_B_LIST"
+
+            # --- DYNAMIC PADDING MATH ---
+            PREFIX_SRC="${SOURCE_DIR}/"
+            PREFIX_OTH="${OTHER_FILE%"$SUB_PATH"}"
+
+            LEN_SRC=${#PREFIX_SRC}
+            LEN_OTH=${#PREFIX_OTH}
+
+            PAD_SRC=""
+            PAD_OTH=""
+
+            if [ "$LEN_SRC" -lt "$LEN_OTH" ]; then
+                PAD_SRC=$(printf '%*s' "$((LEN_OTH - LEN_SRC))" "")
+            elif [ "$LEN_OTH" -lt "$LEN_SRC" ]; then
+                PAD_OTH=$(printf '%*s' "$((LEN_SRC - LEN_OTH))" "")
+            fi
+            # ---------------------------
+
+            BLOCK_B="# $FILENAME\n${STATUS_NOTE}"
+
+            if [ "$SOURCE_FILE" == "$NEW_DEST_PATH" ]; then
+                BLOCK_B+="-> Status: ALREADY IN CORRECT POSITION.\n"
+            else
+                BLOCK_B+="Original: $SOURCE_FILE\n"
+                if [ "$DRY_RUN" = false ]; then
+                    mkdir -p "$NEW_DEST_DIR"
+                    mv "$SOURCE_FILE" "$NEW_DEST_PATH"
+
+                    # --- INJECT NOTE INTO FILE ---
+                    TMP_NOTE=$(mktemp)
+                    echonice "Automatically $SOURCE_FILE to $NEW_DEST_PATH"
+                    echo "<%-- NOTE: Automatically moved from $SOURCE_FILE to match vendor structure --%>" >"$TMP_NOTE"
+                    cat "$NEW_DEST_PATH" >>"$TMP_NOTE"
+                    mv "$TMP_NOTE" "$NEW_DEST_PATH"
+                    # ----------------------------------
+
+                    BLOCK_B+="-> Status: MOVED source to match vendor structure (and note added)...\n"
+                else
+                    BLOCK_B+="-> Status: [DRY RUN] Would move source to match vendor structure (and add note)...\n"
+                fi
+            fi
+
+            BLOCK_B+="${PAD_SRC}${NEW_DEST_PATH}\n"
+            BLOCK_B+="${PAD_OTH}${OTHER_FILE}\n\n"
+
+            echo -e "$BLOCK_B" >>"$TMP_GROUP_B"
+        else
+            BLOCK_C="# $FILENAME\n${STATUS_NOTE}${SOURCE_FILE}\n${OTHER_FILE}\n"
+            BLOCK_C+="-> Status: SKIP (Matched file does not have '/templates/' in its path)\n\n"
+            echo -e "$BLOCK_C" >>"$TMP_GROUP_C"
+        fi
+    fi
+done
+
+# --- FINAL OUTPUT RENDERING ---
+
+echoline
+ECHOHEAD " GROUP A: ONLY IN THEMES FOLDER"
+cat "$TMP_GROUP_A"
+
+echoline
+ECHOHEAD " GROUP B: IN THEMES AND MATCHED ELSEWHERE (SYNCED / MOVED)"
+echonice "--- SUMMARY LIST ---"
+cat "$TMP_GROUP_B_LIST"
+echoline
+echonice "--- DETAILS ---"
+cat "$TMP_GROUP_B"
+
+echoline
+ECHOHEAD " GROUP C: CONFLICTED OR SKIPPED"
+cat "$TMP_GROUP_C"
+
+echoend

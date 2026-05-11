@@ -109,6 +109,7 @@
     "bin/sake-ss-start-new-feature",
     "bin/sake-ss-start-new-module",
     "bin/sake-ss-start-test-site",
+    "bin/sake-ss-template-check",
     "bin/sake-test-site",
     "bin/sake-update-chromium",
     "bin/sake-update-composer",
