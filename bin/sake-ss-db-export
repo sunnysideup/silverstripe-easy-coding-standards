@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Executes SQL or exports to CSV using SilverStripe .env credentials"
+
+############################################ SETTINGS
+query=""
+output_file=""
+help='no'
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    -q | --query)
+        query=$2
+        shift 2
+        ;;
+    -o | --output)
+        output_file=$2
+        shift 2
+        ;;
+    *)
+        # Fallback: if no flags, assume first arg is query
+        if [[ -z "$query" ]]; then query=$1; else dir=$1; fi
+        shift
+        ;;
+    esac
+done
+
+help_and_exit() {
+    ECHOHEAD "Silverstripe SQL Runner/Exporter"
+    echonice "Usage: sake-sql -q \"SELECT * FROM Member\" [-o output.csv]"
+    echonice ""
+    echonice "-q, --query \"SQL\"           The SQL statement to run"
+    echonice "-o, --output file.csv       Optional: Export results to a CSV file"
+    exit
+}
+
+if [[ "$help" == "yes" || -z "$query" ]]; then
+    help_and_exit
+fi
+
+############################################ CODE
+
+if [ -f ".env" ]; then
+    # Use allexport to handle the .env variables cleanly
+    set -a
+    source .env
+    set +a
+else
+    echobad ".env file not found!"
+    exit 1
+fi
+
+# Check for SilverStripe specific env naming
+DB_HOST=${SS_DATABASE_SERVER:-"localhost"}
+DB_USER=${SS_DATABASE_USERNAME}
+DB_PASS=${SS_DATABASE_PASSWORD}
+DB_NAME=${SS_DATABASE_NAME}
+
+if [[ -z "$DB_USER" || -z "$DB_PASS" || -z "$DB_NAME" ]]; then
+    echobad "Missing database credentials in .env file!"
+    exit 1
+fi
+
+if [[ -n "$output_file" ]]; then
+    echonice "Executing query and exporting to $output_file..."
+    # Execute with headers, tab-separated, then convert tabs to commas
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "$query" -B | sed 's/\t/,/g' >"$output_file"
+    echogood "Export Complete."
+else
+    # Just run the query and output to terminal
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -A "$DB_NAME" -e "$query"
+fi
