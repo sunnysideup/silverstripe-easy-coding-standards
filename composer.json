@@ -43,6 +43,7 @@
   "bin": [
 "bin/sake-composer-about",
 "bin/sake-composer-available-updates",
+"bin/sake-composer-check-namespacing",
 "bin/sake-composer-force-update",
 "bin/sake-composer-fork-comparison",
 "bin/sake-composer-require",
