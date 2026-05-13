@@ -1,0 +1,644 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * find-usages.php
+ *
+ * Recursively scans a folder for PHP files, extracts each file's fully-qualified
+ * class name, then searches the project root for every usage of that class.
+ * Usages are validated against six accepted formats.
+ *
+ * Usage:
+ *   php find-usages.php <scan-folder> [namespace-prefix] [--strict]
+ *
+ * Arguments:
+ *   scan-folder        Folder to scan for PHP files  (e.g. health-navigator/src)
+ *   namespace-prefix   (optional) Leading namespace prefix, e.g. 'XXX\YYY'.
+ *                      If omitted, it is looked up automatically from composer.json
+ *                      in the current directory via the PSR-4 autoload map.
+ *   --strict           Exit with code 1 if any invalid usages are found.
+ *
+ * The search root is always the directory from which the script is called (CWD).
+ *
+ * Accepted usage formats for FQCN "Foo\Bar\Baz\MyClass":
+ *   1. Short name only              MyClass
+ *   2. FQ single-backslash          Foo\Bar\Baz\MyClass
+ *   3. FQ double-backslash          Foo\\Bar\\Baz\\MyClass
+ *   4. Dash-separated (any case)    Foo-Bar-Baz-MyClass
+ *   5. Dash-separated lowercase     foo-bar-baz-myclass          (front-end files)
+ *   6. Underscore-separated (ci)    Foo_Bar_Baz_MyClass
+ */
+
+// ─── Colour helpers ───────────────────────────────────────────────────────────
+
+function clr(string $text, string $color): string {
+    static $colors = [
+        'red'    => "\033[31m",
+        'green'  => "\033[32m",
+        'yellow' => "\033[33m",
+        'cyan'   => "\033[36m",
+        'bold'   => "\033[1m",
+        'reset'  => "\033[0m",
+    ];
+    return ($colors[$color] ?? '') . $text . $colors['reset'];
+}
+
+// ─── Usage / help ─────────────────────────────────────────────────────────────
+
+function printHelp(): void {
+    echo <<<HELP
+Usage:
+  php find-usages.php <scan-folder> [namespace-prefix] [--strict]
+
+Arguments:
+  scan-folder        Folder to scan for PHP files  (e.g. health-navigator/src)
+  namespace-prefix   (optional) Override the PSR-4 prefix detected from composer.json
+  --strict           Exit 1 if any invalid usages are found
+
+Examples:
+  php find-usages.php health-navigator/src
+  php find-usages.php health-navigator/src 'App\HealthNavigator' --strict
+
+HELP;
+}
+
+// ─── composer.json / PSR-4 lookup ────────────────────────────────────────────
+
+/**
+ * Parse composer.json with jq and return every PSR-4 mapping as:
+ *   [ ['namespace' => 'Foo\\Bar', 'path' => 'src/'], ... ]
+ *
+ * @return list<array{namespace:string,path:string}>
+ */
+function composerPsr4Mappings(string $rootDir): array {
+    $composerFile = $rootDir . DIRECTORY_SEPARATOR . 'composer.json';
+    if (!file_exists($composerFile)) {
+        return [];
+    }
+
+    // jq extracts psr-4 entries as "namespace\tpath" lines.
+    // JSON double-backslashes become real backslashes in jq output.
+    $cmd = sprintf(
+        'jq -r \'.autoload["psr-4"] // {} | to_entries[] | "\(.key)\t\(.value)"\' %s 2>/dev/null',
+        escapeshellarg($composerFile)
+    );
+
+    $lines = [];
+    exec($cmd, $lines);
+
+    $mappings = [];
+    foreach ($lines as $line) {
+        $parts = explode("\t", $line, 2);
+        if (count($parts) === 2) {
+            $mappings[] = [
+                'namespace' => rtrim($parts[0], '\\'),  // strip trailing backslash
+                'path'      => rtrim($parts[1], '/\\'), // strip trailing slash
+            ];
+        }
+    }
+
+    return $mappings;
+}
+
+/**
+ * Given the scan folder, find its PSR-4 namespace prefix from composer.json.
+ * Picks the longest matching path so nested mappings win over broader ones.
+ */
+function detectNamespacePrefix(string $scanFolder, string $rootDir): ?string {
+    $mappings = composerPsr4Mappings($rootDir);
+    if (empty($mappings)) {
+        return null;
+    }
+
+    $absFolder = realpath($scanFolder) ?: $scanFolder;
+    $relFolder = ltrim(str_replace(realpath($rootDir), '', $absFolder), DIRECTORY_SEPARATOR);
+    $relFolder = str_replace('\\', '/', rtrim($relFolder, '/'));
+
+    $best    = null;
+    $bestLen = -1;
+
+    foreach ($mappings as ['namespace' => $ns, 'path' => $path]) {
+        $normPath = str_replace('\\', '/', $path);
+        if ($relFolder === $normPath || str_starts_with($relFolder . '/', $normPath . '/')) {
+            if (strlen($normPath) > $bestLen) {
+                $bestLen = strlen($normPath);
+                $best    = $ns;
+            }
+        }
+    }
+
+    return $best;
+}
+
+// ─── PHP file scanner ─────────────────────────────────────────────────────────
+
+/**
+ * Recursively yield every *.php file under $dir, skipping:
+ *   - any directory named "vendor"
+ *   - any directory that contains a "_manifest_exclude" file
+ *
+ * Skipped directories are printed immediately so the user can see what was excluded.
+ *
+ * @return Generator<string>
+ */
+function phpFiles(string $dir, string $rootDir): Generator {
+    $dirIt = new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS);
+
+    $filter = new RecursiveCallbackFilterIterator(
+        $dirIt,
+        function (SplFileInfo $current) use ($rootDir): bool {
+            if (!$current->isDir()) {
+                return true;
+            }
+            $name = $current->getFilename();
+            $rel  = ltrim(str_replace($rootDir, '', $current->getRealPath()), DIRECTORY_SEPARATOR);
+            if ($name === 'vendor') {
+                echo clr("  skip vendor   : ", 'yellow') . $rel . "\n";
+                return false;
+            }
+            if (file_exists($current->getRealPath() . DIRECTORY_SEPARATOR . '_manifest_exclude')) {
+                echo clr("  skip excluded : ", 'yellow') . $rel . "\n";
+                return false;
+            }
+            return true;
+        }
+    );
+
+    $it = new RecursiveIteratorIterator($filter, RecursiveIteratorIterator::SELF_FIRST);
+
+    foreach ($it as $file) {
+        if ($file->isFile() && strtolower($file->getExtension()) === 'php') {
+            yield $file->getRealPath();
+        }
+    }
+}
+
+// ─── FQCN extractor ──────────────────────────────────────────────────────────
+
+/**
+ * @return array{namespace:string,class:string,fqcn:string}|null
+ */
+function extractFqcn(string $filePath): ?array {
+    $src = file_get_contents($filePath);
+    if ($src === false) {
+        return null;
+    }
+
+    $namespace = '';
+    $className = '';
+
+    $tokens = token_get_all($src);
+    $count  = count($tokens);
+
+    for ($i = 0; $i < $count; $i++) {
+        $tok = $tokens[$i];
+
+        // ── namespace declaration ──────────────────────────────────────────
+        if (is_array($tok) && $tok[0] === T_NAMESPACE) {
+            $ns = '';
+            for ($j = $i + 1; $j < $count; $j++) {
+                $t = $tokens[$j];
+                if (is_string($t) && ($t === ';' || $t === '{')) {
+                    break;
+                }
+                if (is_array($t) && in_array($t[0], [T_NAME_QUALIFIED, T_STRING, T_NS_SEPARATOR], true)) {
+                    $ns .= $t[1];
+                }
+            }
+            $namespace = trim($ns);
+        }
+
+        // ── class / interface / trait / enum name ──────────────────────────
+        if (is_array($tok) && in_array($tok[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+            for ($j = $i + 1; $j < $count; $j++) {
+                $t = $tokens[$j];
+                if (is_array($t) && $t[0] === T_WHITESPACE) {
+                    continue;
+                }
+                if (is_array($t) && $t[0] === T_STRING) {
+                    $className = $t[1];
+                }
+                break;
+            }
+        }
+
+        if ($namespace !== '' && $className !== '') {
+            break;
+        }
+    }
+
+    if ($className === '') {
+        return null;
+    }
+
+    $fqcn = $namespace !== '' ? $namespace . '\\' . $className : $className;
+
+    return ['namespace' => $namespace, 'class' => $className, 'fqcn' => $fqcn];
+}
+
+// ─── Use-statement extractor ─────────────────────────────────────────────────
+
+/**
+ * Extract all `use` statements from a PHP file that begin with $nsPrefix.
+ *
+ * Handles:
+ *   use Foo\Bar\Baz;
+ *   use Foo\Bar\Baz as Alias;
+ *   use Foo\Bar\{Baz, Qux};          (grouped use)
+ *
+ * @return list<array{fqcn:string,line:int}>
+ */
+function extractUseStatements(string $filePath, string $nsPrefix): array {
+    $src = file_get_contents($filePath);
+    if ($src === false) {
+        return [];
+    }
+
+    $tokens  = token_get_all($src);
+    $count   = count($tokens);
+    $results = [];
+
+    for ($i = 0; $i < $count; $i++) {
+        $tok = $tokens[$i];
+
+        if (!is_array($tok) || $tok[0] !== T_USE) {
+            continue;
+        }
+
+        // Skip trait use inside a class body (preceded by '{' at class level)
+        // We detect this by checking if there's a T_CLASS before this T_USE
+        // with no intervening T_FUNCTION — a rough but effective heuristic.
+        // A simpler approach: class-level `use` is indented and preceded by '{'.
+        // We skip T_USE tokens that are inside a class by checking brace depth.
+        // For simplicity, count braces up to this point.
+        $braceDepth = 0;
+        for ($k = 0; $k < $i; $k++) {
+            if (is_string($tokens[$k])) {
+                if ($tokens[$k] === '{') $braceDepth++;
+                if ($tokens[$k] === '}') $braceDepth--;
+            }
+        }
+        if ($braceDepth > 0) {
+            continue; // inside a class body — this is a trait use, not an import
+        }
+
+        // Collect the use statement tokens until ';'
+        $lineNo  = $tok[2];
+        $segment = '';
+        $j       = $i + 1;
+
+        while ($j < $count) {
+            $t = $tokens[$j];
+            if (is_string($t) && $t === ';') {
+                break;
+            }
+            if (is_array($t) && $t[0] !== T_WHITESPACE) {
+                if (is_string($t)) {
+                    $segment .= $t;
+                } else {
+                    $segment .= $t[1];
+                }
+            }
+            $j++;
+        }
+
+        // Handle grouped: Foo\Bar\{Baz, Qux as Q}
+        if (str_contains($segment, '{')) {
+            preg_match('/^(.*?)\\{(.*)\\}$/', $segment, $m);
+            $prefix  = rtrim($m[1] ?? '', '\\');
+            $members = preg_split('/\s*,\s*/', trim($m[2] ?? ''));
+            foreach ($members as $member) {
+                $member = trim(preg_replace('/\s+as\s+\S+/i', '', $member));
+                if ($member === '') continue;
+                $fqcn = $prefix . '\\' . $member;
+                if (str_starts_with($fqcn, $nsPrefix)) {
+                    $results[] = ['fqcn' => $fqcn, 'line' => $lineNo];
+                }
+            }
+        } else {
+            // Strip alias:  Foo\Bar as Alias  →  Foo\Bar
+            $fqcn = trim(preg_replace('/\s+as\s+\S+/i', '', $segment));
+            if (str_starts_with($fqcn, $nsPrefix)) {
+                $results[] = ['fqcn' => $fqcn, 'line' => $lineNo];
+            }
+        }
+    }
+
+    return $results;
+}
+
+// ─── Variant builder ─────────────────────────────────────────────────────────
+
+/**
+ * Return all surface forms of a FQCN that count as valid usages.
+ *
+ * @return array<string,string>  label => literal string to match against
+ */
+function fqcnVariants(string $fqcn, string $className): array {
+    return [
+        'short'           => $className,                                  // MyClass
+        'fqcn-single'     => $fqcn,                                      // Foo\Bar\MyClass
+        'fqcn-double'     => str_replace('\\', '\\\\', $fqcn),          // Foo\\Bar\\MyClass
+        'fqcn-dash'       => str_replace('\\', '-', $fqcn),             // Foo-Bar-MyClass
+        'fqcn-dash-lower' => strtolower(str_replace('\\', '-', $fqcn)), // foo-bar-myclass
+        'fqcn-underscore' => str_replace('\\', '_', $fqcn),             // Foo_Bar_MyClass
+    ];
+}
+
+// ─── Grep helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * grep -rn for $pattern across all interesting file types under $rootDir.
+ *
+ * @return list<string>  "filepath:lineNo:content" lines
+ */
+function runGrep(string $rootDir, string $pattern, bool $caseInsensitive = false): array {
+    $flag = $caseInsensitive ? '-rni' : '-rn';
+    $includes = implode(' ', array_map(
+        fn($ext) => "--include=\"*.$ext\"",
+        ['php','twig','html','xml','yaml','yml','json','js','ts','jsx','tsx']
+    ));
+
+    $cmd = sprintf(
+        'grep %s %s -e %s %s 2>/dev/null',
+        $flag,
+        $includes,
+        escapeshellarg($pattern),
+        escapeshellarg($rootDir)
+    );
+
+    $raw = [];
+    exec($cmd, $raw);
+    return $raw;
+}
+
+/**
+ * Collect all grep hits for a class, running separate passes for:
+ *   - canonical class name  (catches formats 1–4, 6)
+ *   - lowercase class name  (catches format 5, front-end dash-lower)
+ *
+ * Results are deduplicated by "filepath:lineNo".
+ *
+ * @return list<string>
+ */
+function collectHits(string $rootDir, string $className): array {
+    $seen = [];
+    $hits = [];
+
+    // Single pass — fqcn-dash and fqcn-underscore are matched case-insensitively in classifyLine
+    foreach ([[$className, false]] as [$pattern, $ci]) {
+        foreach (runGrep($rootDir, $pattern, $ci) as $line) {
+            $key = implode(':', array_slice(explode(':', $line), 0, 2));
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $hits[]     = $line;
+            }
+        }
+    }
+
+    return $hits;
+}
+
+// ─── Line classifier ─────────────────────────────────────────────────────────
+
+/**
+ * Stage 1: Is this line a plausible reference to the class at all?
+ *
+ * Returns false for lines where the class name only appears as an embedded
+ * substring of a longer identifier (e.g. "MedicalTestIndexPage" when
+ * searching for "IndexPage"). Those are grep false-positives and should be
+ * silently discarded — they are NOT invalid usages.
+ *
+ * Returns true when:
+ *   - Any FQCN variant is present (backslash / dash / underscore form), OR
+ *   - The short class name appears at a word boundary (not inside a longer word)
+ *
+ * @param  array<string,string> $variants  from fqcnVariants()
+ */
+function isPlausibleReference(string $content, array $variants, string $className): bool {
+    $lower = strtolower($content);
+
+    // Any FQCN variant is an unambiguous reference
+    // fqcn-single and fqcn-double are case-sensitive; fqcn-dash and fqcn-underscore are not
+    foreach (['fqcn-single', 'fqcn-double'] as $label) {
+        if (str_contains($content, $variants[$label])) {
+            return true;
+        }
+    }
+    foreach (['fqcn-dash', 'fqcn-underscore'] as $label) {
+        if (str_contains($lower, strtolower($variants[$label]))) {
+            return true;
+        }
+    }
+
+    // Short name: require a word boundary on both sides so that e.g.
+    // "MedicalTestIndexPage" does NOT count as a reference to "IndexPage".
+    // NOTE: backslash is intentionally NOT excluded here — \ClassName is a
+    // namespace-qualified reference and must be treated as plausible so that
+    // a wrong namespace (e.g. Traitssss\ModelPermissionsTrait) reaches
+    // classifyLine and is reported as invalid.
+    return (bool) preg_match(
+        '/(?<![A-Za-z0-9_])' . preg_quote($className, '/') . '(?![A-Za-z0-9_])/',
+        $content
+    );
+}
+
+/**
+ * Stage 2: Given that the line IS a plausible reference, which valid format
+ * does it match? Returns 'valid:<label>' or 'invalid'.
+ *
+ * @param  array<string,string> $variants  from fqcnVariants()
+ */
+function classifyLine(string $line, array $variants, string $className): string {
+    $parts   = explode(':', $line, 3);
+    $content = count($parts) >= 3 ? $parts[2] : $line;
+    $lower   = strtolower($content);
+
+    // Check longest/most-specific variants first to avoid mis-classifying a FQCN as "short"
+    $checks = [
+        // label              needle                          case-insensitive?
+        ['fqcn-double',     $variants['fqcn-double'],     false],
+        ['fqcn-single',     $variants['fqcn-single'],     false],
+        ['fqcn-dash',       $variants['fqcn-dash'],       true ],  // case-insensitive: matches foo-bar too
+        ['fqcn-underscore', $variants['fqcn-underscore'], true ],
+    ];
+
+    foreach ($checks as [$label, $needle, $ci]) {
+        $haystack = $ci ? $lower : $content;
+        $needle   = $ci ? strtolower($needle) : $needle;
+        if (str_contains($haystack, $needle)) {
+            return 'valid:' . $label;
+        }
+    }
+
+    // Short name at a word boundary
+    if (preg_match('/(?<![A-Za-z0-9_\\])' . preg_quote($className, '/') . '(?![A-Za-z0-9_])/', $content)) {
+        return 'valid:short';
+    }
+
+    return 'invalid';
+}
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
+
+$args = array_slice($argv, 1);
+$args = array_values(array_filter($args, fn($a) => $a !== '--strict')); // --strict kept for compat but now default
+
+if (count($args) < 1) {
+    printHelp();
+    exit(1);
+}
+
+$scanFolder = $args[0];
+$rootDir    = getcwd();
+
+if (!is_dir($scanFolder)) {
+    fwrite(STDERR, clr("Error: scan-folder '$scanFolder' does not exist.\n", 'red'));
+    exit(1);
+}
+
+// ── Resolve namespace prefix ──────────────────────────────────────────────────
+if (isset($args[1])) {
+    $nsPrefix = rtrim(trim($args[1]), '\\');
+    $nsSource = 'argument';
+} else {
+    $nsPrefix = detectNamespacePrefix($scanFolder, $rootDir);
+    $nsSource = 'composer.json';
+    if ($nsPrefix === null) {
+        fwrite(STDERR, clr(
+            "Error: could not detect namespace prefix from composer.json.\n" .
+            "       Pass it as a second argument: php find-usages.php <folder> 'Foo\\Bar'\n",
+            'red'
+        ));
+        exit(1);
+    }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+echo clr("► Scan folder : ", 'bold') . realpath($scanFolder) . "\n";
+echo clr("► Root dir    : ", 'bold') . $rootDir . "\n";
+echo clr("► NS prefix   : ", 'bold') . $nsPrefix . clr("  (via $nsSource)", 'cyan') . "\n";
+echo "\n";
+echo clr("  Accepted formats (example: Foo\\Bar\\Baz\\MyClass):\n", 'cyan');
+echo clr("    1. ", 'cyan') . "short           MyClass\n";
+echo clr("    2. ", 'cyan') . "fqcn-single     Foo\\Bar\\Baz\\MyClass\n";
+echo clr("    3. ", 'cyan') . "fqcn-double     Foo\\\\Bar\\\\Baz\\\\MyClass\n";
+echo clr("    4. ", 'cyan') . "fqcn-dash       Foo-Bar-Baz-MyClass  (case-insensitive)\n";
+echo clr("    5. ", 'cyan') . "fqcn-underscore Foo_Bar_Baz_MyClass  (case-insensitive)\n";
+echo str_repeat('─', 72) . "\n\n";
+
+// ── Pass 1: collect all files and build FQCN registry ────────────────────────
+echo clr("Scanning...\n", 'cyan');
+$files = iterator_to_array(phpFiles($scanFolder, $rootDir), false);
+sort($files);
+
+// Registry: FQCN (string) => relative file path (string)
+$registry = [];
+foreach ($files as $filePath) {
+    $rel  = ltrim(str_replace($rootDir, '', $filePath), DIRECTORY_SEPARATOR);
+    echo "  " . $rel . "\n";
+    $info = extractFqcn($filePath);
+    if ($info !== null) {
+        $registry[$info['fqcn']] = $rel;
+    }
+}
+
+$totalFiles   = count($files);
+$invalidCount = 0;
+echo "\n";
+
+// ── Pass 2a: check use statements reference real FQCNs ───────────────────────
+// For every PHP file in the scan folder, extract `use` statements that begin
+// with our namespace prefix and verify each one exists in the registry.
+echo clr("Checking use statements...\n", 'cyan');
+
+foreach ($files as $filePath) {
+    $rel  = ltrim(str_replace($rootDir, '', $filePath), DIRECTORY_SEPARATOR);
+    $uses = extractUseStatements($filePath, $nsPrefix);
+    $bad  = [];
+
+    foreach ($uses as ['fqcn' => $usedFqcn, 'line' => $lineNo]) {
+        if (!isset($registry[$usedFqcn])) {
+            $bad[] = "    line $lineNo: use $usedFqcn";
+        }
+    }
+
+    if (!empty($bad)) {
+        $invalidCount += count($bad);
+        echo clr("File : ", 'bold') . $rel . "\n";
+        echo clr("  ✗ use statement(s) reference non-existent class (" . count($bad) . "):\n", 'red');
+        foreach ($bad as $msg) {
+            echo clr($msg . "\n", 'red');
+        }
+        echo "\n";
+    }
+}
+
+// ── Pass 2b: check external references use a valid format ────────────────────
+// For each class defined in the scan folder, grep the whole project for
+// references and ensure they use one of the accepted formats.
+echo clr("Checking external references...\n", 'cyan');
+
+foreach ($files as $filePath) {
+    $rel = ltrim(str_replace($rootDir, '', $filePath), DIRECTORY_SEPARATOR);
+
+    $info = extractFqcn($filePath);
+    if ($info === null) {
+        continue;
+    }
+
+    $fqcn      = $info['fqcn'];
+    $className = $info['class'];
+    $variants  = fqcnVariants($fqcn, $className);
+
+    // Collect grep hits, strip the defining file itself
+    $lines = collectHits($rootDir, $className);
+    $lines = array_filter($lines, function (string $line) use ($filePath) {
+        $hitPath = realpath(explode(':', $line, 2)[0]) ?: explode(':', $line, 2)[0];
+        return $hitPath !== $filePath;
+    });
+
+    if (empty($lines)) {
+        continue;
+    }
+
+    // Stage 1: drop substring false-positives; Stage 2: flag invalid formats
+    $invalid = [];
+    foreach ($lines as $line) {
+        $parts   = explode(':', $line, 3);
+        $content = count($parts) >= 3 ? $parts[2] : $line;
+
+        if (!isPlausibleReference($content, $variants, $className)) {
+            continue;
+        }
+
+        if (!str_starts_with(classifyLine($line, $variants, $className), 'valid')) {
+            $invalid[] = $line;
+        }
+    }
+
+    if (empty($invalid)) {
+        continue;
+    }
+
+    $invalidCount += count($invalid);
+    echo clr("File : ", 'bold') . $rel . "\n";
+    echo clr("FQCN : ", 'bold') . $fqcn . "\n";
+    echo clr("  ✗ Invalid external references (" . count($invalid) . "):\n", 'red');
+    foreach ($invalid as $line) {
+        echo clr("    ", 'red') . trim($line) . "\n";
+    }
+    echo "\n";
+}
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+echo str_repeat('─', 72) . "\n";
+echo clr("Scanned $totalFiles PHP file(s). ", 'bold');
+
+if ($invalidCount === 0) {
+    echo clr("All usages are valid ✓\n", 'green');
+} else {
+    echo clr("$invalidCount error(s) found ✗\n", 'red');
+}
+
+exit($invalidCount > 0 ? 1 : 0);
