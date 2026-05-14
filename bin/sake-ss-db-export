@@ -71,10 +71,27 @@ fi
 
 if [[ -n "$output_file" ]]; then
     echonice "Executing query and exporting to $output_file..."
-    # Execute with headers, tab-separated, then convert tabs to commas
-    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "$query" -B | sed 's/\t/,/g' >"$output_file"
+
+    # Execute in batch mode (tab-separated), force UTF-8,
+    # and use PHP to properly unescape MySQL outputs and encode to strict CSV.
+    mysql --default-character-set=utf8mb4 -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -B -e "$query" | php -r '
+        $in = fopen("php://stdin", "r");
+        $out = fopen("php://stdout", "w");
+        while (($line = fgets($in)) !== false) {
+            $line = rtrim($line, "\r\n");
+            $fields = explode("\t", $line);
+            foreach ($fields as &$f) {
+                // MySQL batch mode escapes tabs, newlines, and backslashes. Decode them here.
+                $f = str_replace(["\\n", "\\t", "\\\\"], ["\n", "\t", "\\"], $f);
+            }
+            fputcsv($out, $fields);
+        }
+        fclose($in);
+        fclose($out);
+    ' >"$output_file"
+
     echogood "Export Complete."
 else
     # Just run the query and output to terminal
-    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -A "$DB_NAME" -e "$query"
+    mysql --default-character-set=utf8mb4 -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -A "$DB_NAME" -e "$query"
 fi
