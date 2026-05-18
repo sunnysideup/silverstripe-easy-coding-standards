@@ -53,5 +53,7 @@ sudo apt-get install -y chromium-browser
 ECHOHEAD "Chromium installed"
 chromium-browser --version
 
+sudo apt update -y && sudo apt upgrade google-chrome-stable -y
+
 
 echoend
