@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+# server-check.sh — gentle server health & benchmark
+# Reports CPU / RAM / disk I/O / database stats without stressing the box.
+#
+# Usage:   ./server-check.sh [path/to/.env]
+# Tunable: IO_TEST_SIZE_MB, CPU_TEST_SECONDS, DB_QUERY_ROWS env vars.
+
+set -uo pipefail
+
+# ---------- config ----------
+ENV_FILE="${1:-.env}"
+WORK_DIR="${WORK_DIR:-./srvcheck-$$}"     # default to cwd — /tmp is often tmpfs
+IO_TEST_SIZE_MB="${IO_TEST_SIZE_MB:-64}"      # small file → low impact
+CPU_TEST_SECONDS="${CPU_TEST_SECONDS:-3}"     # short burst
+NICE_LEVEL="${NICE_LEVEL:-19}"                # lowest CPU priority
+IONICE_CLASS="${IONICE_CLASS:-3}"             # idle I/O class
+DB_QUERY_ROWS="${DB_QUERY_ROWS:-10000}"
+
+# ---------- helpers ----------
+bold()  { printf '\n\033[1m%s\033[0m\n' "$*"; }
+dim()   { printf '\033[2m%s\033[0m\n' "$*"; }
+hr()    { printf -- '─%.0s' {1..60}; printf '\n'; }
+have()  { command -v "$1" >/dev/null 2>&1; }
+indent(){ sed 's/^/  /'; }
+gentle() {
+  # Run a command at low CPU & I/O priority. Don't swallow its stderr —
+  # tools like dd report their results on stderr.
+  if have ionice; then
+    nice -n "$NICE_LEVEL" ionice -c "$IONICE_CLASS" "$@"
+  else
+    nice -n "$NICE_LEVEL" "$@"
+  fi
+}
+
+cleanup() { rm -rf "$WORK_DIR" 2>/dev/null || true; }
+trap cleanup EXIT
+mkdir -p "$WORK_DIR"
+
+ms_since() {     # ms_since <start_epoch_ns>
+  local start="$1" now
+  now=$(date +%s%N)
+  awk "BEGIN{printf \"%.2f\", ($now-$start)/1000000}"
+}
+
+# ---------- load .env ----------
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+  dim "Loaded $ENV_FILE"
+else
+  dim "No .env at '$ENV_FILE' — database section will be skipped."
+fi
+
+# Normalize common variants → generic DB_* used below.
+# Supports: generic, Laravel (DB_USERNAME/DB_DATABASE/DB_CONNECTION),
+#           SilverStripe (SS_DATABASE_*).
+DB_HOST="${DB_HOST:-${DB_SERVER:-${SS_DATABASE_SERVER:-127.0.0.1}}}"
+DB_PORT="${DB_PORT:-${SS_DATABASE_PORT:-}}"
+DB_USER="${DB_USER:-${DB_USERNAME:-${SS_DATABASE_USERNAME:-}}}"
+DB_PASSWORD="${DB_PASSWORD:-${DB_PASS:-${SS_DATABASE_PASSWORD:-}}}"
+DB_NAME="${DB_NAME:-${DB_DATABASE:-${SS_DATABASE_NAME:-}}}"
+DB_TYPE="${DB_TYPE:-${DB_CONNECTION:-}}"
+
+# SilverStripe stores the engine as a class name (e.g. MySQLDatabase) — map it.
+if [[ -z "$DB_TYPE" && -n "${SS_DATABASE_DATABASE_CLASS:-}" ]]; then
+  case "${SS_DATABASE_DATABASE_CLASS}" in
+    MySQLDatabase|MySQLPDODatabase)        DB_TYPE="mysql" ;;
+    PostgreSQLDatabase|PostgrePDODatabase) DB_TYPE="postgres" ;;
+    *) DB_TYPE="${SS_DATABASE_DATABASE_CLASS}" ;;
+  esac
+fi
+
+# ========== SYSTEM INFO ==========
+bold "═══ System ═══"
+{
+  echo "Host    : $(hostname)"
+  echo "Kernel  : $(uname -srmo)"
+  if [[ -f /etc/os-release ]]; then
+    echo "Distro  : $(. /etc/os-release; echo "$PRETTY_NAME")"
+  fi
+  echo "Uptime  : $(uptime -p 2>/dev/null || uptime)"
+  echo "Load avg: $(cut -d' ' -f1-3 /proc/loadavg)"
+} | indent
+
+# ========== CPU ==========
+bold "═══ CPU ═══"
+if have lscpu; then
+  lscpu | grep -E 'Model name|Socket|Core|Thread|CPU MHz|CPU max MHz|Architecture' | indent
+else
+  grep -E 'model name|cpu MHz' /proc/cpuinfo | head -4 | indent
+fi
+CPU_COUNT=$(nproc 2>/dev/null || echo 1)
+echo "  Logical CPUs: $CPU_COUNT"
+
+echo
+dim "  Running openssl speed (sha256, ${CPU_TEST_SECONDS}s) — single core…"
+if have openssl; then
+  # openssl speed hashes in-process; numbers are kB/s for various block sizes.
+  SPEED_OUT=$(gentle openssl speed -seconds "$CPU_TEST_SECONDS" -evp sha256 2>&1)
+  HEADER=$(printf 'type             16 bytes     64 bytes    256 bytes   1024 bytes   8192 bytes  16384 bytes')
+  SHA_LINE=$(echo "$SPEED_OUT" | awk '/^sha256/ {print; exit}')
+  if [[ -n "$SHA_LINE" ]]; then
+    echo "$HEADER" | indent
+    echo "$SHA_LINE" | indent
+    dim "  (figures are 1000s of bytes per second)"
+  else
+    echo "  openssl speed produced no result — falling back:"
+    echo "$SPEED_OUT" | tail -5 | indent
+  fi
+else
+  echo "  openssl not available — CPU benchmark skipped"
+fi
+
+# ========== MEMORY ==========
+bold "═══ Memory ═══"
+if have free; then
+  free -h | indent
+else
+  grep -E 'MemTotal|MemAvailable|SwapTotal|SwapFree' /proc/meminfo | indent
+fi
+echo
+dim "  Memory bandwidth (512 MB through /dev/null)…"
+gentle dd if=/dev/zero of=/dev/null bs=1M count=512 2>&1 | tail -1 | indent
+
+# ---- Swap analysis ----
+echo
+SWAP_USED_KB=$(awk '/^SwapTotal/{t=$2} /^SwapFree/{f=$2} END{print t-f}' /proc/meminfo)
+SWAP_USED_MB=$((SWAP_USED_KB / 1024))
+SWAPPINESS=$(cat /proc/sys/vm/swappiness 2>/dev/null || echo "?")
+echo "  vm.swappiness : $SWAPPINESS  $([ "$SWAPPINESS" -gt 30 ] 2>/dev/null && echo '(high — 10 is recommended for DB hosts)')"
+echo "  Swap in use   : ${SWAP_USED_MB} MB"
+
+if (( SWAP_USED_MB > 100 )); then
+  echo
+  dim "  Top swap holders (process + KB in swap):"
+  if [[ -r /proc/1/status ]]; then
+    {
+      for f in /proc/[0-9]*/status; do
+        awk '/^Name:/{n=$2} /^VmSwap:/{print n, $2}' "$f" 2>/dev/null
+      done | sort -k2 -n | tail -10
+    } | indent
+    [[ $EUID -ne 0 ]] && dim "  (run as root to see all processes, including system services)"
+  else
+    echo "  (cannot read /proc — skipped)" | indent
+  fi
+fi
+
+# ========== DISK I/O ==========
+bold "═══ Disk I/O ═══"
+df -hT "$WORK_DIR" 2>/dev/null | indent
+
+# Warn loudly if we're benchmarking RAM, not disk.
+WORK_FS=$(df -T "$WORK_DIR" 2>/dev/null | awk 'NR==2 {print $2}')
+case "$WORK_FS" in
+  tmpfs|ramfs)
+    echo
+    echo "  ⚠  WORK_DIR ($WORK_DIR) is on $WORK_FS — RAM-backed, not real disk."
+    echo "     Numbers below reflect memory speed, not storage. Re-run with"
+    echo "     WORK_DIR=/var/tmp/srvcheck (or another real-disk path)."
+    ;;
+esac
+echo
+dim "  Sequential write — ${IO_TEST_SIZE_MB} MB with fdatasync…"
+gentle dd if=/dev/zero of="$WORK_DIR/io.test" \
+  bs=1M count="$IO_TEST_SIZE_MB" conv=fdatasync 2>&1 | tail -1 | indent
+
+# drop cache for an honest read test if we can
+sync
+[[ -w /proc/sys/vm/drop_caches ]] && echo 1 > /proc/sys/vm/drop_caches 2>/dev/null || true
+
+dim "  Sequential read — ${IO_TEST_SIZE_MB} MB…"
+gentle dd if="$WORK_DIR/io.test" of=/dev/null bs=1M 2>&1 | tail -1 | indent
+rm -f "$WORK_DIR/io.test"
+
+# ========== DATABASE ==========
+bold "═══ Database ═══"
+
+bench_mysql() {
+  local port="${DB_PORT:-3306}" t0 dur
+  echo "  Engine : MySQL / MariaDB"
+  echo "  Target : ${DB_USER}@${DB_HOST}:${port}/${DB_NAME}"
+
+  t0=$(date +%s%N)
+  if ! mysql --connect-timeout=5 -h "$DB_HOST" -P "$port" \
+        -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+        -e "SELECT 1;" >/dev/null 2>&1; then
+    echo "  ✗ Connection failed"; return 1
+  fi
+  echo "  Connect + SELECT 1 : $(ms_since "$t0") ms"
+
+  t0=$(date +%s%N)
+  mysql -h "$DB_HOST" -P "$port" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+    -e "SELECT BENCHMARK($DB_QUERY_ROWS, MD5(RAND()));" >/dev/null 2>&1
+  echo "  BENCHMARK($DB_QUERY_ROWS × MD5) : $(ms_since "$t0") ms"
+
+  mysql -h "$DB_HOST" -P "$port" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -N -e "
+    SELECT CONCAT('  Version          : ', VERSION());
+    SELECT CONCAT('  Uptime (s)       : ', VARIABLE_VALUE)
+      FROM performance_schema.global_status WHERE VARIABLE_NAME='Uptime';
+    SELECT CONCAT('  Threads connected: ', VARIABLE_VALUE)
+      FROM performance_schema.global_status WHERE VARIABLE_NAME='Threads_connected';
+  " 2>/dev/null
+
+  # ---- Sizing audit ----
+  echo
+  dim "  Configuration & sizing:"
+  mysql -h "$DB_HOST" -P "$port" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -N -B -e "
+    SELECT CONCAT('  innodb_buffer_pool : ', ROUND(@@innodb_buffer_pool_size/1024/1024/1024, 2), ' GB');
+    SELECT CONCAT('  key_buffer         : ', ROUND(@@key_buffer_size/1024/1024), ' MB');
+    SELECT CONCAT('  max_connections    : ', @@max_connections);
+    SELECT CONCAT('  sort_buffer (×conn): ', ROUND(@@sort_buffer_size/1024/1024, 2), ' MB');
+    SELECT CONCAT('  join_buffer (×conn): ', ROUND(@@join_buffer_size/1024/1024, 2), ' MB');
+  " 2>/dev/null
+
+  # Sanity check: buffer pool vs system RAM
+  BP_BYTES=$(mysql -h "$DB_HOST" -P "$port" -u "$DB_USER" -p"$DB_PASSWORD" -N -B \
+    -e "SELECT @@innodb_buffer_pool_size;" 2>/dev/null)
+  RAM_BYTES=$(awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo)
+  if [[ -n "$BP_BYTES" && -n "$RAM_BYTES" && "$RAM_BYTES" -gt 0 ]]; then
+    BP_PCT=$(awk "BEGIN{printf \"%.0f\", $BP_BYTES * 100 / $RAM_BYTES}")
+    echo "  Buffer pool is ${BP_PCT}% of system RAM"
+    if (( BP_PCT > 60 )); then
+      echo "    ⚠  Too high for a shared host (web+DB). Target: 30–40%."
+    fi
+  fi
+
+  echo
+  dim "  Data size & engines:"
+  mysql -h "$DB_HOST" -P "$port" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -N -B -e "
+    SELECT CONCAT('  Total data + indexes : ',
+                  ROUND(SUM(data_length+index_length)/1024/1024/1024, 2), ' GB')
+      FROM information_schema.tables
+      WHERE table_schema NOT IN ('mysql','information_schema','performance_schema','sys');
+    SELECT CONCAT('  ', engine, ' tables: ', COUNT(*))
+      FROM information_schema.tables
+      WHERE table_schema NOT IN ('mysql','information_schema','performance_schema','sys')
+      GROUP BY engine;
+  " 2>/dev/null
+
+  echo
+  dim "  Slow query log:"
+  mysql -h "$DB_HOST" -P "$port" -u "$DB_USER" -p"$DB_PASSWORD" -N -B -e "
+    SELECT CONCAT('  slow_query_log     : ', @@slow_query_log);
+    SELECT CONCAT('  long_query_time    : ', @@long_query_time, ' s');
+    SELECT CONCAT('  Slow queries since boot: ', VARIABLE_VALUE)
+      FROM performance_schema.global_status WHERE VARIABLE_NAME='Slow_queries';
+  " 2>/dev/null
+}
+
+bench_psql() {
+  local port="${DB_PORT:-5432}" t0
+  export PGPASSWORD="$DB_PASSWORD"
+  echo "  Engine : PostgreSQL"
+  echo "  Target : ${DB_USER}@${DB_HOST}:${port}/${DB_NAME}"
+
+  t0=$(date +%s%N)
+  if ! psql -h "$DB_HOST" -p "$port" -U "$DB_USER" -d "$DB_NAME" \
+        -c "SELECT 1;" >/dev/null 2>&1; then
+    echo "  ✗ Connection failed"; return 1
+  fi
+  echo "  Connect + SELECT 1 : $(ms_since "$t0") ms"
+
+  t0=$(date +%s%N)
+  psql -h "$DB_HOST" -p "$port" -U "$DB_USER" -d "$DB_NAME" -c "
+    SELECT count(*) FROM (
+      SELECT md5(g::text) FROM generate_series(1,$DB_QUERY_ROWS) g
+    ) x;" >/dev/null 2>&1
+  echo "  ${DB_QUERY_ROWS}-row md5 query : $(ms_since "$t0") ms"
+
+  psql -h "$DB_HOST" -p "$port" -U "$DB_USER" -d "$DB_NAME" -At -c "
+    SELECT '  Version          : '||version();
+    SELECT '  Uptime           : '||(now()-pg_postmaster_start_time())::text;
+    SELECT '  Active conns     : '||count(*)::text FROM pg_stat_activity;
+  " 2>/dev/null
+}
+
+case "${DB_TYPE,,}" in
+  mysql|mariadb)
+    have mysql && bench_mysql || echo "  mysql client not installed" ;;
+  pgsql|postgres|postgresql)
+    have psql && bench_psql || echo "  psql client not installed" ;;
+  "")
+    echo "  DB_TYPE / DB_CONNECTION not set in $ENV_FILE — skipping." ;;
+  *)
+    echo "  Unsupported DB_TYPE='$DB_TYPE' (expected mysql or postgres)" ;;
+esac
+
+hr
+
+# ========== PHP / OPCACHE ==========
+bold "═══ PHP & Opcache ═══"
+PHP_BIN=$(command -v php 2>/dev/null || true)
+if [[ -z "$PHP_BIN" ]]; then
+  echo "  PHP not installed — skipping"
+else
+  PHP_VER=$("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null)
+  echo "  PHP version : $PHP_VER"
+
+  # Find php-fpm — try a few common names
+  FPM_BIN=""
+  for cand in "php-fpm${PHP_VER%.*}" "php${PHP_VER%.*}-fpm" php-fpm; do
+    if have "$cand"; then FPM_BIN=$(command -v "$cand"); break; fi
+  done
+  [[ -n "$FPM_BIN" ]] && echo "  php-fpm     : $FPM_BIN"
+
+  # Show opcache settings from the FPM ini if we can find it
+  FPM_INI=""
+  for cand in "/etc/php/${PHP_VER%.*}/fpm/php.ini" "/etc/php-fpm.conf" "/etc/php/fpm/php.ini"; do
+    [[ -f "$cand" ]] && FPM_INI="$cand" && break
+  done
+
+  if [[ -n "$FPM_INI" ]]; then
+    echo "  FPM ini     : $FPM_INI"
+    echo
+    dim "  Opcache settings (from FPM ini):"
+    grep -E '^\s*opcache\.(enable|memory_consumption|max_accelerated_files|interned_strings_buffer|validate_timestamps|revalidate_freq)\s*=' \
+      "$FPM_INI" 2>/dev/null | sed 's/^/    /' || echo "    (no explicit opcache.* values — using PHP defaults)"
+  else
+    echo "  Couldn't locate FPM php.ini — falling back to CLI settings"
+    echo
+    dim "  Opcache settings (CLI):"
+    "$PHP_BIN" -i 2>/dev/null | grep -E 'opcache\.(enable|memory_consumption|max_accelerated_files|interned_strings_buffer)' | sed 's/^/    /'
+  fi
+
+  # Warnings based on undersized values
+  MC=$(grep -E '^\s*opcache\.memory_consumption\s*=' "$FPM_INI" 2>/dev/null | awk -F= '{gsub(/[^0-9]/,"",$2); print $2}')
+  MF=$(grep -E '^\s*opcache\.max_accelerated_files\s*=' "$FPM_INI" 2>/dev/null | awk -F= '{gsub(/[^0-9]/,"",$2); print $2}')
+  echo
+  dim "  Recommendations for a SilverStripe / Laravel-sized app:"
+  [[ -n "$MC" && "$MC" -lt 256 ]] && \
+    echo "    ⚠  memory_consumption=${MC} — raise to 256 (currently risks eviction)"
+  [[ -n "$MF" && "$MF" -lt 20000 ]] && \
+    echo "    ⚠  max_accelerated_files=${MF} — raise to 20000"
+  grep -qE '^\s*opcache\.interned_strings_buffer\s*=' "$FPM_INI" 2>/dev/null || \
+    echo "    ⚠  interned_strings_buffer not set — add it at 16 (MB)"
+fi
+
+hr
+
+# ========== SUMMARY ==========
+bold "═══ Summary & Recommendations ═══"
+ISSUES=0
+
+# Swap > 1 GB used
+if (( SWAP_USED_MB > 1024 )); then
+  echo "  ⚠  Heavy swap usage (${SWAP_USED_MB} MB). Investigate top swap holders above."
+  echo "     If MariaDB/MySQL is the culprit, restart it during a quiet window."
+  ISSUES=$((ISSUES+1))
+fi
+
+# Swappiness too high
+if [[ "$SWAPPINESS" =~ ^[0-9]+$ ]] && (( SWAPPINESS > 30 )); then
+  echo "  ⚠  vm.swappiness=$SWAPPINESS is high for a DB host. Lower to 10:"
+  echo "     sudo sysctl -w vm.swappiness=10"
+  echo "     echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swappiness.conf"
+  ISSUES=$((ISSUES+1))
+fi
+
+# Buffer pool vs RAM
+if [[ -n "${BP_PCT:-}" ]] && (( BP_PCT > 60 )); then
+  echo "  ⚠  innodb_buffer_pool at ${BP_PCT}% of RAM is too large for a shared host."
+  echo "     Edit MariaDB config and lower it to 30–40% of RAM."
+  ISSUES=$((ISSUES+1))
+fi
+
+# Opcache undersized
+if [[ -n "${MC:-}" && "$MC" -lt 256 ]]; then
+  echo "  ⚠  opcache.memory_consumption=${MC} is small for a modern PHP framework."
+  ISSUES=$((ISSUES+1))
+fi
+
+(( ISSUES == 0 )) && echo "  ✓  No major configuration issues detected."
+
+hr
+bold "Done."

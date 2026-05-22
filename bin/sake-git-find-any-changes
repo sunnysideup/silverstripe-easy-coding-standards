@@ -137,6 +137,8 @@ find "$rootDir" -type d -name .git -prune 2>/dev/null | while IFS= read -r gitDi
     if hasLocalChanges "$repoDir" || hasUnpushedCommitsAfterPull "$repoDir"; then
         if canPush "$repoDir"; then
             echo "$repoDir"
+            git add . -A
+            meld "$repoDir"
         fi
     fi
 done
