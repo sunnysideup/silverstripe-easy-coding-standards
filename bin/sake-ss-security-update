@@ -121,7 +121,7 @@ add_step \
     ''
 add_step \
     'Write all Data Objects!' \
-    'vendor/bin/sake dev/tasks/write-all-data-objects' \
+    'sudo -u www-data vendor/bin/sake dev/tasks/write-all-data-objects' \
     ''
 add_step \
     'Check all end-points' \
