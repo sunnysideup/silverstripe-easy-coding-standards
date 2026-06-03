@@ -12,37 +12,131 @@ dir='./'
 ############################################ STEPS
 # Each entry: "Label ::: command"
 # Add / remove / reorder steps here -- everything else adapts.
-STEPS=(
-    'Checkout develop branch ::: git checkout develop'
-    'Show git status ::: git status'
-    'Quick commit (cleanup) ::: sake-git-commit-quick -m "FIX: cleanup"'
-    'Commit and push vendor packages ::: sake-git-commit-and-push-vendor-packages . -s "yes"'
-    'Merge production into develop ::: sake-git-merge-towards-production -r'
-    'Rsync all ::: sake-ss-rsync-all'
-    'Dev build (pass 1) ::: sake-ss-dev-build'
-    'Apply patches (pass 1) ::: bin/apply-patches.sh'
-    'Run tests (pass 1) ::: bin/tests.sh'
-    'Composer update (pass 1) ::: sake-composer-update'
-    'Lint app ::: sake-lint-all app'
-    'Dev build (pass 2) ::: sake-ss-dev-build'
-    'Apply patches (pass 2) ::: bin/apply-patches.sh'
-    'Run tests (pass 2) ::: bin/tests.sh'
-    'Commit and push security checker update ::: sake-git-commit-and-push -m "FIX: update security checker"'
-    'Push to production ::: sake-git-merge-towards-production --ship'
-)
+# Internal field separator: ASCII Unit Separator (0x1F).
+# Safe because it never appears in labels, commands, or comments.
+readonly FS=$'\x1f'
+
+STEPS=()
+
+# add_step <label> <command> [comment]
+add_step() {
+    STEPS+=("${1}${FS}${2}${FS}${3-}")
+}
+
+## CLEAN PROJECT:
+add_step \
+    'Checkout develop branch' \
+    'git checkout develop' \
+    ''
+add_step \
+    'Show git status' \
+    'git status' \
+    ''
+add_step \
+    'Quick commit (cleanup)' \
+    'sake-git-commit-quick -m "FIX: cleanup"' \
+    ''
+add_step \
+    'Check vendor packages' \
+    'sake-git-commit-and-push-vendor-packages . -s "yes"' \
+    ''
+
+## REVERSE MERGE:
+add_step \
+    'Merge production into develop' \
+    'sake-git-merge-towards-production -r' \
+    ''
+add_step \
+    'Rsync all - ' \
+    'sake-ss-rsync-all' \
+    'make sure you have set up your preferred server in your .env SS_SERVER_FOR_EXAMPLE_DATA'
+add_step \
+    'Dev build (pass 1)' \
+    'sake-ss-dev-build' \
+    ''
+add_step \
+    'Apply patches (pass 2)' \
+    'bin/apply-patches.sh' \
+    ''
+add_step \
+    'Run tests (pass 2)' \
+    'bin/tests.sh' \
+    ''
+
+## COMPOSER UPDATE:
+add_step \
+    'Composer update (pass 1)' \
+    'sake-composer-update' \
+    ''
+
+# LINT AND CHECK:
+add_step \
+    'Lint app' \
+    'sake-lint-all [APP_FOLDERS]' \
+    ''
+add_step \
+    'Lint app' \
+    'sake-lint-remove-origs [APP_FOLDERS]' \
+    ''
+add_step \
+    'Check namespaces' \
+    'sake-composer-check-namespacing [APP_FOLDERS]' \
+    ''
+add_step \
+    'Dev build (pass 2)' \
+    'sake-ss-dev-build' \
+    ''
+add_step \
+    'Apply patches (pass 2)' \
+    'bin/apply-patches.sh' \
+    ''
+add_step \
+    'Run tests (pass 2)' \
+    'bin/tests.sh' \
+    ''
+add_step \
+    'Run Security Checks' \
+    'sake-lint-security --all' \
+    ''
+add_step \
+    'Write all Data Objects!' \
+    'vendor/bin/sake dev/tasks/write-all-data-objects' \
+    ''
+add_step \
+    'Check all end-points' \
+    'sake dev/tasks/smoketestcli' \
+    'This does not work in SS5, and you will need to run this manually.'
+
+## COMMIT AND PUSH TOWARDS PRODUCTION:
+add_step \
+    'Commit and push!' \
+    'sake-git-commit-and-push -m "FIX: update security checker"' \
+    ''
+
+add_step \
+    'Push to production' \
+    'sake-git-merge-towards-production --ship' \
+    'Make sure you have carried out all your checks and are ready to deploy before running this step!'
 
 TOTAL_STEPS=${#STEPS[@]}
 
-# Pull the label / command out of "Label ::: command".
+# --- accessors (same call convention as before: step_label 0, etc.) ---
+
 step_label() {
     local e="${STEPS[$1]}"
-    echo "${e%% :::*}"
-}
-step_cmd() {
-    local e="${STEPS[$1]}"
-    echo "${e#*::: }"
+    printf '%s' "${e%%"$FS"*}"
 }
 
+step_cmd() {
+    local e="${STEPS[$1]}"
+    e="${e#*"$FS"}"            # drop label
+    printf '%s' "${e%%"$FS"*}" # keep up to next FS
+}
+
+step_comment() {
+    local e="${STEPS[$1]}"
+    printf '%s' "${e##*"$FS"}"
+}
 ############################################ SETTINGS
 force="no"
 list_only="no"
@@ -76,6 +170,30 @@ while (($#)); do
     shift
 done
 
+############################################ APP FOLDERS
+# Level-1 folders under $dir that:
+#   - are not _dev, vendor, bin, or themes
+#   - do not contain a _manifest_exclude file
+APP_FOLDERS=()
+discover_app_folders() {
+    local base="${1:-.}"
+    local d name
+    APP_FOLDERS=()
+    shopt -s nullglob
+    for d in "$base"/*/; do
+        d="${d%/}"
+        name="${d##*/}"
+        case "$name" in
+        _dev | vendor | bin | themes) continue ;;
+        esac
+        [[ -e "$d/_manifest_exclude" ]] && continue
+        APP_FOLDERS+=("$name")
+    done
+    shopt -u nullglob
+}
+
+discover_app_folders "$dir"
+
 help_and_exit() {
 
     ECHOHEAD "Run the SilverStripe security update workflow"
@@ -86,6 +204,7 @@ help_and_exit() {
     echonice "Directory of script:          $SCRIPT_DIR"
     echonice "Directory to analyse:         $WORKING_DIR/$dir"
     echonice "Total steps:                  $TOTAL_STEPS"
+    echonice "App folders detected:         ${APP_FOLDERS[*]:-(none)}"
 
     ECHOHEAD "Available settings:"
     echonice "-f, --force                   run all steps without prompts"
@@ -158,6 +277,33 @@ prompt_choice() {
     done
 }
 
+# Runs a command. If it contains [APP_FOLDERS], runs it once per app folder
+# with the placeholder replaced by each folder name. Returns non-zero if any
+# invocation failed (keeps the last failing exit code).
+run_step_cmd() {
+    local cmd="$1"
+
+    if [[ "$cmd" != *'[APP_FOLDERS]'* ]]; then
+        eval "$cmd"
+        return $?
+    fi
+
+    if ((${#APP_FOLDERS[@]} == 0)); then
+        echonice "No app folders found for [APP_FOLDERS] -- nothing to run."
+        return 0
+    fi
+
+    local folder expanded rc=0 this_rc
+    for folder in "${APP_FOLDERS[@]}"; do
+        expanded="${cmd//\[APP_FOLDERS\]/$folder}"
+        echonice "-> $expanded"
+        eval "$expanded"
+        this_rc=$?
+        ((this_rc != 0)) && rc=$this_rc
+    done
+    return $rc
+}
+
 ############################################ RUN STEPS
 ECHOHEAD "Running steps $from_step..$to_step of $TOTAL_STEPS"
 
@@ -165,10 +311,12 @@ for ((i = from_step - 1; i < to_step; i++)); do
     step_num=$((i + 1))
     label="$(step_label "$i")"
     cmd="$(step_cmd "$i")"
+    comment="$(step_comment "$i")"
 
     while true; do
         ECHOHEAD "Step $step_num/$TOTAL_STEPS: $label"
         echonice "Command: $cmd"
+        echonice "Comment: $comment"
 
         if [[ "$force" == "yes" ]]; then
             action="o"
@@ -186,7 +334,7 @@ for ((i = from_step - 1; i < to_step; i++)); do
             exit 0
             ;;
         o)
-            eval "$cmd"
+            run_step_cmd "$cmd"
             rc=$?
             echo
             if ((rc == 0)); then

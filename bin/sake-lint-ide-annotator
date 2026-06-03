@@ -6,16 +6,12 @@ WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 SCRIPT_SUMMARY="Generates IDE annotations and DocBlock hints for DataObjects"
 
-############################################ DIR
+############################################ DIR & SETTINGS
 
-if [ "$1" != "" ]; then
-    dir=$1
-else
-    dir='app'
-fi
-
-############################################ SETTINGS
+dir=""
 help='no'
+
+# Parse arguments
 while (($#)); do
     case $1 in
     *)
@@ -30,7 +26,6 @@ while (($#)); do
 done
 
 help_and_exit() {
-
     ECHOHEAD "PHP IDE-ANNOTATOR"
     echonice "Generates IDE annotations and DocBlock hints for DataObjects and related classes."
     echonice ""
@@ -43,7 +38,8 @@ help_and_exit() {
     echonice "-h, --help                    show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-lint-ide-annotator  app "
+    echonice "sake-lint-ide-annotator app"
+    echonice "sake-lint-ide-annotator (Runs automatically on valid depth-1 folders)"
 
     echofunctions
     exit
@@ -55,26 +51,93 @@ sake_check_help_and_exit
 
 cd_or_fail "$WORKING_DIR" help_and_exit
 
-if [ -d "./$dir" ]; then
-    echonice "Directory exists: $dir"
+# 1. Determine target directories
+TARGET_DIRS=()
+
+if [ -n "$dir" ]; then
+    # Specific folder requested
+    if [ -d "./$dir" ]; then
+        TARGET_DIRS=("$dir")
+        echonice "Directory explicitly specified: $dir"
+    else
+        echobad "Folder $dir does not exist."
+        help_and_exit
+    fi
 else
-    echobad "Folder $app does not exist."
-    help_and_exit
+    # Automatically find depth 1 folders excluding specific system folders
+    for d in */; do
+        d="${d%/}" # Strip trailing slash
+
+        # Exclude specific folders
+        if [[ "$d" == "vendor" || "$d" == "themes" || "$d" == "bin" || "$d" == "_dev" ]]; then
+            continue
+        fi
+
+        # Exclude if _manifest_exclude exists
+        if [ -f "$d/_manifest_exclude" ]; then
+            continue
+        fi
+
+        TARGET_DIRS+=("$d")
+    done
+    echonice "No directory specified. Found directories to process: ${TARGET_DIRS[*]}"
 fi
 
-composer require --dev silverleague/ideannotator:3.x-dev
-cat >$dir/_config/ide-annotator.yml <<EOL
+# Exit if no valid folders found
+if [ ${#TARGET_DIRS[@]} -eq 0 ]; then
+    echobad "No valid directories found to process."
+    exit 1
+fi
+
+# 2. Prevent Composer install if package is already present
+if [ -d "vendor/silverleague/ideannotator" ]; then
+    echonice "silverleague/ideannotator is already installed. Skipping composer require."
+else
+    composer require --dev silverleague/ideannotator
+fi
+
+# 3. Check for existing configuration in app/_config/**.yml
+HAS_CONFIG=0
+if [ -d "app/_config" ]; then
+    # Use -rF to safely perform a recursive literal-string search
+    if grep -rF "SilverLeague\IDEAnnotator\DataObjectAnnotator:" app/_config/ 2>/dev/null; then
+        HAS_CONFIG=1
+    fi
+fi
+
+if [ "$HAS_CONFIG" -eq 1 ]; then
+    echonice "Annotator configuration already detected in app/_config. Skipping YAML creation."
+else
+    # Create the config dynamically.
+    # If app/_config doesn't exist, we generate it in the first target dir.
+    CONFIG_DIR="app/_config"
+    [ ! -d "$CONFIG_DIR" ] && CONFIG_DIR="${TARGET_DIRS[0]}/_config"
+
+    mkdir -p "$CONFIG_DIR"
+    CONFIG_FILE="$CONFIG_DIR/ide-annotator.yml"
+
+    cat >"$CONFIG_FILE" <<EOL
 ---
 Only:
     environment: 'dev'
 ---
 SilverLeague\IDEAnnotator\DataObjectAnnotator:
     enabled_modules:
-      - $dir
 EOL
 
-echogood "IDE Annotator file created in $dir/_config/ide-annotator.yml"
-echogood "You can now run sake dev/build to annotate your code"
-vendor/bin/sake dev/tasks/SilverLeague-IDEAnnotator-Tasks-DataObjectAnnotatorTask module=$dir
+    # Append all discovered directories to the config automatically
+    for d in "${TARGET_DIRS[@]}"; do
+        echo "      - $d" >>"$CONFIG_FILE"
+    done
+    echogood "IDE Annotator config file created at $CONFIG_FILE"
+fi
+
+echogood "You can now run sake dev/build to annotate your code if needed"
+
+# Run the task against all target modules
+for d in "${TARGET_DIRS[@]}"; do
+    echonice "Annotating module: $d"
+    vendor/bin/sake dev/tasks/SilverLeague-IDEAnnotator-Tasks-DataObjectAnnotatorTask module="$d"
+done
 
 echoend

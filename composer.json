@@ -65,6 +65,7 @@
     "bin/sake-git-pm-my-pull-requests",
     "bin/sake-git-pm-my-work-being-forked",
     "bin/sake-git-pm-scrutinizer-add",
+    "bin/sake-git-prod-diff",
     "bin/sake-git-squash-and-pr",
     "bin/sake-git-squash-commits",
     "bin/sake-git-squash-stale-branches",

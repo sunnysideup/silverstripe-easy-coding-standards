@@ -37,6 +37,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-merge-towards-production - take develop to production 
  - sake-git-my-pull-requests
  - sake-git-my-work-being-forked
+ - sake-git-prod-diff - check any hot fixes on the live site. 
  - sake-git-squash-and-pr - squash and make a pull request
  - sake-git-squash-commits
  - sake-git-tag

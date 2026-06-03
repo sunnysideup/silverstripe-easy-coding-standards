@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Reports which remote uncommitted changes are also applied locally"
+
+############################################ SETTINGS
+server=''
+help='no'
+envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
+
+############################################ ARGUMENTS
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        server=$1
+        ;;
+    esac
+    shift
+done
+
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
+
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
+    help_and_exit
+fi
+server="$(normalize_server "$server")"
+
+############################################ HELPERS
+
+help_and_exit() {
+    ECHOHEAD "Check Remote Git Diff"
+    echonice "Logs into the remote server, runs git diff, and compares with local changes."
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Working Directory:             $WORKING_DIR"
+    echonice "Server to check:               ${server:-"(not set)"}"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-check-diff my-server:/var/www/website-root"
+    echonice "sake-ss-check-diff my-server # default path is /container/application"
+
+    ECHOHEAD "Setting defaults:"
+    echonice "Set default server in .env with key $envServerKey,"
+    echonice " e.g. $envServerKey=my-server:/var/www/website-root"
+    echofunctions
+    exit
+}
+sake_check_help_and_exit
+
+############################################ RUN COMMANDS
+
+# Parse host and path from server (assuming format host:path)
+REMOTE_HOST="${server%%:*}"
+if [[ "$server" == *":"* ]]; then
+    REMOTE_PATH="${server#*:}"
+else
+    REMOTE_PATH="/container/application" # Default path based on your original script
+fi
+
+ECHOHEAD "Checking remote changes on: $REMOTE_HOST"
+echonice "Target Path: $REMOTE_PATH"
+
+# 1. Get remote modified files
+echonice "Fetching remote git diff --name-only..."
+REMOTE_FILES=$(ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && git diff --name-only" 2>/dev/null)
+
+if [[ -z "$REMOTE_FILES" ]]; then
+    echonice "Result: No uncommitted changes found on the remote server."
+    echoend
+    exit 0
+fi
+
+echonice "Remote has uncommitted modifications in the following files:"
+echo "$REMOTE_FILES" | sed 's/^/  - /'
+echonice ""
+
+# 2. Get local modified files
+echonice "Checking local git diff --name-only..."
+LOCAL_FILES=$(git diff --name-only 2>/dev/null)
+
+if [[ -z "$LOCAL_FILES" ]]; then
+    echonice "Result: No uncommitted changes found locally. None of the remote changes are applied here."
+    echoend
+    exit 0
+fi
+
+# 3. Compare files to report overlaps
+ECHOHEAD "Comparison Report"
+
+# Use 'comm' to find files that exist in both outputs
+COMMON_FILES=$(comm -12 <(echo "$REMOTE_FILES" | sort) <(echo "$LOCAL_FILES" | sort))
+
+if [[ -n "$COMMON_FILES" ]]; then
+    echonice "The following files have uncommitted changes BOTH on the remote and locally:"
+    echo "$COMMON_FILES" | sed 's/^/  [✓] /'
+    echonice ""
+    echonice "Note: To verify if the exact line-by-line changes match, run standard git diff on these files."
+else
+    echonice "Result: None of the remote file changes overlap with your local file changes."
+fi
+
+echoend

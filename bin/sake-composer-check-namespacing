@@ -2,14 +2,14 @@
 <?php
 
 /**
- * find-usages.php
+ * sake-composer-check-namespacing
  *
  * Recursively scans a folder for PHP files, extracts each file's fully-qualified
  * class name, then searches the project root for every usage of that class.
  * Usages are validated against six accepted formats.
  *
  * Usage:
- *   php find-usages.php <scan-folder> [namespace-prefix] [--strict]
+ *   php sake-composer-check-namespacing <scan-folder> [namespace-prefix] [--strict]
  *
  * Arguments:
  *   scan-folder        Folder to scan for PHP files  (e.g. health-navigator/src)
@@ -31,7 +31,8 @@
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
-function clr(string $text, string $color): string {
+function clr(string $text, string $color): string
+{
     static $colors = [
         'red'    => "\033[31m",
         'green'  => "\033[32m",
@@ -45,19 +46,20 @@ function clr(string $text, string $color): string {
 
 // ─── Usage / help ─────────────────────────────────────────────────────────────
 
-function printHelp(): void {
+function printHelp(): void
+{
     echo <<<HELP
 Usage:
-  php find-usages.php <scan-folder> [namespace-prefix] [--strict]
+  sake-composer-check-namespacing <scan-folder> [namespace-prefix] [--strict]
 
 Arguments:
-  scan-folder        Folder to scan for PHP files  (e.g. health-navigator/src)
+  scan-folder        Folder to scan for PHP files  (e.g. my-folder/src)
   namespace-prefix   (optional) Override the PSR-4 prefix detected from composer.json
   --strict           Exit 1 if any invalid usages are found
 
 Examples:
-  php find-usages.php health-navigator/src
-  php find-usages.php health-navigator/src 'App\HealthNavigator' --strict
+  sake-composer-check-namespacing my-folder/src
+  sake-composer-check-namespacing my-folder/src 'App\MyFolder' --strict
 
 HELP;
 }
@@ -70,7 +72,8 @@ HELP;
  *
  * @return list<array{namespace:string,path:string}>
  */
-function composerPsr4Mappings(string $rootDir): array {
+function composerPsr4Mappings(string $rootDir): array
+{
     $composerFile = $rootDir . DIRECTORY_SEPARATOR . 'composer.json';
     if (!file_exists($composerFile)) {
         return [];
@@ -104,7 +107,8 @@ function composerPsr4Mappings(string $rootDir): array {
  * Given the scan folder, find its PSR-4 namespace prefix from composer.json.
  * Picks the longest matching path so nested mappings win over broader ones.
  */
-function detectNamespacePrefix(string $scanFolder, string $rootDir): ?string {
+function detectNamespacePrefix(string $scanFolder, string $rootDir): ?string
+{
     $mappings = composerPsr4Mappings($rootDir);
     if (empty($mappings)) {
         return null;
@@ -141,7 +145,8 @@ function detectNamespacePrefix(string $scanFolder, string $rootDir): ?string {
  *
  * @return Generator<string>
  */
-function phpFiles(string $dir, string $rootDir): Generator {
+function phpFiles(string $dir, string $rootDir): Generator
+{
     $dirIt = new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS);
 
     $filter = new RecursiveCallbackFilterIterator(
@@ -178,7 +183,8 @@ function phpFiles(string $dir, string $rootDir): Generator {
 /**
  * @return array{namespace:string,class:string,fqcn:string}|null
  */
-function extractFqcn(string $filePath): ?array {
+function extractFqcn(string $filePath): ?array
+{
     $src = file_get_contents($filePath);
     if ($src === false) {
         return null;
@@ -248,7 +254,8 @@ function extractFqcn(string $filePath): ?array {
  *
  * @return list<array{fqcn:string,line:int}>
  */
-function extractUseStatements(string $filePath, string $nsPrefix): array {
+function extractUseStatements(string $filePath, string $nsPrefix): array
+{
     $src = file_get_contents($filePath);
     if ($src === false) {
         return [];
@@ -274,8 +281,12 @@ function extractUseStatements(string $filePath, string $nsPrefix): array {
         $braceDepth = 0;
         for ($k = 0; $k < $i; $k++) {
             if (is_string($tokens[$k])) {
-                if ($tokens[$k] === '{') $braceDepth++;
-                if ($tokens[$k] === '}') $braceDepth--;
+                if ($tokens[$k] === '{') {
+                    $braceDepth++;
+                }
+                if ($tokens[$k] === '}') {
+                    $braceDepth--;
+                }
             }
         }
         if ($braceDepth > 0) {
@@ -309,7 +320,9 @@ function extractUseStatements(string $filePath, string $nsPrefix): array {
             $members = preg_split('/\s*,\s*/', trim($m[2] ?? ''));
             foreach ($members as $member) {
                 $member = trim(preg_replace('/\s+as\s+\S+/i', '', $member));
-                if ($member === '') continue;
+                if ($member === '') {
+                    continue;
+                }
                 $fqcn = $prefix . '\\' . $member;
                 if (str_starts_with($fqcn, $nsPrefix)) {
                     $results[] = ['fqcn' => $fqcn, 'line' => $lineNo];
@@ -334,7 +347,8 @@ function extractUseStatements(string $filePath, string $nsPrefix): array {
  *
  * @return array<string,string>  label => literal string to match against
  */
-function fqcnVariants(string $fqcn, string $className): array {
+function fqcnVariants(string $fqcn, string $className): array
+{
     return [
         'short'           => $className,                                  // MyClass
         'fqcn-single'     => $fqcn,                                      // Foo\Bar\MyClass
@@ -352,10 +366,11 @@ function fqcnVariants(string $fqcn, string $className): array {
  *
  * @return list<string>  "filepath:lineNo:content" lines
  */
-function runGrep(string $rootDir, string $pattern, bool $caseInsensitive = false): array {
+function runGrep(string $rootDir, string $pattern, bool $caseInsensitive = false): array
+{
     $flag = $caseInsensitive ? '-rni' : '-rn';
     $includes = implode(' ', array_map(
-        fn($ext) => "--include=\"*.$ext\"",
+        fn ($ext) => "--include=\"*.$ext\"",
         ['php','twig','html','xml','yaml','yml','json','js','ts','jsx','tsx']
     ));
 
@@ -381,7 +396,8 @@ function runGrep(string $rootDir, string $pattern, bool $caseInsensitive = false
  *
  * @return list<string>
  */
-function collectHits(string $rootDir, string $className): array {
+function collectHits(string $rootDir, string $className): array
+{
     $seen = [];
     $hits = [];
 
@@ -415,7 +431,8 @@ function collectHits(string $rootDir, string $className): array {
  *
  * @param  array<string,string> $variants  from fqcnVariants()
  */
-function isPlausibleReference(string $content, array $variants, string $className): bool {
+function isPlausibleReference(string $content, array $variants, string $className): bool
+{
     $lower = strtolower($content);
 
     // Any FQCN variant is an unambiguous reference
@@ -449,7 +466,8 @@ function isPlausibleReference(string $content, array $variants, string $classNam
  *
  * @param  array<string,string> $variants  from fqcnVariants()
  */
-function classifyLine(string $line, array $variants, string $className): string {
+function classifyLine(string $line, array $variants, string $className): string
+{
     $parts   = explode(':', $line, 3);
     $content = count($parts) >= 3 ? $parts[2] : $line;
     $lower   = strtolower($content);
@@ -482,7 +500,7 @@ function classifyLine(string $line, array $variants, string $className): string 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 $args = array_slice($argv, 1);
-$args = array_values(array_filter($args, fn($a) => $a !== '--strict')); // --strict kept for compat but now default
+$args = array_values(array_filter($args, fn ($a) => $a !== '--strict')); // --strict kept for compat but now default
 
 if (count($args) < 1) {
     printHelp();
@@ -507,7 +525,7 @@ if (isset($args[1])) {
     if ($nsPrefix === null) {
         fwrite(STDERR, clr(
             "Error: could not detect namespace prefix from composer.json.\n" .
-            "       Pass it as a second argument: php find-usages.php <folder> 'Foo\\Bar'\n",
+            "       Pass it as a second argument: php sake-composer-check-namespacing <folder> 'Foo\\Bar'\n",
             'red'
         ));
         exit(1);
