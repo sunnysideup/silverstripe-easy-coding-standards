@@ -6,19 +6,26 @@
  *
  * Recursively scans a folder for PHP files, extracts each file's fully-qualified
  * class name, then searches the project root for every usage of that class.
- * Usages are validated against six accepted formats.
+ * Usages are validated against the accepted formats.
  *
  * Usage:
  *   php sake-composer-check-namespacing <scan-folder> [namespace-prefix] [--strict]
  *
  * Arguments:
- *   scan-folder        Folder to scan for PHP files  (e.g. health-navigator/src)
- *   namespace-prefix   (optional) Leading namespace prefix, e.g. 'XXX\YYY'.
- *                      If omitted, it is looked up automatically from composer.json
- *                      in the current directory via the PSR-4 autoload map.
+ *   scan-folder        Folder to scan for PHP files  (e.g. app, or app/src)
+ *   namespace-prefix   (optional) Leading namespace prefix, e.g. 'App\Website'.
+ *                      If omitted, every matching PSR-4 prefix is looked up
+ *                      automatically from composer.json in the current directory.
  *   --strict           Exit with code 1 if any invalid usages are found.
  *
  * The search root is always the directory from which the script is called (CWD).
+ *
+ * Namespace auto-detection accepts BOTH directions:
+ *   - the scan folder IS a PSR-4 root or a subfolder of one   (app/src  ⊆  app/src)
+ *   - a PSR-4 root lives INSIDE the scan folder                (app/src  ⊂  app)
+ * so running it against `app` finds the `App\Website => app/src` mapping.
+ * If several PSR-4 roots fall under the scan folder, ALL of their prefixes
+ * are collected and use-statements are checked against any of them.
  *
  * Accepted usage formats for FQCN "Foo\Bar\Baz\MyClass":
  *   1. Short name only              MyClass
@@ -53,13 +60,14 @@ Usage:
   sake-composer-check-namespacing <scan-folder> [namespace-prefix] [--strict]
 
 Arguments:
-  scan-folder        Folder to scan for PHP files  (e.g. my-folder/src)
+  scan-folder        Folder to scan for PHP files  (e.g. app, or app/src)
   namespace-prefix   (optional) Override the PSR-4 prefix detected from composer.json
   --strict           Exit 1 if any invalid usages are found
 
 Examples:
-  sake-composer-check-namespacing my-folder/src
-  sake-composer-check-namespacing my-folder/src 'App\MyFolder' --strict
+  sake-composer-check-namespacing app
+  sake-composer-check-namespacing app/src
+  sake-composer-check-namespacing app/src 'App\Website' --strict
 
 HELP;
 }
@@ -104,34 +112,58 @@ function composerPsr4Mappings(string $rootDir): array
 }
 
 /**
- * Given the scan folder, find its PSR-4 namespace prefix from composer.json.
- * Picks the longest matching path so nested mappings win over broader ones.
+ * Given the scan folder, find all PSR-4 namespace prefixes from composer.json
+ * whose mapped path is at/below the scan folder OR contains it.
+ *
+ * Both directions are accepted so that pointing at an ancestor folder
+ * (e.g. `app` when the mapping is `app/src`) still resolves the prefix.
+ *
+ * @return list<string>
  */
-function detectNamespacePrefix(string $scanFolder, string $rootDir): ?string
+function detectNamespacePrefixes(string $scanFolder, string $rootDir): array
 {
     $mappings = composerPsr4Mappings($rootDir);
     if (empty($mappings)) {
-        return null;
+        return [];
     }
 
     $absFolder = realpath($scanFolder) ?: $scanFolder;
     $relFolder = ltrim(str_replace(realpath($rootDir), '', $absFolder), DIRECTORY_SEPARATOR);
     $relFolder = str_replace('\\', '/', rtrim($relFolder, '/'));
 
-    $best    = null;
-    $bestLen = -1;
+    $prefixes = [];
 
     foreach ($mappings as ['namespace' => $ns, 'path' => $path]) {
         $normPath = str_replace('\\', '/', $path);
-        if ($relFolder === $normPath || str_starts_with($relFolder . '/', $normPath . '/')) {
-            if (strlen($normPath) > $bestLen) {
-                $bestLen = strlen($normPath);
-                $best    = $ns;
-            }
+
+        // scan folder is the PSR-4 root or a subfolder of it  (app/src  ⊆  app/src)
+        $scanAtOrBelowMap = $relFolder === $normPath
+            || str_starts_with($relFolder . '/', $normPath . '/');
+
+        // PSR-4 root lives inside the scan folder              (app/src  ⊂  app)
+        $mapBelowScan = str_starts_with($normPath . '/', $relFolder . '/');
+
+        if ($scanAtOrBelowMap || $mapBelowScan) {
+            $prefixes[$ns] = true; // dedupe via keys
         }
     }
 
-    return $best;
+    return array_keys($prefixes);
+}
+
+/**
+ * True if $fqcn begins with any of the supplied namespace prefixes.
+ *
+ * @param list<string> $prefixes
+ */
+function matchesAnyPrefix(string $fqcn, array $prefixes): bool
+{
+    foreach ($prefixes as $p) {
+        if (str_starts_with($fqcn, $p)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // ─── PHP file scanner ─────────────────────────────────────────────────────────
@@ -245,16 +277,18 @@ function extractFqcn(string $filePath): ?array
 // ─── Use-statement extractor ─────────────────────────────────────────────────
 
 /**
- * Extract all `use` statements from a PHP file that begin with $nsPrefix.
+ * Extract all `use` statements from a PHP file whose FQCN begins with any of
+ * the supplied namespace prefixes.
  *
  * Handles:
  *   use Foo\Bar\Baz;
  *   use Foo\Bar\Baz as Alias;
  *   use Foo\Bar\{Baz, Qux};          (grouped use)
  *
+ * @param  list<string> $nsPrefixes
  * @return list<array{fqcn:string,line:int}>
  */
-function extractUseStatements(string $filePath, string $nsPrefix): array
+function extractUseStatements(string $filePath, array $nsPrefixes): array
 {
     $src = file_get_contents($filePath);
     if ($src === false) {
@@ -272,12 +306,8 @@ function extractUseStatements(string $filePath, string $nsPrefix): array
             continue;
         }
 
-        // Skip trait use inside a class body (preceded by '{' at class level)
-        // We detect this by checking if there's a T_CLASS before this T_USE
-        // with no intervening T_FUNCTION — a rough but effective heuristic.
-        // A simpler approach: class-level `use` is indented and preceded by '{'.
-        // We skip T_USE tokens that are inside a class by checking brace depth.
-        // For simplicity, count braces up to this point.
+        // Skip trait `use` inside a class body. Detect by brace depth: a
+        // top-level import has brace depth 0; a trait use is nested in a class.
         $braceDepth = 0;
         for ($k = 0; $k < $i; $k++) {
             if (is_string($tokens[$k])) {
@@ -304,11 +334,9 @@ function extractUseStatements(string $filePath, string $nsPrefix): array
                 break;
             }
             if (is_array($t) && $t[0] !== T_WHITESPACE) {
-                if (is_string($t)) {
-                    $segment .= $t;
-                } else {
-                    $segment .= $t[1];
-                }
+                $segment .= $t[1];
+            } elseif (is_string($t)) {
+                $segment .= $t;
             }
             $j++;
         }
@@ -324,14 +352,14 @@ function extractUseStatements(string $filePath, string $nsPrefix): array
                     continue;
                 }
                 $fqcn = $prefix . '\\' . $member;
-                if (str_starts_with($fqcn, $nsPrefix)) {
+                if (matchesAnyPrefix($fqcn, $nsPrefixes)) {
                     $results[] = ['fqcn' => $fqcn, 'line' => $lineNo];
                 }
             }
         } else {
             // Strip alias:  Foo\Bar as Alias  →  Foo\Bar
             $fqcn = trim(preg_replace('/\s+as\s+\S+/i', '', $segment));
-            if (str_starts_with($fqcn, $nsPrefix)) {
+            if (matchesAnyPrefix($fqcn, $nsPrefixes)) {
                 $results[] = ['fqcn' => $fqcn, 'line' => $lineNo];
             }
         }
@@ -388,11 +416,8 @@ function runGrep(string $rootDir, string $pattern, bool $caseInsensitive = false
 }
 
 /**
- * Collect all grep hits for a class, running separate passes for:
- *   - canonical class name  (catches formats 1–4, 6)
- *   - lowercase class name  (catches format 5, front-end dash-lower)
- *
- * Results are deduplicated by "filepath:lineNo".
+ * Collect all grep hits for a class name. Results are deduplicated by
+ * "filepath:lineNo".
  *
  * @return list<string>
  */
@@ -401,7 +426,8 @@ function collectHits(string $rootDir, string $className): array
     $seen = [];
     $hits = [];
 
-    // Single pass — fqcn-dash and fqcn-underscore are matched case-insensitively in classifyLine
+    // Single pass — fqcn-dash and fqcn-underscore are matched case-insensitively
+    // later in classifyLine, so one case-sensitive grep on the class name is enough.
     foreach ([[$className, false]] as [$pattern, $ci]) {
         foreach (runGrep($rootDir, $pattern, $ci) as $line) {
             $key = implode(':', array_slice(explode(':', $line), 0, 2));
@@ -425,18 +451,14 @@ function collectHits(string $rootDir, string $className): array
  * searching for "IndexPage"). Those are grep false-positives and should be
  * silently discarded — they are NOT invalid usages.
  *
- * Returns true when:
- *   - Any FQCN variant is present (backslash / dash / underscore form), OR
- *   - The short class name appears at a word boundary (not inside a longer word)
- *
  * @param  array<string,string> $variants  from fqcnVariants()
  */
 function isPlausibleReference(string $content, array $variants, string $className): bool
 {
     $lower = strtolower($content);
 
-    // Any FQCN variant is an unambiguous reference
-    // fqcn-single and fqcn-double are case-sensitive; fqcn-dash and fqcn-underscore are not
+    // Any FQCN variant is an unambiguous reference.
+    // fqcn-single and fqcn-double are case-sensitive; dash/underscore are not.
     foreach (['fqcn-single', 'fqcn-double'] as $label) {
         if (str_contains($content, $variants[$label])) {
             return true;
@@ -450,9 +472,8 @@ function isPlausibleReference(string $content, array $variants, string $classNam
 
     // Short name: require a word boundary on both sides so that e.g.
     // "MedicalTestIndexPage" does NOT count as a reference to "IndexPage".
-    // NOTE: backslash is intentionally NOT excluded here — \ClassName is a
-    // namespace-qualified reference and must be treated as plausible so that
-    // a wrong namespace (e.g. Traitssss\ModelPermissionsTrait) reaches
+    // Backslash is intentionally NOT excluded so that a wrong-namespace
+    // reference (e.g. Traitssss\ModelPermissionsTrait) still reaches
     // classifyLine and is reported as invalid.
     return (bool) preg_match(
         '/(?<![A-Za-z0-9_])' . preg_quote($className, '/') . '(?![A-Za-z0-9_])/',
@@ -490,7 +511,7 @@ function classifyLine(string $line, array $variants, string $className): string
     }
 
     // Short name at a word boundary
-    if (preg_match('/(?<![A-Za-z0-9_\\])' . preg_quote($className, '/') . '(?![A-Za-z0-9_])/', $content)) {
+    if (preg_match('/(?<![A-Za-z0-9_\\\\])' . preg_quote($className, '/') . '(?![A-Za-z0-9_])/', $content)) {
         return 'valid:short';
     }
 
@@ -515,14 +536,14 @@ if (!is_dir($scanFolder)) {
     exit(1);
 }
 
-// ── Resolve namespace prefix ──────────────────────────────────────────────────
+// ── Resolve namespace prefix(es) ──────────────────────────────────────────────
 if (isset($args[1])) {
-    $nsPrefix = rtrim(trim($args[1]), '\\');
-    $nsSource = 'argument';
+    $nsPrefixes = [rtrim(trim($args[1]), '\\')];
+    $nsSource   = 'argument';
 } else {
-    $nsPrefix = detectNamespacePrefix($scanFolder, $rootDir);
-    $nsSource = 'composer.json';
-    if ($nsPrefix === null) {
+    $nsPrefixes = detectNamespacePrefixes($scanFolder, $rootDir);
+    $nsSource   = 'composer.json';
+    if (empty($nsPrefixes)) {
         fwrite(STDERR, clr(
             "Error: could not detect namespace prefix from composer.json.\n" .
             "       Pass it as a second argument: php sake-composer-check-namespacing <folder> 'Foo\\Bar'\n",
@@ -535,7 +556,7 @@ if (isset($args[1])) {
 // ── Header ────────────────────────────────────────────────────────────────────
 echo clr("► Scan folder : ", 'bold') . realpath($scanFolder) . "\n";
 echo clr("► Root dir    : ", 'bold') . $rootDir . "\n";
-echo clr("► NS prefix   : ", 'bold') . $nsPrefix . clr("  (via $nsSource)", 'cyan') . "\n";
+echo clr("► NS prefix   : ", 'bold') . implode(', ', $nsPrefixes) . clr("  (via $nsSource)", 'cyan') . "\n";
 echo "\n";
 echo clr("  Accepted formats (example: Foo\\Bar\\Baz\\MyClass):\n", 'cyan');
 echo clr("    1. ", 'cyan') . "short           MyClass\n";
@@ -566,13 +587,11 @@ $invalidCount = 0;
 echo "\n";
 
 // ── Pass 2a: check use statements reference real FQCNs ───────────────────────
-// For every PHP file in the scan folder, extract `use` statements that begin
-// with our namespace prefix and verify each one exists in the registry.
 echo clr("Checking use statements...\n", 'cyan');
 
 foreach ($files as $filePath) {
     $rel  = ltrim(str_replace($rootDir, '', $filePath), DIRECTORY_SEPARATOR);
-    $uses = extractUseStatements($filePath, $nsPrefix);
+    $uses = extractUseStatements($filePath, $nsPrefixes);
     $bad  = [];
 
     foreach ($uses as ['fqcn' => $usedFqcn, 'line' => $lineNo]) {
@@ -593,8 +612,6 @@ foreach ($files as $filePath) {
 }
 
 // ── Pass 2b: check external references use a valid format ────────────────────
-// For each class defined in the scan folder, grep the whole project for
-// references and ensure they use one of the accepted formats.
 echo clr("Checking external references...\n", 'cyan');
 
 foreach ($files as $filePath) {
