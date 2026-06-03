@@ -47,6 +47,10 @@ add_step \
     'sake-git-merge-towards-production -r' \
     ''
 add_step \
+    'Check diff from server' \
+    'sake-git-prod-diff' \
+    'Make sure you have SS_SERVER_FOR_EXAMPLE_DATA set in your .env and that it points to the correct server before running this step!'
+add_step \
     'Rsync all - ' \
     'sake-ss-rsync-all' \
     'make sure you have set up your preferred server in your .env SS_SERVER_FOR_EXAMPLE_DATA'

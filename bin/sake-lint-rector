@@ -14,6 +14,7 @@ also='app/_config.php'
 dryRun=''
 rectorConfig="Rector.php"
 verbose=''
+useCurrentVersion=''
 help='no'
 while (($#)); do
     case $1 in
@@ -21,9 +22,11 @@ while (($#)); do
         also=$2
         shift
         ;;
+    -c | --current-version)
+        useCurrentVersion='yes'
+        ;;
     -d | --dry-run)
         dryRun='--dry-run'
-        shift
         ;;
     -r | --rector-config)
         rectorConfig=$2
@@ -31,7 +34,6 @@ while (($#)); do
         ;;
     -v | --verbose)
         verbose='--debug'
-        shift
         ;;
     *)
         if sake_handle_help_flag "$1"; then
@@ -60,6 +62,7 @@ help_and_exit() {
 
     ECHOHEAD "Available settings:"
     echonice "-a, --also                     also lint - e.g. app/_config.php OR myfolder"
+    echonice "-c, --current-version          use the installed silverstripe/framework major version as config (e.g. SS6)"
     echonice "-d, --dry-run                  dry run"
     echonice "-r, --rector-config            rector config file location e.g. ../rector.php"
 
@@ -82,10 +85,31 @@ help_and_exit() {
 
     ECHOHEAD "Example usage:"
     echonice "sake-lint-rector -a app_more/_config.php   -r SS6   app/src "
+    echonice "sake-lint-rector -c   app/src "
     echoline
 
     echofunctions
     exit
+}
+
+get_silverstripe_major_version() {
+    local installedFile="$WORKING_DIR/vendor/composer/installed.php"
+    local version=''
+    if [ -f "$installedFile" ]; then
+        version=$(php -r '
+            $data = require $argv[1];
+            $v = $data["versions"]["silverstripe/framework"]["pretty_version"]
+                ?? $data["versions"]["silverstripe/framework"]["version"]
+                ?? "";
+            $v = ltrim($v, "v");
+            if ($v !== "") { echo (int) explode(".", $v)[0]; }
+        ' "$installedFile" 2>/dev/null)
+    fi
+    if [ -z "$version" ] && command -v composer >/dev/null 2>&1; then
+        version=$(composer show silverstripe/framework --working-dir="$WORKING_DIR" 2>/dev/null |
+            grep -iE '^versions' | grep -oE '[0-9]+' | head -n1)
+    fi
+    echo "$version"
 }
 
 sake_check_help_and_exit
@@ -93,6 +117,17 @@ sake_check_help_and_exit
 ############################################ CODE
 
 cd_or_fail "$WORKING_DIR" help_and_exit
+
+# Resolve -c / --current-version: use installed silverstripe/framework major version
+if [ "$useCurrentVersion" = 'yes' ]; then
+    ssMajor=$(get_silverstripe_major_version)
+    if [ -z "$ssMajor" ]; then
+        echobad "Could not determine installed silverstripe/framework version."
+        help_and_exit
+    fi
+    rectorConfig="SS${ssMajor}"
+    echonice "Using current Silverstripe major version: $ssMajor (config: $rectorConfig)"
+fi
 
 # Resolve shorthand rector config names (e.g. "SS4" -> "RectorSS4.php")
 if [ ! -f "$rectorConfig" ]; then

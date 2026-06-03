@@ -4,7 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Reports which remote uncommitted changes are also applied locally"
+SCRIPT_SUMMARY="Diffs remote uncommitted changes and lists untracked files against your local codebase"
 
 ############################################ SETTINGS
 server=''
@@ -44,8 +44,10 @@ server="$(normalize_server "$server")"
 ############################################ HELPERS
 
 help_and_exit() {
-    ECHOHEAD "Check Remote Git Diff"
-    echonice "Logs into the remote server, runs git diff, and compares with local changes."
+    ECHOHEAD "Diff Remote Uncommitted vs Local Code"
+    echonice "Fetches uncommitted file modifications and untracked files from"
+    echonice "the remote server. It lists untracked files and diffs modifications"
+    echonice "against your current local files to reveal discrepancies."
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Working Directory:             $WORKING_DIR"
@@ -53,14 +55,6 @@ help_and_exit() {
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
-
-    ECHOHEAD "Example usage:"
-    echonice "sake-git-prod-diff my-server:/var/www/website-root"
-    echonice "sake-git-prod-diff my-server # default path is /container/application"
-
-    ECHOHEAD "Setting defaults:"
-    echonice "Set default server in .env with key $envServerKey,"
-    echonice " e.g. $envServerKey=my-server:/var/www/website-root"
     echofunctions
     exit
 }
@@ -68,54 +62,90 @@ sake_check_help_and_exit
 
 ############################################ RUN COMMANDS
 
-# Parse host and path from server (assuming format host:path)
 REMOTE_HOST="${server%%:*}"
 if [[ "$server" == *":"* ]]; then
     REMOTE_PATH="${server#*:}"
 else
-    REMOTE_PATH="/container/application" # Default path based on your original script
+    REMOTE_PATH="/container/application"
 fi
 
-ECHOHEAD "Checking remote changes on: $REMOTE_HOST"
-echonice "Target Path: $REMOTE_PATH"
+ECHOHEAD "Analyzing remote changes on: $REMOTE_HOST"
 
-# 1. Get remote modified files
-echonice "Fetching remote git diff --name-only..."
-REMOTE_FILES=$(ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && git diff --name-only" 2>/dev/null)
+# 1. Identify modified, deleted, and untracked files on remote
+REMOTE_FILES=$(ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && git diff --name-only --diff-filter=ACMR" 2>/dev/null)
+REMOTE_DELETED=$(ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && git diff --name-only --diff-filter=D" 2>/dev/null)
+REMOTE_UNTRACKED=$(ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && git ls-files --others --exclude-standard" 2>/dev/null)
 
-if [[ -z "$REMOTE_FILES" ]]; then
-    echonice "Result: No uncommitted changes found on the remote server."
+if [[ -z "$REMOTE_FILES" && -z "$REMOTE_DELETED" && -z "$REMOTE_UNTRACKED" ]]; then
+    echonice "Result: No uncommitted changes or untracked files found on the remote server."
     echoend
     exit 0
 fi
 
-echonice "Remote has uncommitted modifications in the following files:"
-echo "$REMOTE_FILES" | sed 's/^/  - /'
-echonice ""
-
-# 2. Get local modified files
-echonice "Checking local git diff --name-only..."
-LOCAL_FILES=$(git diff --name-only 2>/dev/null)
-
-if [[ -z "$LOCAL_FILES" ]]; then
-    echonice "Result: No uncommitted changes found locally. None of the remote changes are applied here."
-    echoend
-    exit 0
-fi
-
-# 3. Compare files to report overlaps
-ECHOHEAD "Comparison Report"
-
-# Use 'comm' to find files that exist in both outputs
-COMMON_FILES=$(comm -12 <(echo "$REMOTE_FILES" | sort) <(echo "$LOCAL_FILES" | sort))
-
-if [[ -n "$COMMON_FILES" ]]; then
-    echonice "The following files have uncommitted changes BOTH on the remote and locally:"
-    echo "$COMMON_FILES" | sed 's/^/  [✓] /'
+# 2. Output Untracked Files List (if any)
+if [[ -n "$REMOTE_UNTRACKED" ]]; then
+    ECHOHEAD "Untracked Files on Server (Not in Git Repo)"
+    echo "$REMOTE_UNTRACKED" | sed 's/^/  + /'
     echonice ""
-    echonice "Note: To verify if the exact line-by-line changes match, run standard git diff on these files."
-else
-    echonice "Result: None of the remote file changes overlap with your local file changes."
+fi
+
+# Check if we need to proceed to diffing tracked files
+if [[ -z "$REMOTE_FILES" && -z "$REMOTE_DELETED" ]]; then
+    echonice "No tracked files were modified. Skipping diff process."
+    echoend
+    exit 0
+fi
+
+# 3. Setup temporary directory to hold remote state for diffing
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+# 4. Stream modified files securely over SSH using tar
+if [[ -n "$REMOTE_FILES" ]]; then
+    echonice "Fetching remote modified files for comparison..."
+    ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && echo \"$REMOTE_FILES\" | tar -czf - -T -" | tar -xzf - -C "$TMP_DIR" 2>/dev/null
+fi
+
+ECHOHEAD "Diff Report: Remote Uncommitted vs Local Files"
+DIFF_FOUND="no"
+
+# 5. Compare Added/Modified Files
+if [[ -n "$REMOTE_FILES" ]]; then
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        OUTPUT=$(git diff --color=always --no-index "$file" "$TMP_DIR/$file" 2>/dev/null)
+
+        if [[ -n "$OUTPUT" ]]; then
+            DIFF_FOUND="yes"
+            echonice "--------------------------------------------------------"
+            echonice " File: $file"
+            echonice "--------------------------------------------------------"
+            echo "$OUTPUT" | sed "s|$TMP_DIR/||g"
+            echo ""
+        fi
+    done <<<"$REMOTE_FILES"
+fi
+
+# 6. Compare Deleted Files
+if [[ -n "$REMOTE_DELETED" ]]; then
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        if [[ -f "$file" ]]; then
+            DIFF_FOUND="yes"
+            echonice "--------------------------------------------------------"
+            echonice " File: $file (Deleted on remote)"
+            echonice "--------------------------------------------------------"
+            git diff --color=always --no-index "$file" /dev/null
+            echo ""
+        fi
+    done <<<"$REMOTE_DELETED"
+fi
+
+# 7. Conclusion
+if [[ "$DIFF_FOUND" == "no" ]]; then
+    echonice "Result: All remote tracked uncommitted changes perfectly match your local files!"
 fi
 
 echoend
