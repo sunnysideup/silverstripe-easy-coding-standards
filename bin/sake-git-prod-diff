@@ -55,8 +55,8 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-ss-check-diff my-server:/var/www/website-root"
-    echonice "sake-ss-check-diff my-server # default path is /container/application"
+    echonice "sake-git-prod-diff my-server:/var/www/website-root"
+    echonice "sake-git-prod-diff my-server # default path is /container/application"
 
     ECHOHEAD "Setting defaults:"
     echonice "Set default server in .env with key $envServerKey,"

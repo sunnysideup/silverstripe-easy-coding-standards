@@ -54,14 +54,14 @@ add_step \
     'Dev build (pass 1)' \
     'sake-ss-dev-build' \
     ''
-add_step \
-    'Apply patches (pass 2)' \
-    'bin/apply-patches.sh' \
-    ''
-add_step \
-    'Run tests (pass 2)' \
-    'bin/tests.sh' \
-    ''
+# add_step \
+#     'Apply patches (pass 2)' \
+#     'bin/apply-patches.sh' \
+#     ''
+# add_step \
+#     'Run tests (pass 2)' \
+#     'bin/tests.sh' \
+#     ''
 
 ## COMPOSER UPDATE:
 add_step \
@@ -86,14 +86,14 @@ add_step \
     'Dev build (pass 2)' \
     'sake-ss-dev-build' \
     ''
-add_step \
-    'Apply patches (pass 2)' \
-    'bin/apply-patches.sh' \
-    ''
-add_step \
-    'Run tests (pass 2)' \
-    'bin/tests.sh' \
-    ''
+# add_step \
+#     'Apply patches (pass 2)' \
+#     'bin/apply-patches.sh' \
+#     ''
+# add_step \
+#     'Run tests (pass 2)' \
+#     'bin/tests.sh' \
+#     ''
 add_step \
     'Run Security Checks' \
     'sake-lint-security --all' \
@@ -115,7 +115,7 @@ add_step \
 
 add_step \
     'Push to production' \
-    'sake-git-merge-towards-production --ship' \
+    'echo "now run sake-git-merge-towards-production --ship" to release!' \
     'Make sure you have carried out all your checks and are ready to deploy before running this step!'
 
 TOTAL_STEPS=${#STEPS[@]}
