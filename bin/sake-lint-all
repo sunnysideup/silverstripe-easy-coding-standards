@@ -72,8 +72,6 @@ if [[ "$justDoIt" == "yes" ]]; then
     message='MNT: linter all'
 fi
 
-
-
 ############################################ HELP
 
 help_and_exit() {
@@ -112,7 +110,6 @@ help_and_exit() {
     exit
 }
 
-
 sake_check_help_and_exit
 
 message=$(check_commit_message "$message")
@@ -131,7 +128,7 @@ if [ -z "$(git status --porcelain)" ]; then
     cd $WORKING_DIR
 
     echonice "# remove origs"
-    $SCRIPT_DIR/sake-lint-remove-origs -a $also $dir
+    $SCRIPT_DIR/sake-lint-remove-origs $dir
     cd $WORKING_DIR
 
     sake-git-commit-and-push . -m "$message"
@@ -141,7 +138,7 @@ if [ -z "$(git status --porcelain)" ]; then
     cd $WORKING_DIR
 
     echonice "# run linter ide annotator #1"
-    $SCRIPT_DIR/sake-lint-ide-annotator -a $also $dir
+    $SCRIPT_DIR/sake-lint-ide-annotator $dir
 
     echonice "# run linter ecs #1"
     $SCRIPT_DIR/sake-lint-ecs -a $also $dir

@@ -853,12 +853,17 @@ silverstripe_php_folders() {
         # Extract *just* the folder name (e.g., "my/custom/path/vendor" becomes "vendor")
         local dir_name="${d##*/}"
 
-        # 1. Exclude if it's in the SCAN_EXCLUDE_PATHS array
+        # 1. Exclude hidden folders (names starting with a dot, e.g. .git, .github)
+        if [[ "$dir_name" == .* ]]; then
+            continue
+        fi
+
+        # 2. Exclude if it's in the SCAN_EXCLUDE_PATHS array
         if contains_element "$dir_name" "${SCAN_EXCLUDE_PATHS[@]}"; then
             continue
         fi
 
-        # 2. Exclude if the directory contains a _manifest_exclude
+        # 3. Exclude if the directory contains a _manifest_exclude
         if [[ -e "$d/_manifest_exclude" ]]; then
             continue
         fi
