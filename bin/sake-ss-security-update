@@ -125,7 +125,7 @@ add_step \
     ''
 add_step \
     'Check all end-points' \
-    'sake dev/tasks/smoketestcli' \
+    'sudo -u www-data vendor/bin/sake dev/tasks/smoketestcli' \
     'This does not work in SS5, and you will need to run this manually.'
 
 ## COMMIT AND PUSH TOWARDS PRODUCTION:
@@ -311,62 +311,62 @@ run_step_cmd() {
 
 ############################################ RUN STEPS
 ECHOHEAD "Running steps $from_step..$to_step of $TOTAL_STEPS"
-
 for ((i = from_step - 1; i < to_step; i++)); do
     step_num=$((i + 1))
     label="$(step_label "$i")"
     cmd="$(step_cmd "$i")"
     comment="$(step_comment "$i")"
 
-    while true; do
-        ECHOHEAD "Step $step_num/$TOTAL_STEPS: $label"
-        echonice "Command: $cmd"
-        echonice "Comment: $comment"
+    ECHOHEAD "Step $step_num/$TOTAL_STEPS: $label"
+    echonice "Command: $cmd"
+    echonice "Comment: $comment"
 
-        if [[ "$force" == "yes" ]]; then
-            action="o"
-        else
-            action=$(prompt_choice "[O]K / [S]kip / [Q]uit (default O):" "o" "o|s|q")
-        fi
-
+    # Decide whether to run this step at all.
+    if [[ "$force" != "yes" ]]; then
+        action=$(prompt_choice "[O]K / [S]kip / [Q]uit (default O):" "o" "o|s|q")
         case "$action" in
         s)
             echonice "-> Skipped step $step_num."
-            break
+            continue
             ;;
         q)
             echonice "-> Quit at step $step_num."
             exit 0
             ;;
-        o)
-            run_step_cmd "$cmd"
-            rc=$?
-            echo
-            if ((rc == 0)); then
-                echonice "OK  Step $step_num completed."
-            else
-                echonice "ERR Step $step_num failed (exit $rc)."
-            fi
+        esac
+    fi
 
-            if [[ "$force" == "yes" ]]; then
-                if ((rc != 0)); then
-                    echonice "-> Stopping (force mode + non-zero exit)."
-                    exit "$rc"
-                fi
-                break
-            fi
+    # Run (and optionally re-run) the command.
+    while true; do
+        run_step_cmd "$cmd"
+        rc=$?
+        echo
+        if ((rc == 0)); then
+            echonice "OK  Step $step_num completed."
+        else
+            echonice "ERR Step $step_num failed (exit $rc)."
+        fi
+        echonice "-> $cmd"
+        echonice "-> $comment"
+        echoline
 
-            if ((rc == 0)); then
-                after=$(prompt_choice "[O]K continue / [R]un again / [Q]uit (default O):" "o" "o|r|q")
-            else
-                after=$(prompt_choice "[R]un again / [C]ontinue anyway / [Q]uit (default Q):" "q" "r|c|q")
+        if [[ "$force" == "yes" ]]; then
+            if ((rc != 0)); then
+                echonice "-> Stopping (force mode + non-zero exit)."
+                exit "$rc"
             fi
-            case "$after" in
-            r) continue ;;
-            q) exit "$rc" ;;
-            o | c) break ;;
-            esac
-            ;;
+            break
+        fi
+
+        if ((rc == 0)); then
+            after=$(prompt_choice "[O]K continue / [R]un again / [Q]uit (default O):" "o" "o|r|q")
+        else
+            after=$(prompt_choice "[R]un again / [C]ontinue anyway / [Q]uit (default Q):" "q" "r|c|q")
+        fi
+        case "$after" in
+        r) continue ;; # re-runs the command directly now
+        q) exit "$rc" ;;
+        o | c) break ;;
         esac
     done
 done
