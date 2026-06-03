@@ -24,7 +24,6 @@ declare -A varsToAdd=(
     [LLM_MODEL]=''
 )
 
-
 # Loop through vars and add them if missing
 for key in "${!varsToAdd[@]}"; do
     if ! grep -q "^$key=" "$envFileLocation"; then
@@ -34,7 +33,6 @@ done
 
 # Load the .env file
 source "$envFileLocation"
-
 
 ############################################ COMMON INITIALIZATION FUNCTIONS
 
@@ -160,10 +158,7 @@ echofunctions() {
     echoline
 }
 
-
 ############################################ HELP
-
-
 
 echolistoffunctions() {
     ECHOHEAD 'List of Available Functions'
@@ -176,12 +171,12 @@ echolistoffunctions() {
         if [[ -f "$entry" && -x "$entry" ]]; then
             local script
             script="$(basename "$entry")"
-            
+
             # Skip internal scripts
             [[ "$script" == "sake-self-methods" ]] && continue
             [[ "$script" == "sake-self-update" ]] && continue
             [[ "$script" == "ecs" ]] && continue
-            
+
             local category label
 
             if [[ "$script" == sake-*-* ]]; then
@@ -198,7 +193,7 @@ echolistoffunctions() {
         fi
     done
 
-    if (( ${#categorized_scripts[@]} > 0 )); then
+    if ((${#categorized_scripts[@]} > 0)); then
         local sorted_scripts=()
         while IFS= read -r line; do
             sorted_scripts+=("$line")
@@ -230,8 +225,8 @@ echolistoffunctions() {
 }
 
 echodetailedhelp() {
-    local filter_section="${1:-}"  # Optional section filter (uppercase)
-    
+    local filter_section="${1:-}" # Optional section filter (uppercase)
+
     if [[ -n "$filter_section" ]]; then
         ECHOHEAD "Detailed Help for $filter_section"
         echonice "Compact summaries for $filter_section scripts"
@@ -242,7 +237,7 @@ echodetailedhelp() {
     echo "" >&2
 
     local categorized_scripts=()
-    
+
     # Use the directory where sake-self-methods actually is (not the composer bin wrapper dir)
     local ACTUAL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -251,12 +246,12 @@ echodetailedhelp() {
         if [[ -f "$entry" && -x "$entry" ]]; then
             local script
             script="$(basename "$entry")"
-            
+
             # Skip self-methods and self-update as they're not user commands
             [[ "$script" == "sake-self-methods" ]] && continue
             [[ "$script" == "sake-self-update" ]] && continue
             [[ "$script" == "ecs" ]] && continue
-            
+
             local category label
 
             if [[ "$script" == sake-*-* ]]; then
@@ -274,7 +269,7 @@ echodetailedhelp() {
         fi
     done
 
-    if (( ${#categorized_scripts[@]} > 0 )); then
+    if ((${#categorized_scripts[@]} > 0)); then
         local sorted_scripts=()
         while IFS= read -r line; do
             sorted_scripts+=("$line")
@@ -286,14 +281,14 @@ echodetailedhelp() {
             local category="${item%%:*}"
             local rest="${item#*:}"
             local label="${rest%%:*}"
-            
+
             # Extract second word (subcategory) from label
             local subcategory=""
             if [[ "$label" == *-* ]]; then
                 subcategory="${label%%-*}"
                 subcategory="${subcategory^^}"
             fi
-            
+
             if [[ -n "$subcategory" ]]; then
                 local key="${category}:${subcategory}"
                 subcategory_counts[$key]=$((${subcategory_counts[$key]:-0} + 1))
@@ -336,7 +331,7 @@ echodetailedhelp() {
             if [[ -f "$path" ]]; then
                 summary=$(grep -m 1 '^SCRIPT_SUMMARY=' "$path" 2>/dev/null | sed 's/^SCRIPT_SUMMARY=//' | tr -d '"' | tr -d "'")
             fi
-            
+
             if [[ -z "$summary" ]] && output=$("$path" -h 2>&1); then
                 local clean_output=$(echo "$output" | sed 's/\x1b\[[0-9;]*m//g')
                 summary=$(echo "$clean_output" | awk '
@@ -348,16 +343,16 @@ echodetailedhelp() {
                     found_title && /directory of script:/ { next }
                     found_title && /directory to [a-z]+:/ { next }
                     found_title && /^[[:space:]]*$/ { next }
-                    found_title && NF > 0 { 
+                    found_title && NF > 0 {
                         gsub(/^[[:space:]]+/, "");
                         if (length($0) > 5 && $0 !~ /^[-]+$/) {
-                            print; 
-                            if (++count >= 1) exit 
+                            print;
+                            if (++count >= 1) exit
                         }
                     }
                 ' | head -1 | sed 's/^[[:space:]]*//')
             fi
-            
+
             # Format the output line
             local output_line
             if [[ -n "$summary" && ${#summary} -gt 5 ]]; then
@@ -374,26 +369,26 @@ echodetailedhelp() {
                 category_misc_items[$category]="${category_misc_items[$category]}${output_line}"$'\n'
             fi
         done
-        
+
         # Now output everything organized
         current_category=""
         for item in "${sorted_scripts[@]}"; do
             local category="${item%%:*}"
-            
+
             # Skip this category if filtering and it doesn't match
             if [[ -n "$filter_section" && "$category" != "$filter_section" ]]; then
                 continue
             fi
-            
+
             if [[ "$category" != "$current_category" ]]; then
                 echo "" >&2
                 _print_col_stderr "$_COL_HEAD" "# $category"
                 current_category="$category"
-                
+
                 # Output grouped subcategories
                 local rest="${item#*:}"
                 local label="${rest%%:*}"
-                
+
                 # Get all unique subcategories for this category (from sorted list)
                 local -a shown_subcats=()
                 for subitem in "${sorted_scripts[@]}"; do
@@ -401,7 +396,7 @@ echodetailedhelp() {
                     # Skip if filtering and doesn't match
                     [[ -n "$filter_section" && "$subcat" != "$filter_section" ]] && continue
                     [[ "$subcat" != "$category" ]] && continue
-                    
+
                     local subrest="${subitem#*:}"
                     local sublabel="${subrest%%:*}"
                     local subsubcategory=""
@@ -409,26 +404,26 @@ echodetailedhelp() {
                         subsubcategory="${sublabel%%-*}"
                         subsubcategory="${subsubcategory^^}"
                     fi
-                    
+
                     [[ -z "$subsubcategory" ]] && continue
-                    
+
                     local key="${category}:${subsubcategory}"
                     local count=${subcategory_counts[$key]:-0}
                     [[ $count -le 1 ]] && continue
-                    
+
                     # Check if already shown
                     local already_shown="no"
                     for shown in "${shown_subcats[@]}"; do
                         [[ "$shown" == "$subsubcategory" ]] && already_shown="yes" && break
                     done
                     [[ "$already_shown" == "yes" ]] && continue
-                    
+
                     shown_subcats+=("$subsubcategory")
                     _print_col_stderr "$_COL_NICE" "## $subsubcategory"
                     local grp_key="${category}::${subsubcategory}"
                     echo -n "${category_grouped_items[$grp_key]}" >&2
                 done
-                
+
                 # Output MISC items for this category
                 if [[ -n "${category_misc_items[$category]}" ]]; then
                     _print_col_stderr "$_COL_NICE" "## MISC"
@@ -500,15 +495,17 @@ read_local_dotenv_value() {
 
     local value=''
     value="$(
-        grep -E "^[[:space:]]*(export[[:space:]]+)?${key}=" "$envFile" \
-            | tail -n 1 \
-            | sed -E "s/^[[:space:]]*(export[[:space:]]+)?${key}=//"
+        grep -E "^[[:space:]]*(export[[:space:]]+)?${key}=" "$envFile" |
+            tail -n 1 |
+            sed -E "s/^[[:space:]]*(export[[:space:]]+)?${key}=//"
     )"
 
     value="${value#"${value%%[![:space:]]*}"}"
     value="${value%"${value##*[![:space:]]}"}"
-    value="${value%\"}"; value="${value#\"}"
-    value="${value%\'}"; value="${value#\'}"
+    value="${value%\"}"
+    value="${value#\"}"
+    value="${value%\'}"
+    value="${value#\'}"
 
     [[ -n "$value" ]] || return 1
 
@@ -629,7 +626,7 @@ check_commit_message() {
 
     if [[ -z "$message" ]]; then
         # Read from stderr prompt to avoid corrupting stdout
-        read -r -p "Commit message: " message < /dev/tty
+        read -r -p "Commit message: " message </dev/tty
     fi
 
     local PREFIXES=("API" "NEW" "ENH" "FIX" "DOC" "DEP" "TLN" "MNT" "Merge")
@@ -668,7 +665,7 @@ mask_api_key() {
     fi
 
     local len=${#key}
-    if (( len <= keepStart + keepEnd )); then
+    if ((len <= keepStart + keepEnd)); then
         printf '%s' '***'
         return 0
     fi
@@ -676,10 +673,6 @@ mask_api_key() {
     # Pure data output
     printf '%s***%s' "${key:0:keepStart}" "${key:len-keepEnd:keepEnd}"
 }
-
-
-
-
 
 ############################################ SILVERSTRIPE VERSION DETECTION
 
@@ -726,7 +719,7 @@ sake_check_major_version_match() {
     local clean_string="${req_string//||/|}"
     clean_string="${clean_string// /}"
 
-    IFS='|' read -ra parts <<< "$clean_string"
+    IFS='|' read -ra parts <<<"$clean_string"
     for part in "${parts[@]}"; do
         # Extract the first sequence of digits (ignores all prefixes like ^, ~, >=, v)
         if [[ "$part" =~ ([0-9]+) ]]; then
@@ -796,14 +789,13 @@ sake_determine_ss_version() {
         # Take the highest version (transitional constraints like "^4 || ^5" are fine)
         local highest=0
         for v in "${found_versions[@]}"; do
-            (( v > highest )) && highest=$v
+            ((v > highest)) && highest=$v
         done
         echo "$highest"
     else
         echo "${found_versions[0]}"
     fi
 }
-
 
 ######################################## SCAN
 
@@ -834,9 +826,52 @@ SCAN_EXCLUDE_PATHS=(
     _dev
     patches
     bin
-    public/assets
-    datauploadfolder
+    public
 )
+
+contains_element() {
+    local match="$1"
+    shift
+    for element; do
+        [[ "$element" == "$match" ]] && return 0
+    done
+    return 1
+}
+
+silverstripe_php_folders() {
+    # Use the provided argument, or default to '.'
+    local search_dir="${1:-.}"
+    local valid_folders=()
+
+    # Find directories inside search_dir
+    while IFS= read -r -d '' d; do
+        # Skip the base search directory itself
+        if [[ "$d" == "$search_dir" ]]; then
+            continue
+        fi
+
+        # Extract *just* the folder name (e.g., "my/custom/path/vendor" becomes "vendor")
+        local dir_name="${d##*/}"
+
+        # 1. Exclude if it's in the SCAN_EXCLUDE_PATHS array
+        if contains_element "$dir_name" "${SCAN_EXCLUDE_PATHS[@]}"; then
+            continue
+        fi
+
+        # 2. Exclude if the directory contains a _manifest_exclude
+        if [[ -e "$d/_manifest_exclude" ]]; then
+            continue
+        fi
+
+        # Output just the folder name to match your original script's behavior
+        valid_folders+=("$dir_name")
+
+    done < <(find "$search_dir" -maxdepth 1 -type d -print0)
+
+    for folder in "${valid_folders[@]}"; do
+        echo "$folder"
+    done
+}
 
 # PHPStan-specific ignore patterns
 PHPSTAN_IGNORE_ERRORS=(
@@ -877,9 +912,9 @@ scan_get_existing_extra_files() {
 # Generate a phpstan.neon from the shared config
 scan_generate_phpstan_neon() {
     local paths
-    read -ra paths <<< "$(scan_get_existing_paths)"
+    read -ra paths <<<"$(scan_get_existing_paths)"
     local extra_files
-    read -ra extra_files <<< "$(scan_get_existing_extra_files)"
+    read -ra extra_files <<<"$(scan_get_existing_extra_files)"
 
     if [[ ${#paths[@]} -eq 0 ]]; then
         echobad "No scan paths found in project — cannot generate phpstan.neon"
@@ -906,7 +941,7 @@ scan_generate_phpstan_neon() {
             echo "        - '$err'"
         done
         echo "    reportUnmatchedIgnoredErrors: false"
-    } > phpstan.neon
+    } >phpstan.neon
 
     echogood "Generated phpstan.neon with paths: ${paths[*]}"
 }
@@ -914,9 +949,9 @@ scan_generate_phpstan_neon() {
 # Build Phan CLI args from the shared config
 scan_get_phan_directory_args() {
     local paths
-    read -ra paths <<< "$(scan_get_existing_paths)"
+    read -ra paths <<<"$(scan_get_existing_paths)"
     local extra_files
-    read -ra extra_files <<< "$(scan_get_existing_extra_files)"
+    read -ra extra_files <<<"$(scan_get_existing_extra_files)"
 
     local args=()
     for p in "${paths[@]}"; do
@@ -925,7 +960,10 @@ scan_get_phan_directory_args() {
     # Phan uses --include-analysis-file-list for individual files
     if [[ ${#extra_files[@]} -gt 0 ]]; then
         local joined
-        joined=$(IFS=,; echo "${extra_files[*]}")
+        joined=$(
+            IFS=,
+            echo "${extra_files[*]}"
+        )
         args+=(--include-analysis-file-list "$joined")
     fi
     echo "${args[@]}"

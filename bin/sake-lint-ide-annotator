@@ -65,21 +65,8 @@ if [ -n "$dir" ]; then
     fi
 else
     # Automatically find depth 1 folders excluding specific system folders
-    for d in */; do
-        d="${d%/}" # Strip trailing slash
-
-        # Exclude specific folders
-        if [[ "$d" == "vendor" || "$d" == "themes" || "$d" == "bin" || "$d" == "_dev" ]]; then
-            continue
-        fi
-
-        # Exclude if _manifest_exclude exists
-        if [ -f "$d/_manifest_exclude" ]; then
-            continue
-        fi
-
-        TARGET_DIRS+=("$d")
-    done
+    # Replace the entire for-loop with this:
+    mapfile -t TARGET_DIRS < <(silverstripe_php_folders)
     echonice "No directory specified. Found directories to process: ${TARGET_DIRS[*]}"
 fi
 

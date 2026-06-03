@@ -62,7 +62,10 @@ add_step \
 #     'Run tests (pass 2)' \
 #     'bin/tests.sh' \
 #     ''
-
+add_step \
+    'Commit and push!' \
+    'sake-git-commit-and-push -m "FIX: update security checker - pre composer"' \
+    ''
 ## COMPOSER UPDATE:
 add_step \
     'Composer update (pass 1)' \
@@ -70,6 +73,11 @@ add_step \
     ''
 
 # LINT AND CHECK:
+add_step \
+    'Commit and push!' \
+    'sake-git-commit-and-push -m "FIX: update security checker - post composer"' \
+    ''
+
 add_step \
     'Lint app' \
     'sake-lint-all [APP_FOLDERS]' \
@@ -110,7 +118,7 @@ add_step \
 ## COMMIT AND PUSH TOWARDS PRODUCTION:
 add_step \
     'Commit and push!' \
-    'sake-git-commit-and-push -m "FIX: update security checker"' \
+    'sake-git-commit-and-push -m "FIX: update security checker - final"' \
     ''
 
 add_step \
@@ -174,25 +182,9 @@ done
 # Level-1 folders under $dir that:
 #   - are not _dev, vendor, bin, or themes
 #   - do not contain a _manifest_exclude file
+# Safely fetch app folders for the given directory
 APP_FOLDERS=()
-discover_app_folders() {
-    local base="${1:-.}"
-    local d name
-    APP_FOLDERS=()
-    shopt -s nullglob
-    for d in "$base"/*/; do
-        d="${d%/}"
-        name="${d##*/}"
-        case "$name" in
-        _dev | vendor | bin | themes) continue ;;
-        esac
-        [[ -e "$d/_manifest_exclude" ]] && continue
-        APP_FOLDERS+=("$name")
-    done
-    shopt -u nullglob
-}
-
-discover_app_folders "$dir"
+mapfile -t APP_FOLDERS < <(silverstripe_php_folders "$dir")
 
 help_and_exit() {
 

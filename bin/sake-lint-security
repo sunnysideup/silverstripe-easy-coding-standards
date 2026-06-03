@@ -10,18 +10,18 @@ SCRIPT_SUMMARY="Runs comprehensive security checks including composer audit and 
 ############################################ CHECK REGISTRY
 # Each check: KEY="description"
 declare -A CHECK_DESC=(
-    [composer-audit]="Composer audit for known vulnerabilities"
+    [composer - audit]="Composer audit for known vulnerabilities"
     [roave]="roave/security-advisories dry-run update"
     [phpstan]="PHPStan static analysis (level 1)"
     [phpcs]="PHPCS with Security ruleset"
     [semgrep]="Semgrep OWASP + security rules"
-    [npm-audit]="NPM audit per package.json"
-    [npm-audit-dev]="npm-audit-dev with security plugins"
-    [public-files]="Sensitive files in public/"
-    [world-writable]="World-writable file detection"
+    [npm - audit]="NPM audit per package.json"
+    [npm - audit - dev]="npm-audit-dev with security plugins"
+    [public - files]="Sensitive files in public/"
+    [world - writable]="World-writable file detection"
     [gitleaks]="Scan for leaked secrets/credentials"
-    [php-dangerous]="Grep for dangerous PHP functions"
-    [env-permissions]="Check .env file permissions"
+    [php - dangerous]="Grep for dangerous PHP functions"
+    [env - permissions]="Check .env file permissions"
 )
 
 # Which checks are "key" (default). User can adjust this list.
@@ -53,7 +53,7 @@ ALL_CHECKS=(
 )
 
 ############################################ HELP / ARG PARSING
-mode="key"          # "all", "key", or "only"
+mode="key" # "all", "key", or "only"
 only_check=""
 
 help_and_exit() {
@@ -110,21 +110,21 @@ list_checks() {
 
 while (($#)); do
     case $1 in
-        -h|--help)     help_and_exit ;;
-        -a|--all)      mode="all" ;;
-        -k|--key)      mode="key" ;;
-        -l|--list)     list_checks ;;
-        -o|--only)
-            mode="only"
+    -h | --help) help_and_exit ;;
+    -a | --all) mode="all" ;;
+    -k | --key) mode="key" ;;
+    -l | --list) list_checks ;;
+    -o | --only)
+        mode="only"
+        shift
+        only_check="${1:?'--only requires a check name. Use --list to see options.'}"
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
             shift
-            only_check="${1:?'--only requires a check name. Use --list to see options.'}"
-            ;;
-        *)
-            if sake_handle_help_flag "$1"; then
-                shift
-                continue
-            fi
-            ;;
+            continue
+        fi
+        ;;
     esac
     shift
 done
@@ -133,20 +133,20 @@ done
 declare -A ENABLED_CHECKS=()
 
 case "$mode" in
-    all)
-        for c in "${ALL_CHECKS[@]}"; do ENABLED_CHECKS[$c]=1; done
-        ;;
-    key)
-        for c in "${KEY_CHECKS[@]}"; do ENABLED_CHECKS[$c]=1; done
-        ;;
-    only)
-        if [[ -z "${CHECK_DESC[$only_check]+x}" ]]; then
-            echobad "Unknown check: $only_check"
-            echobad "Use --list to see available checks."
-            exit 1
-        fi
-        ENABLED_CHECKS[$only_check]=1
-        ;;
+all)
+    for c in "${ALL_CHECKS[@]}"; do ENABLED_CHECKS[$c]=1; done
+    ;;
+key)
+    for c in "${KEY_CHECKS[@]}"; do ENABLED_CHECKS[$c]=1; done
+    ;;
+only)
+    if [[ -z "${CHECK_DESC[$only_check]+x}" ]]; then
+        echobad "Unknown check: $only_check"
+        echobad "Use --list to see available checks."
+        exit 1
+    fi
+    ENABLED_CHECKS[$only_check]=1
+    ;;
 esac
 
 should_run() {
@@ -167,20 +167,9 @@ run() {
 
 # Build targets array safely (handles spaces in dir names)
 TARGETS=()
-while IFS= read -r -d '' d; do
-    TARGETS+=("$d")
-done < <(find . -maxdepth 1 -type d \
-    -not -path './vendor*' \
-    -not -path './datauploadfolder*' \
-    -not -path './bin*' \
-    -not -path './.graphql*' \
-    -not -path './public/assets/*' \
-    -not -path './.git' \
-    -not -path './_upgrade*' \
-    -not -path './patches*' \
-    -not -path './_dev*' \
-    -not -path './node_modules*' \
-    -print0)
+
+# Find all directories at max depth 1 and loop through them
+mapfile -t TARGETS < <(silverstripe_php_folders)
 
 TARGETS+=("vendor/$PACKAGIST_USERNAME")
 
@@ -207,7 +196,6 @@ if should_run roave; then
         echobad "Skipping roave/security-advisories (composer not found)."
     fi
 fi
-
 
 ############################################ 3) PHPStan
 if should_run phpstan; then
@@ -297,7 +285,10 @@ if should_run npm-audit; then
         pushd "$npmdir" >/dev/null
         if command -v npm >/dev/null; then
             if [[ ! -f package-lock.json ]]; then
-                npm i --package-lock-only --ignore-scripts 2>/dev/null || { popd >/dev/null; continue; }
+                npm i --package-lock-only --ignore-scripts 2>/dev/null || {
+                    popd >/dev/null
+                    continue
+                }
             fi
             result=$(npm audit --omit=dev --audit-level=high 2>&1) || status=1
             if [[ "$result" != *"found 0 vulnerabilities"* ]]; then
@@ -322,7 +313,10 @@ if should_run npm-audit-dev; then
         pushd "$npmdir" >/dev/null
         if command -v npm >/dev/null; then
             if [[ ! -f package-lock.json ]]; then
-                npm i --package-lock-only --ignore-scripts 2>/dev/null || { popd >/dev/null; continue; }
+                npm i --package-lock-only --ignore-scripts 2>/dev/null || {
+                    popd >/dev/null
+                    continue
+                }
             fi
             result=$(npm audit --audit-level=critical 2>&1) || true
             if [[ "$result" != *"found 0 vulnerabilities"* ]]; then
@@ -339,7 +333,6 @@ if should_run npm-audit-dev; then
         -not -path './vendor/*' \
         -not -path '*/node_modules/*' -print0)
 fi
-
 
 ############################################ 8) Sensitive files in public/
 if should_run public-files; then
