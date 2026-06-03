@@ -12,7 +12,7 @@ dir='app/src'
 ############################################ SETTINGS
 also='app/_config.php'
 dryRun=''
-rectorConfig="Rector.php"
+rectorConfig="Lint"
 verbose=''
 useCurrentVersion=''
 help='no'
@@ -64,7 +64,7 @@ help_and_exit() {
     echonice "-a, --also                     also lint - e.g. app/_config.php OR myfolder"
     echonice "-c, --current-version          use the installed silverstripe/framework major version as config (e.g. SS6)"
     echonice "-d, --dry-run                  dry run"
-    echonice "-r, --rector-config            rector config file location e.g. ../rector.php"
+    echonice "-r, --rector-config            rector config file location e.g. Lint"
 
     local rectorDir="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rectors"
     if [ -d "$rectorDir" ]; then

@@ -88,6 +88,10 @@ add_step \
     ''
 add_step \
     'Lint app' \
+    'sake-lint-rector [APP_FOLDERS] -c' \
+    ''
+add_step \
+    'Lint app' \
     'sake-lint-remove-origs [APP_FOLDERS]' \
     ''
 add_step \
