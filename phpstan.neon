@@ -1,6 +1,6 @@
 parameters:
 
-    phpVersion: 80200  # for PHP 8.2
+    # phpVersion: 80200  # for PHP 8.2
 
     excludePaths:
         - /tests/*
@@ -15,6 +15,7 @@ parameters:
         - '#but returns SilverStripe\\ORM\\DataObject\|null#'
         - '#Call to an undefined method [a-zA-Z0-9\\_]+::[a-zA-Z0-9\\_]+\(\)#'
         - '#Access to an undefined property#'
+        - identifier: ternary.shortNotAllowed
         # - '#is never read, only written#'
         # - '#with incorrect case:#'
         # - '#Access to an undefined property#'
