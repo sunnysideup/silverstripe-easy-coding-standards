@@ -150,7 +150,7 @@ if [ -z "$(git status --porcelain)" ]; then
     sake-git-commit-and-push . -m "$message"
 
     echonice "# run linter ide annotator #2"
-    $SCRIPT_DIR/sake-lint-ide-annotator -a $also $dir
+    $SCRIPT_DIR/sake-lint-ide-annotator $dir
 
     echonice "# run ecs #2"
     $SCRIPT_DIR/sake-lint-ecs -a $also $dir
@@ -167,12 +167,6 @@ if [ -z "$(git status --porcelain)" ]; then
     echonice "# run stan"
     $SCRIPT_DIR/sake-lint-stan -a $also -l 2 $dir
     cd $WORKING_DIR
-
-    if test -f "$also"; then
-        ECHOHEAD "# run the above on $also"
-        $SCRIPT_DIR/sake-lint-all -m $message -a 'nothing-here-hopefully' -c no -t no -j no -p $phpVersion $also
-        cd $WORKING_DIR
-    fi
 
     if [[ "$alsoDoThemes" == "yes" ]]; then
         ECHOHEAD "# run the above on themes"

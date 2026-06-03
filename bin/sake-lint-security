@@ -232,13 +232,13 @@ if should_run phpcs; then
     if [[ -n "$PHPCS" ]]; then
         run "$PHPCS" \
             --standard=Security \
-            --severity=6 \
+            --severity=5 \
             --ignore='*/vendor/*,*/node_modules/*,public/assets/*,.graphql-generated/*' \
             "${TARGETS[@]}"
 
         run "$PHPCS" \
             --standard=Security \
-            --severity=6 \
+            --severity=5 \
             --ignore='*/node_modules/*' \
             "vendor/$PACKAGIST_USERNAME"
     fi

@@ -91,6 +91,11 @@ add_step \
     'sake-lint-rector [APP_FOLDERS] -c' \
     ''
 add_step \
+    'Commit and push!' \
+    'sake-git-commit-and-push -m "FIX: update security checker - post lint"' \
+    ''
+
+add_step \
     'Lint app' \
     'sake-lint-remove-origs [APP_FOLDERS]' \
     ''
