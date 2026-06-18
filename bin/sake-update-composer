@@ -44,9 +44,17 @@ help_and_exit() {
 
 sake_check_help_and_exit
 
+
+sudo apt remove composer
+
 php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
 php composer-setup.php
 sudo mv composer.phar /usr/local/bin/composer
 php -r "unlink('composer-setup.php');"
+
+sudo composer self-update
+echonice "Please restart the command line windows"
+
+hash -r
 
 echoend

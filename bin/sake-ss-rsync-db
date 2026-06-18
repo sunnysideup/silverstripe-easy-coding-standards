@@ -52,6 +52,12 @@ if [[ -z "${server:-}" ]]; then
 fi
 server="$(normalize_server "$server")"
 
+serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+if [[ -z "$serverFromEnv" ]] ; then
+    echowarn "No default server set in .env (key: $envServerKey).
+    You can set it like this: $envServerKey=my-server:/var/www/website-root"
+fi
+
 if [[ -z "$server" || "$help" == "yes" ]]; then
     ECHOHEAD "Sync Database"
     echonice "Syncs MySQL database between local and remote server via dump files"

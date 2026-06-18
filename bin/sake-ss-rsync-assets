@@ -45,10 +45,7 @@ if [[ -z "$server" ]]; then
     [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
 fi
 
-if [[ -z "${server:-}" ]]; then
-    echobad 'No server specified.'
-    help_and_exit
-fi
+
 server="$(normalize_server "$server")"
 
 ############################################ HELP
@@ -90,6 +87,11 @@ help_and_exit() {
     exit 0
 }
 sake_check_help_and_exit
+
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
+    help_and_exit
+fi
 
 [[ "$reverse" == 'yes' ]] && echobad 'CAREFUL: you are pushing to the server.'
 
