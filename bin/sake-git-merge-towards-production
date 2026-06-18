@@ -17,10 +17,12 @@ from='develop'
 to='test'
 direct='no'
 reverse='no'
-ship='no'    # shorthand: develop -> production (stepwise)
-toProd='no'  # shorthand: set --to production
-toStage='no' # shorthand: set --to staging
-toTest='no'  # shorthand: set --to testing
+ship='no'      # shorthand: develop -> production (stepwise)
+toProd='no'    # shorthand: set --to production
+toStage='no'   # shorthand: set --to staging
+toTest='no'    # shorthand: set --to testing
+status='no'    # only show ahead/behind comparison, do NOT merge anything
+assumeYes='no' # skip the "are you sure" prompt for production (for automation)
 
 while (($#)); do
     case $1 in
@@ -61,6 +63,14 @@ while (($#)); do
         toTest='yes'
         shift
         ;;
+    -c | --status | --compare | --dry-run)
+        status='yes'
+        shift
+        ;;
+    -q | --yes)
+        assumeYes='yes'
+        shift
+        ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
@@ -87,6 +97,8 @@ help_and_exit() {
     echonice "to production:                 $toProd"
     echonice "to staging:                    $toStage"
     echonice "to testing:                    $toTest"
+    echonice "status only (no merge):        $status"
+    echonice "assume yes (skip prompt):      $assumeYes"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
@@ -99,12 +111,15 @@ help_and_exit() {
     echonice "-p, --prod                      shorthand: sets --to production"
     echonice "-s, --stage                     shorthand: sets --to staging"
     echonice "-t, --test                      shorthand: sets --to testing"
+    echonice "-c, --status, --compare         only SHOW the ahead/behind comparison, do not merge"
+    echonice "-y, --yes                       skip the production confirmation prompt (use with care)"
 
     echonice 'Usage example:'
     echonice '  sake-git-merge-towards-production ./ --ship'
     echonice '  sake-git-merge-towards-production ./ --prod'
     echonice '  sake-git-merge-towards-production ./ --from develop --to production'
     echonice '  sake-git-merge-towards-production ./ --from production --to develop --reverse'
+    echonice '  sake-git-merge-towards-production ./ --status'
     echofunctions
     exit
 }
@@ -261,51 +276,98 @@ pick_existing_at_or_above() {
     echo "$bestBranch"
 }
 
+# ---------- Ask for explicit confirmation, or abort.
+# Honours --yes (assumeYes) for automation, and refuses to silently
+# continue when there is no interactive terminal to answer the prompt.
+confirm_or_exit() {
+    local prompt=$1
+    local answer=''
+
+    if [[ "$assumeYes" == 'yes' ]]; then
+        echowarn "$prompt (auto-confirmed via --yes)"
+        return 0
+    fi
+
+    if [[ ! -t 0 ]]; then
+        echobad "$prompt"
+        echobad 'Confirmation required but no interactive terminal is available. Re-run with --yes to bypass.'
+        exit 1
+    fi
+
+    echowarn "$prompt"
+    read -r -p '   Type "yes" to proceed (anything else aborts): ' answer
+    if [[ "$answer" != 'yes' ]]; then
+        echobad 'Aborted: not confirmed.'
+        exit 1
+    fi
+}
+
+# ---------- Does any planned step write to production?
+# A step syncs both branches, so production is touched whenever it is
+# either the source OR the target of a step.
+production_in_steps() {
+    local s f t
+    for s in "${steps[@]}"; do
+        IFS='→' read -r f t <<<"$s"
+        [[ "$f" == 'production' || "$t" == 'production' ]] && return 0
+    done
+    return 1
+}
+
+# ---------- Show ahead/behind comparison for the env flow (no merging).
+show_branch_status() {
+    local title=${1:-'Branch status'}
+    local i left right counts ahead behind b
+
+    echonice ''
+    ECHOHEAD "$title"
+
+    git fetch origin >/dev/null 2>&1 || true
+
+    # ---- Adjacent branch comparison
+    printf '  %-25s  %-15s  %-15s\n' 'COMPARISON' 'AHEAD' 'BEHIND'
+    printf '  %-25s  %-15s  %-15s\n' '─────────────────────────' '───────────────' '───────────────'
+
+    for ((i = 0; i < ${#FLOW_ACTUAL[@]} - 1; i++)); do
+        left="${FLOW_ACTUAL[$i]}"
+        right="${FLOW_ACTUAL[$((i + 1))]}"
+
+        counts=$(git rev-list --left-right --count "origin/${left}...origin/${right}" 2>/dev/null)
+        if [[ $? -eq 0 && -n "$counts" ]]; then
+            ahead=$(echo "$counts" | awk '{print $1}')
+            behind=$(echo "$counts" | awk '{print $2}')
+            printf '  %-27s  %-15s  %-15s\n' "${left} → ${right}" "$ahead" "$behind" # 27 is 25 for the names + 2 for the arrow and spaces
+        else
+            printf '  %-27s  %-15s  %-15s\n' "${left} → ${right}" '?' '?' # 27 is 25 for the names + 2 for the arrow and spaces
+        fi
+    done
+
+    # ---- Local vs origin
+    echonice ''
+    printf '  %-25s  %-15s  %-15s\n' 'BRANCH' 'LOCAL +' 'LOCAL −'
+    printf '  %-25s  %-15s  %-15s\n' '─────────────────────────' '───────────────' '───────────────'
+
+    for b in "${FLOW_ACTUAL[@]}"; do
+        if git show-ref --verify --quiet "refs/heads/${b}" && branch_exists_remote "$b"; then
+            counts=$(git rev-list --left-right --count "${b}...origin/${b}" 2>/dev/null)
+            if [[ $? -eq 0 && -n "$counts" ]]; then
+                ahead=$(echo "$counts" | awk '{print $1}')
+                behind=$(echo "$counts" | awk '{print $2}')
+                printf '  %-25s  %-15s  %-15s\n' "$b" "$ahead" "$behind"
+            else
+                printf '  %-25s  %-15s  %-15s\n' "$b" '?' '?'
+            fi
+        fi
+    done
+
+    echonice ''
+}
+
 ############################################ PREP
 load_branch_cache
 
-# ---------- defaults for reverse mode
-if [[ "$reverse" == 'yes' ]]; then
-    [[ "$from" == 'develop' ]] && from='production'
-    [[ "$to" == 'test' ]] && to='develop'
-fi
-
-# ---------- message
-if [[ -z "$message" ]]; then
-    if [[ "$reverse" == 'yes' ]]; then
-        message='Merge: merge production branches back towards develop'
-    else
-        message='Merge: merge development branches towards production'
-    fi
-fi
-
-message=$(check_commit_message "$message")
-retVal=$?
-if [[ $retVal -ne 0 ]]; then
-    echobad 'Invalid commit message. Exiting script.'
-    exit 1
-fi
-
-# ---------- normalize stage/staging args to whichever exists (if any)
+# ---------- resolve which stage branch (if any) exists
 stageBranch=$(resolve_stage_branch)
-
-if [[ "$from" == 'stage' || "$from" == 'staging' ]]; then
-    if [[ -n "$stageBranch" ]]; then
-        from="$stageBranch"
-    else
-        echowarn 'No stage/staging branch exists; falling back to develop.'
-        from='develop'
-    fi
-fi
-
-if [[ "$to" == 'stage' || "$to" == 'staging' ]]; then
-    if [[ -n "$stageBranch" ]]; then
-        to="$stageBranch"
-    else
-        echowarn 'No stage/staging branch exists; will target the nearest existing env.'
-        to='staging' # logical; resolved below
-    fi
-fi
 
 ############################################ BUILD FLOW (no hard requirements unless needed)
 FLOW_ACTUAL=()
@@ -329,6 +391,54 @@ fi
 if ((${#FLOW_ACTUAL[@]} < 2)); then
     echobad 'Not enough env branches exist (need at least two of develop/test/(stage|staging)/production).'
     exit 1
+fi
+
+############################################ STATUS ONLY (no merges) — early exit
+if [[ "$status" == 'yes' ]]; then
+    show_branch_status 'Branch status (no merges performed)'
+    exit 0
+fi
+
+############################################ MERGE PREP
+# ---------- defaults for reverse mode
+if [[ "$reverse" == 'yes' ]]; then
+    [[ "$from" == 'develop' ]] && from='production'
+    [[ "$to" == 'test' ]] && to='develop'
+fi
+
+# ---------- message
+if [[ -z "$message" ]]; then
+    if [[ "$reverse" == 'yes' ]]; then
+        message='Merge: merge production branches back towards develop'
+    else
+        message='Merge: merge development branches towards production'
+    fi
+fi
+
+message=$(check_commit_message "$message")
+retVal=$?
+if [[ $retVal -ne 0 ]]; then
+    echobad 'Invalid commit message. Exiting script.'
+    exit 1
+fi
+
+# ---------- normalize stage/staging args to whichever exists (if any)
+if [[ "$from" == 'stage' || "$from" == 'staging' ]]; then
+    if [[ -n "$stageBranch" ]]; then
+        from="$stageBranch"
+    else
+        echowarn 'No stage/staging branch exists; falling back to develop.'
+        from='develop'
+    fi
+fi
+
+if [[ "$to" == 'stage' || "$to" == 'staging' ]]; then
+    if [[ -n "$stageBranch" ]]; then
+        to="$stageBranch"
+    else
+        echowarn 'No stage/staging branch exists; will target the nearest existing env.'
+        to='staging' # logical; resolved below
+    fi
 fi
 
 ############################################ RESOLVE FROM/TO (skip-able, only within actual flow)
@@ -404,6 +514,18 @@ else
     fi
 fi
 
+############################################ CONFIRM BEFORE RUNNING
+echonice ''
+ECHOHEAD 'Planned merge steps'
+for step in "${steps[@]}"; do
+    echonice "   $step"
+done
+
+# Ask once, up-front, before ANY merge runs, if production will be touched.
+if production_in_steps; then
+    confirm_or_exit 'One or more of these steps will UPDATE the production branch. Are you sure?'
+fi
+
 ############################################ RUN MERGES
 for step in "${steps[@]}"; do
     IFS='→' read -r fromBranch toBranch <<<"$step"
@@ -441,51 +563,13 @@ for step in "${steps[@]}"; do
     echonice "✓ Completed $fromBranch ↔ $toBranch"
 done
 
-echonice ''
-ECHOHEAD 'Branch status after merges'
-
-git fetch origin >/dev/null 2>&1 || true
-
-# ---- Adjacent branch comparison
-printf '  %-25s  %-15s  %-15s\n' 'COMPARISON' 'AHEAD' 'BEHIND'
-printf '  %-25s  %-15s  %-15s\n' '─────────────────────────' '───────────────' '───────────────'
-
-for ((i = 0; i < ${#FLOW_ACTUAL[@]} - 1; i++)); do
-    left="${FLOW_ACTUAL[$i]}"
-    right="${FLOW_ACTUAL[$((i + 1))]}"
-
-    counts=$(git rev-list --left-right --count "origin/${left}...origin/${right}" 2>/dev/null)
-    if [[ $? -eq 0 && -n "$counts" ]]; then
-        ahead=$(echo "$counts" | awk '{print $1}')
-        behind=$(echo "$counts" | awk '{print $2}')
-        printf '  %-27s  %-15s  %-15s\n' "${left} → ${right}" "$ahead" "$behind" # 27 is 25 for the names + 2 for the arrow and spaces
-    else
-        printf '  %-27s  %-15s  %-15s\n' "${left} → ${right}" '?' '?' # 27 is 25 for the names + 2 for the arrow and spaces
-    fi
-done
-
-# ---- Local vs origin
-echonice ''
-printf '  %-25s  %-15s  %-15s\n' 'BRANCH' 'LOCAL +' 'LOCAL −'
-printf '  %-25s  %-15s  %-15s\n' '─────────────────────────' '───────────────' '───────────────'
-
-for b in "${FLOW_ACTUAL[@]}"; do
-    if git show-ref --verify --quiet "refs/heads/${b}" && branch_exists_remote "$b"; then
-        counts=$(git rev-list --left-right --count "${b}...origin/${b}" 2>/dev/null)
-        if [[ $? -eq 0 && -n "$counts" ]]; then
-            ahead=$(echo "$counts" | awk '{print $1}')
-            behind=$(echo "$counts" | awk '{print $2}')
-            printf '  %-25s  %-15s  %-15s\n' "$b" "$ahead" "$behind"
-        else
-            printf '  %-25s  %-15s  %-15s\n' "$b" '?' '?'
-        fi
-    fi
-done
-
-echonice ''
+############################################ FINAL STATUS
+show_branch_status 'Branch status after merges'
 
 # Always end on develop (if it exists)
 if git show-ref --verify --quiet 'refs/heads/develop' || git show-ref --verify --quiet 'refs/remotes/origin/develop'; then
     ensure_local_branch 'develop' >/dev/null 2>&1 || true
     git checkout develop >/dev/null 2>&1 || true
 fi
+
+echoend

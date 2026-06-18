@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Updates Go programming language to the latest version"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Update Go"
+    echonice "Updates Go programming language to the latest version"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-update-go"
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+
+ECHOHEAD "Fetching the latest Go version"
+VERSION=$(curl -s https://go.dev/VERSION?m=text | head -n 1)
+OS="linux"
+ARCH="amd64"
+
+if [ -z "$VERSION" ]; then
+    echonice "Failed to fetch the latest version. Check your internet connection."
+    exit 1
+fi
+
+TAR_FILE="${VERSION}.${OS}-${ARCH}.tar.gz"
+DOWNLOAD_URL="https://go.dev/dl/${TAR_FILE}"
+
+echonice "Latest version found: $VERSION"
+echonice "Downloading $TAR_FILE ..."
+wget -q --show-progress "$DOWNLOAD_URL"
+
+ECHOHEAD "Removing old Go installation"
+sudo rm -rf /usr/local/go
+
+ECHOHEAD "Extracting new Go installation to /usr/local"
+sudo tar -C /usr/local -xzf "$TAR_FILE"
+
+echonice "Cleaning up downloaded archive..."
+rm "$TAR_FILE"
+
+ECHOHEAD "Go updated"
+/usr/local/go/bin/go version
+
+echonice "NOTE: If 'go version' does not work directly in your terminal,"
+echonice "make sure /usr/local/go/bin is in your PATH. You can add it by running:"
+echonice 'echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc && source ~/.bashrc'
+
+
+echoend
