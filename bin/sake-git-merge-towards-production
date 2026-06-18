@@ -17,10 +17,10 @@ from='develop'
 to='test'
 direct='no'
 reverse='no'
-ship='no'       # shorthand: develop -> production (stepwise)
-toProd='no'     # shorthand: set --to production
-toStage='no'    # shorthand: set --to staging
-toTest='no'     # shorthand: set --to testing
+ship='no'    # shorthand: develop -> production (stepwise)
+toProd='no'  # shorthand: set --to production
+toStage='no' # shorthand: set --to staging
+toTest='no'  # shorthand: set --to testing
 
 while (($#)); do
     case $1 in
@@ -210,11 +210,11 @@ resolve_stage_branch() {
 
 desired_index() {
     case "$1" in
-        develop) echo 0 ;;
-        test) echo 1 ;;
-        stage|staging) echo 2 ;;
-        production) echo 3 ;;
-        *) echo -1 ;;
+    develop) echo 0 ;;
+    test) echo 1 ;;
+    stage | staging) echo 2 ;;
+    production) echo 3 ;;
+    *) echo -1 ;;
     esac
 }
 
@@ -235,7 +235,7 @@ pick_existing_at_or_below() {
 
     for b in "${FLOW_ACTUAL[@]}"; do
         idx=$(desired_index "$b")
-        if (( idx <= targetIndex && idx > bestIndex )); then
+        if ((idx <= targetIndex && idx > bestIndex)); then
             bestIndex=$idx
             bestBranch=$b
         fi
@@ -252,7 +252,7 @@ pick_existing_at_or_above() {
 
     for b in "${FLOW_ACTUAL[@]}"; do
         idx=$(desired_index "$b")
-        if (( idx >= targetIndex && idx < bestIndex )); then
+        if ((idx >= targetIndex && idx < bestIndex)); then
             bestIndex=$idx
             bestBranch=$b
         fi
@@ -326,7 +326,7 @@ if branch_exists 'production'; then
     FLOW_ACTUAL+=('production')
 fi
 
-if (( ${#FLOW_ACTUAL[@]} < 2 )); then
+if ((${#FLOW_ACTUAL[@]} < 2)); then
     echobad 'Not enough env branches exist (need at least two of develop/test/(stage|staging)/production).'
     exit 1
 fi
@@ -335,7 +335,7 @@ fi
 fromDesired=$(desired_index "$from")
 toDesired=$(desired_index "$to")
 
-if (( fromDesired == -1 || toDesired == -1 )); then
+if ((fromDesired == -1 || toDesired == -1)); then
     echobad "Invalid branch name. Use develop, test, stage|staging, production."
     exit 1
 fi
@@ -371,18 +371,18 @@ fi
 fromPos=$(get_pos_in_flow_actual "$from")
 toPos=$(get_pos_in_flow_actual "$to")
 
-if (( fromPos == -1 || toPos == -1 )); then
+if ((fromPos == -1 || toPos == -1)); then
     echobad 'Could not resolve from/to branches in the available flow.'
     exit 1
 fi
 
 if [[ "$reverse" == 'yes' ]]; then
-    if (( fromPos < toPos )); then
+    if ((fromPos < toPos)); then
         echobad "Reverse mode cannot merge upwards (from $from to $to)."
         exit 1
     fi
 else
-    if (( fromPos > toPos )); then
+    if ((fromPos > toPos)); then
         echobad "Cannot merge backwards (from $from to $to)."
         exit 1
     fi
@@ -394,19 +394,19 @@ if [[ "$direct" == 'yes' ]]; then
     steps=("${from}→${to}")
 else
     if [[ "$reverse" == 'yes' ]]; then
-        for (( i=fromPos; i>toPos; i-- )); do
-            steps+=("${FLOW_ACTUAL[$i]}→${FLOW_ACTUAL[$((i-1))]}")
+        for ((i = fromPos; i > toPos; i--)); do
+            steps+=("${FLOW_ACTUAL[$i]}→${FLOW_ACTUAL[$((i - 1))]}")
         done
     else
-        for (( i=fromPos; i<toPos; i++ )); do
-            steps+=("${FLOW_ACTUAL[$i]}→${FLOW_ACTUAL[$((i+1))]}")
+        for ((i = fromPos; i < toPos; i++)); do
+            steps+=("${FLOW_ACTUAL[$i]}→${FLOW_ACTUAL[$((i + 1))]}")
         done
     fi
 fi
 
 ############################################ RUN MERGES
 for step in "${steps[@]}"; do
-    IFS='→' read -r fromBranch toBranch <<< "$step"
+    IFS='→' read -r fromBranch toBranch <<<"$step"
     echonice "### Processing merge: $fromBranch → $toBranch ###"
 
     git fetch origin "$toBranch" "$fromBranch"
@@ -441,34 +441,33 @@ for step in "${steps[@]}"; do
     echonice "✓ Completed $fromBranch ↔ $toBranch"
 done
 
-
 echonice ''
 ECHOHEAD 'Branch status after merges'
 
 git fetch origin >/dev/null 2>&1 || true
 
 # ---- Adjacent branch comparison
-printf '  %-20s  %-10s  %-10s\n' 'COMPARISON' 'AHEAD' 'BEHIND'
-printf '  %-20s  %-10s  %-10s\n' '────────────────────' '──────────' '──────────'
+printf '  %-25s  %-15s  %-15s\n' 'COMPARISON' 'AHEAD' 'BEHIND'
+printf '  %-25s  %-15s  %-15s\n' '─────────────────────────' '───────────────' '───────────────'
 
-for (( i=0; i<${#FLOW_ACTUAL[@]}-1; i++ )); do
+for ((i = 0; i < ${#FLOW_ACTUAL[@]} - 1; i++)); do
     left="${FLOW_ACTUAL[$i]}"
-    right="${FLOW_ACTUAL[$((i+1))]}"
+    right="${FLOW_ACTUAL[$((i + 1))]}"
 
     counts=$(git rev-list --left-right --count "origin/${left}...origin/${right}" 2>/dev/null)
     if [[ $? -eq 0 && -n "$counts" ]]; then
         ahead=$(echo "$counts" | awk '{print $1}')
         behind=$(echo "$counts" | awk '{print $2}')
-        printf '  %-20s  %-10s  %-10s\n' "${left} → ${right}" "$ahead" "$behind"
+        printf '  %-27s  %-15s  %-15s\n' "${left} → ${right}" "$ahead" "$behind" # 27 is 25 for the names + 2 for the arrow and spaces
     else
-        printf '  %-20s  %-10s  %-10s\n' "${left} → ${right}" '?' '?'
+        printf '  %-27s  %-15s  %-15s\n' "${left} → ${right}" '?' '?' # 27 is 25 for the names + 2 for the arrow and spaces
     fi
 done
 
 # ---- Local vs origin
 echonice ''
-printf '  %-20s  %-10s  %-10s\n' 'BRANCH' 'LOCAL +' 'LOCAL −'
-printf '  %-20s  %-10s  %-10s\n' '────────────────────' '──────────' '──────────'
+printf '  %-25s  %-15s  %-15s\n' 'BRANCH' 'LOCAL +' 'LOCAL −'
+printf '  %-25s  %-15s  %-15s\n' '─────────────────────────' '───────────────' '───────────────'
 
 for b in "${FLOW_ACTUAL[@]}"; do
     if git show-ref --verify --quiet "refs/heads/${b}" && branch_exists_remote "$b"; then
@@ -476,9 +475,9 @@ for b in "${FLOW_ACTUAL[@]}"; do
         if [[ $? -eq 0 && -n "$counts" ]]; then
             ahead=$(echo "$counts" | awk '{print $1}')
             behind=$(echo "$counts" | awk '{print $2}')
-            printf '  %-20s  %-10s  %-10s\n' "$b" "$ahead" "$behind"
+            printf '  %-25s  %-15s  %-15s\n' "$b" "$ahead" "$behind"
         else
-            printf '  %-20s  %-10s  %-10s\n' "$b" '?' '?'
+            printf '  %-25s  %-15s  %-15s\n' "$b" '?' '?'
         fi
     fi
 done
