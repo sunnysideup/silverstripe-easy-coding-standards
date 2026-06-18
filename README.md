@@ -123,7 +123,7 @@ Install as global composer package and then try to access the commands, starting
 2. browse to root folder of your project and type:
 
 ```shell
-composer require --dev sunnysideup/easy-coding-standards:dev-master
+composer require --dev sunnysideup/easy-coding-standards:dev-main
 ```
 
 ## global install (recommended - more likely to work)
@@ -135,7 +135,7 @@ composer require --dev sunnysideup/easy-coding-standards:dev-master
 # install ...
 composer global config minimum-stability dev
 composer global config prefer-stable true
-composer global require sunnysideup/easy-coding-standards:dev-master
+composer global require sunnysideup/easy-coding-standards:dev-main
 cat << 'EOF' >> ~/.bashrc
 
 # Add composer path
