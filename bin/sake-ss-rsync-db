@@ -18,6 +18,7 @@ server=''
 toServer=''
 help='no'
 reverse='no'
+dropDb='no'
 
 while (($#)); do
     case $1 in
@@ -27,6 +28,10 @@ while (($#)); do
         ;;
     -t | --to)
         toServer=$2
+        shift
+        ;;
+    -d | --drop)
+        dropDb='yes'
         shift
         ;;
     *)
@@ -53,7 +58,7 @@ fi
 server="$(normalize_server "$server")"
 
 serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-if [[ -z "$serverFromEnv" ]] ; then
+if [[ -z "$serverFromEnv" ]]; then
     echowarn "No default server set in .env (key: $envServerKey).
     You can set it like this: $envServerKey=my-server:/var/www/website-root"
 fi
@@ -66,6 +71,7 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     echonice "Server to sync with:           $server"
     echonice "Do reverse sync:               $reverse"
     echonice "To server (if any):            $toServer"
+    echonice "Drop & recreate server DB:     $dropDb"
     echonice "Apache user (-w):              $wwwDataUser"
     echonice ""
     echonice "Local .env File:               $localEnvFile"
@@ -77,12 +83,17 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     ECHOHEAD "Available settings:"
     echonice "-r, --reverse                  sync FROM local TO server"
     echonice "-t, --to SERVER[:/path]        after pulling, also push dump to this server and import"
+    echonice "-d, --drop                     drop & recreate the SERVER DB before import (needs DROP privilege)"
     echonice "-h, --help                     show help information"
+    echonice ""
+    echonice "Note: the LOCAL database is always dropped & recreated on import."
+    echonice "      Use -d to also drop & recreate on the remote / --to server."
     echonice ""
     ECHOHEAD "Examples:"
     echonice "sake-ss-sync-db my-server:/var/www/website-root"
     echonice "sake-ss-sync-db my-server            # default path is /container/application"
     echonice "sake-ss-sync-db --reverse my-server"
+    echonice "sake-ss-sync-db --reverse --drop my-server"
     echonice "sake-ss-sync-db my-server --to other-server:/var/www/site"
 
     ECHOHEAD "Setting defaults:"
@@ -109,7 +120,6 @@ if [[ -n "$toServer" ]]; then
 fi
 
 ############################################ EXTRACT .env VARIABLES
-
 
 localDbUser=$(read_local_dotenv_value "SS_DATABASE_USERNAME")
 localDbPass=$(read_local_dotenv_value "SS_DATABASE_PASSWORD")
@@ -156,35 +166,82 @@ fi
 ############################################ SYNC PROCESS
 if [[ "$reverse" == "yes" ]]; then
     echowarn "You are about to overwrite the remote database ($server) with your local database."
+    [[ "$dropDb" == "yes" ]] && echowarn "The remote database will be DROPPED and recreated."
     read -p "Are you sure? (yes/[no]): " confirm
     [[ "$confirm" != "yes" ]] && echonice "Aborted." && exit 1
 
     echonice "Dumping local database..."
-    mysqldump --no-tablespaces -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" > "$localDumpFile"
+    mysqldump --no-tablespaces --add-drop-table -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" >"$localDumpFile"
     [[ $? -ne 0 ]] && echobad "Local database dump failed." && exit 1
 
     echonice "Uploading dump to source server..."
-    rsync -chavzP "$localDumpFile" "$serverClean:$remoteDumpFile" || { echobad "Failed to upload dump."; exit 1; }
+    rsync -chavzP "$localDumpFile" "$serverClean:$remoteDumpFile" || {
+        echobad "Failed to upload dump."
+        exit 1
+    }
+
+    if [[ "$dropDb" == "yes" ]]; then
+        echonice "Recreating database on source server..."
+        ssh "$serverClean" "mysql -u '$remoteDbUser' -p'$escapedRemotePass' -h '$remoteDbHost' -e 'DROP DATABASE IF EXISTS \`$remoteDbName\`; CREATE DATABASE \`$remoteDbName\`;'" || {
+            echobad "Failed to recreate database on source server."
+            exit 1
+        }
+    fi
 
     echonice "Importing on source server..."
-    ssh "$serverClean" "mysql -u '$remoteDbUser' -p'$escapedRemotePass' -h '$remoteDbHost' '$remoteDbName' < '$remoteDumpFile' " || { echobad "Failed to import on source server."; exit 1; }
-
+    ssh "$serverClean" "mysql -u '$remoteDbUser' -p'$escapedRemotePass' -h '$remoteDbHost' '$remoteDbName' < '$remoteDumpFile' " || {
+        echobad "Failed to import on source server."
+        exit 1
+    }
 else
     # PULL: source server -> local
     echonice "Dumping remote database (source)..."
-    ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName > $remoteDumpFile" || { echobad "Remote database dump failed."; exit 1; }
+    ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces --add-drop-table -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName > $remoteDumpFile" || {
+        echobad "Remote database dump failed."
+        exit 1
+    }
 
     echonice "Downloading dump from source server..."
-    rsync -chavzP "$serverClean:$remoteDumpFile" "$localDumpFile" || { echobad "Failed to download dump."; exit 1; }
+    rsync -chavzP "$serverClean:$remoteDumpFile" "$localDumpFile" || {
+        echobad "Failed to download dump."
+        exit 1
+    }
+
+    # Local is always dropped & recreated.
+    echonice "Recreating local database..."
+    mysql -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" -e "DROP DATABASE IF EXISTS \`$localDbName\`; CREATE DATABASE \`$localDbName\`;" || {
+        echobad "Failed to recreate local database."
+        exit 1
+    }
 
     echonice "Importing locally..."
-    mysql -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" < "$localDumpFile" || { echobad "Failed to import locally."; exit 1; }
+    mysql -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" <"$localDumpFile" || {
+        echobad "Failed to import locally."
+        exit 1
+    }
 
     # If --to provided: send THIS downloaded dump to the --to server and import there
     if [[ -n "$toServer" ]]; then
         echowarn "Also importing the same dump into --to server ($toServer)..."
-        rsync -chavzP "$localDumpFile" "$toServerClean:$toRemoteDumpFile" || { echobad "Failed to upload dump to --to server."; exit 1; }
-        ssh "$toServerClean" "mysql -u $toRemoteDbUser -p$toRemoteDbPass -h $toRemoteDbHost $toRemoteDbName < $toRemoteDumpFile" || { echobad "Failed to import on --to server."; exit 1; }
+
+        if [[ "$dropDb" == "yes" ]]; then
+            echonice "Recreating database on --to server..."
+            ssh "$toServerClean" "mysql -u $toRemoteDbUser -p$toRemoteDbPass -h $toRemoteDbHost -e 'DROP DATABASE IF EXISTS \`$toRemoteDbName\`; CREATE DATABASE \`$toRemoteDbName\`;'" || {
+                echobad "Failed to recreate database on --to server."
+                exit 1
+            }
+        fi
+
+        rsync -chavzP "$localDumpFile" "$toServerClean:$toRemoteDumpFile" || {
+            echobad "Failed to upload dump to --to server."
+            exit 1
+        }
+
+        ssh "$toServerClean" "mysql -u $toRemoteDbUser -p$toRemoteDbPass -h $toRemoteDbHost $toRemoteDbName < $toRemoteDumpFile" || {
+            echobad "Failed to import on --to server."
+            exit 1
+        }
+
         # Clean up on --to server
         ssh "$toServerClean" "rm -f $toRemoteDumpFile" || echowarn "Failed to clean up dump on --to server."
     fi
