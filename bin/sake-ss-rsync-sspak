@@ -11,6 +11,7 @@ envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
 
 ############################################ SETTINGS
 server=''
+serverFromArg=''
 wwwDataUser='www-data'
 help='no'
 
@@ -21,17 +22,23 @@ while (($#)); do
             shift
             continue
         fi
-        server=$1
+        serverFromArg=$1
         ;;
     esac
 
 
     shift
 done
-############################################ DEFAULT SERVER FROM .env
-if [[ -z "$server" ]]; then
-    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+############################################ RESOLVE SERVER (arg ALWAYS overrules .env)
+serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+if [[ -n "$serverFromArg" ]]; then
+    server="$serverFromArg"
+    if [[ -n "$serverFromEnv" && "$(normalize_server "$serverFromArg")" != "$(normalize_server "$serverFromEnv")" ]]; then
+        echowarn "Note: argument server ($serverFromArg) differs from .env $envServerKey ($serverFromEnv)."
+        echowarn "Using the argument server."
+    fi
+elif [[ -n "$serverFromEnv" ]]; then
+    server="$serverFromEnv"
 fi
 
 if [[ -z "${server:-}" ]]; then
@@ -39,12 +46,6 @@ if [[ -z "${server:-}" ]]; then
     help_and_exit
 fi
 server="$(normalize_server "$server")"
-
-############################################ DEFAULT SERVER FROM .env
-if [[ -z "$server" ]]; then
-    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
-fi
 
 help_and_exit() {
     ECHOHEAD "Sync Database from Server"

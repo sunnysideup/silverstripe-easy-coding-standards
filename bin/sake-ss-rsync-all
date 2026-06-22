@@ -14,15 +14,14 @@ reverse='no'
 envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
 
 ############################################ ARGUMENTS
+serverFromArg=''
 while (($#)); do
     case $1 in
     -h | --help)
         help='yes'
-        shift
         ;;
     -r | --reverse)
         reverse='yes'
-        shift
         ;;
     -t | --to)
         toServer=$2
@@ -33,19 +32,25 @@ while (($#)); do
             shift
             continue
         fi
-        server=$1
+        serverFromArg=$1
         ;;
     esac
     shift
 done
 
-############################################ DEFAULT SERVER FROM .env
-if [[ -z "$server" ]]; then
-    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
-fi
-
-if [[ -z "${server:-}" ]]; then
+############################################ RESOLVE SERVER (arg ALWAYS overrules .env)
+serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+if [[ -n "$serverFromArg" ]]; then
+    server="$serverFromArg"
+    serverSource="argument"
+    if [[ -n "$serverFromEnv" && "$(normalize_server "$serverFromArg")" != "$(normalize_server "$serverFromEnv")" ]]; then
+        echowarn "Note: argument server ($serverFromArg) differs from .env $envServerKey ($serverFromEnv)."
+        echowarn "Using the argument server."
+    fi
+elif [[ -n "$serverFromEnv" ]]; then
+    server="$serverFromEnv"
+    serverSource=".env ($envServerKey)"
+else
     echobad 'No server specified.'
     help_and_exit
 fi
@@ -90,8 +95,19 @@ sake_check_help_and_exit
 
 
 ############################################ RUN COMMANDS
-ECHOHEAD "Starting full sync from server: $server"
-[[ -n "$TO_NORMALIZED" ]] && echonice "To server: $TO_NORMALIZED"
+ECHOHEAD "Starting full sync"
+echonice "Server:               $server"
+echonice "Server source:        $serverSource"
+echonice "Direction:            $([[ "$reverse" == "yes" ]] && echo 'LOCAL → SERVER (reverse)' || echo 'SERVER → LOCAL')"
+[[ -n "$TO_NORMALIZED" ]] && echonice "Also push to:         $TO_NORMALIZED"
+
+if [[ "$reverse" == "yes" ]]; then
+    serverHost="${server%%:*}"
+    ECHOHEAD "DANGER: REVERSE SYNC (LOCAL → REMOTE for BOTH db and assets)"
+    echowarn "You are about to overwrite the remote database AND assets on $server."
+    read -p "Type the server host name ($serverHost) to confirm: " confirm
+    [[ "$confirm" != "$serverHost" ]] && echonice "Aborted (input did not match server host)." && exit 1
+fi
 
 dbArgs=("$server")
 assetArgs=("$server")

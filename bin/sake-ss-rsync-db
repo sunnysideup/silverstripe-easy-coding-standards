@@ -20,11 +20,11 @@ help='no'
 reverse='no'
 dropDb='no'
 
+serverFromArg=''
 while (($#)); do
     case $1 in
     -r | --reverse)
         reverse='yes'
-        shift
         ;;
     -t | --to)
         toServer=$2
@@ -32,36 +32,37 @@ while (($#)); do
         ;;
     -d | --drop)
         dropDb='yes'
-        shift
         ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
             continue
         fi
-        server=$1
+        serverFromArg=$1
         ;;
     esac
 
     shift
 done
 
-############################################ DEFAULT SERVER FROM .env
-if [[ -z "$server" ]]; then
-    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
-fi
-if [[ -z "${server:-}" ]]; then
-    echobad 'No server specified.'
-    help_and_exit
+############################################ RESOLVE SERVER (arg ALWAYS overrules .env)
+serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+if [[ -n "$serverFromArg" ]]; then
+    server="$serverFromArg"
+    serverSource="argument"
+    if [[ -n "$serverFromEnv" && "$(normalize_server "$serverFromArg")" != "$(normalize_server "$serverFromEnv")" ]]; then
+        echowarn "Note: argument server ($serverFromArg) differs from .env $envServerKey ($serverFromEnv)."
+        echowarn "Using the argument server."
+    fi
+elif [[ -n "$serverFromEnv" ]]; then
+    server="$serverFromEnv"
+    serverSource=".env ($envServerKey)"
+else
+    echobad 'No server specified (no argument, no .env value).'
+    echowarn "Set a default in .env: $envServerKey=my-server:/var/www/website-root"
+    exit 1
 fi
 server="$(normalize_server "$server")"
-
-serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-if [[ -z "$serverFromEnv" ]]; then
-    echowarn "No default server set in .env (key: $envServerKey).
-    You can set it like this: $envServerKey=my-server:/var/www/website-root"
-fi
 
 if [[ -z "$server" || "$help" == "yes" ]]; then
     ECHOHEAD "Sync Database"
@@ -165,10 +166,14 @@ fi
 
 ############################################ SYNC PROCESS
 if [[ "$reverse" == "yes" ]]; then
-    echowarn "You are about to overwrite the remote database ($server) with your local database."
+    ECHOHEAD "DANGER: REVERSE SYNC (LOCAL → REMOTE)"
+    echowarn "Target server:        $server"
+    echowarn "Server source:        $serverSource"
+    echowarn "Remote DB:            $remoteDbName @ $remoteDbHost (user: $remoteDbUser)"
+    echowarn "You are about to OVERWRITE the remote database with your LOCAL database."
     [[ "$dropDb" == "yes" ]] && echowarn "The remote database will be DROPPED and recreated."
-    read -p "Are you sure? (yes/[no]): " confirm
-    [[ "$confirm" != "yes" ]] && echonice "Aborted." && exit 1
+    read -p "Type the server host name ($serverClean) to confirm: " confirm
+    [[ "$confirm" != "$serverClean" ]] && echonice "Aborted (input did not match server host)." && exit 1
 
     echonice "Dumping local database..."
     mysqldump --no-tablespaces --add-drop-table -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" >"$localDumpFile"

@@ -22,6 +22,7 @@ wwwDataUser="$WWW_DATA_DEFAULT"
 help='no'
 reverse='no'
 
+serverFromArg=''
 while (($#)); do
     case $1 in
         -w|--www-data-user) wwwDataUser=$2; shift ;;
@@ -33,20 +34,28 @@ while (($#)); do
             shift
             continue
         fi
-        server=$1
+        serverFromArg=$1
         ;;
     esac
     shift
 done
 
-############################################ DEFAULT SERVER FROM .env
-if [[ -z "$server" ]]; then
-    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+############################################ RESOLVE SERVER (arg ALWAYS overrules .env)
+serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+serverSource=''
+if [[ -n "$serverFromArg" ]]; then
+    server="$serverFromArg"
+    serverSource="argument"
+    if [[ -n "$serverFromEnv" && "$(normalize_server "$serverFromArg")" != "$(normalize_server "$serverFromEnv")" ]]; then
+        echowarn "Note: argument server ($serverFromArg) differs from .env $envServerKey ($serverFromEnv)."
+        echowarn "Using the argument server."
+    fi
+elif [[ -n "$serverFromEnv" ]]; then
+    server="$serverFromEnv"
+    serverSource=".env ($envServerKey)"
 fi
 
-
-server="$(normalize_server "$server")"
+[[ -n "$server" ]] && server="$(normalize_server "$server")"
 
 ############################################ HELP
 help_and_exit() {
@@ -120,10 +129,14 @@ fi
 cd "$WORKING_DIR" || { echobad "Cannot cd to $WORKING_DIR"; exit 1; }
 
 if [[ "$reverse" == 'yes' ]]; then
-    ECHOHEAD "Now syncing LOCAL → $server ..."
-    echowarn "You are about to overwrite remote assets at $REMOTE_ASSETS_DIR with LOCAL $LOCAL_ASSETS_DIR"
-    read -p 'Are you sure? (yes/[no]): ' confirm
-    [[ "$confirm" != 'yes' ]] && echonice 'Aborted.' && exit 1
+    ECHOHEAD "DANGER: REVERSE SYNC (LOCAL → REMOTE assets)"
+    echowarn "Target server:        $server"
+    echowarn "Server source:        ${serverSource:-unknown}"
+    echowarn "Remote assets dir:    $REMOTE_ASSETS_DIR"
+    echowarn "Local assets dir:     $LOCAL_ASSETS_DIR"
+    echowarn "You are about to OVERWRITE remote assets with LOCAL contents."
+    read -p "Type the server host name ($SERVER_HOST) to confirm: " confirm
+    [[ "$confirm" != "$SERVER_HOST" ]] && echonice 'Aborted (input did not match server host).' && exit 1
     rsync "${RSYNC_OPTS[@]}" "$LOCAL_ASSETS_DIR/" "$server/$REMOTE_ASSETS_SUBPATH"
 else
     ECHOHEAD 'Now clearing local assets...'
