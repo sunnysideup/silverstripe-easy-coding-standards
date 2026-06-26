@@ -108,6 +108,7 @@ Install as global composer package and then try to access the commands, starting
 
 # machine maintenance
  - sake-update-chromium
+ - sake-update-go
  - sake-update-vs-code
  - sake-update-composer
 
