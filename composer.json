@@ -120,6 +120,7 @@
     "bin/sake-update-chromium",
     "bin/sake-update-composer",
     "bin/sake-update-go",
+    "bin/sake-update-shell",
     "bin/sake-update-vs-code"
   ],
   "config": {

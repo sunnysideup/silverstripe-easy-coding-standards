@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Updates Go programming language to the latest version"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+while (($#)); do
+    case $1 in
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+
+    shift
+done
+
+help_and_exit() {
+
+    echoHEAD "Update Your Shell Experience"
+    echonice "Updates Shell To Zsh "
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+
+    echoHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    echoHEAD "Example usage:"
+    echonice "sake-update-shell"
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+
+
+# Prevent running as root so '~' and '$USER' resolve to the actual user
+if [[ $EUID -eq 0 ]]; then
+  echo "Please run this script as your normal user, NOT with sudo."
+  exit 1
+fi
+
+echo "--- Installing Zsh and dependencies ---"
+sudo apt update
+sudo apt install -y zsh git curl fontconfig
+
+# --- Make Zsh the default shell ---
+sudo chsh -s "$(command -v zsh)" "$USER"
+
+mkdir -p ~/.zsh/plugins
+touch ~/.zshrc
+
+# Append a line to .zshrc only if it isn't already there
+append_once() {
+  grep -qxF "$1" ~/.zshrc 2>/dev/null || echo "$1" >> ~/.zshrc
+}
+
+# --- History (Keep Zsh and Bash history separate) ---
+append_once 'HISTFILE=~/.zsh_history'
+append_once 'HISTSIZE=50000'
+append_once 'SAVEHIST=50000'
+append_once 'setopt SHARE_HISTORY INC_APPEND_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_SPACE'
+
+echo "--- Installing Powerlevel10k ---"
+[ -d ~/.zsh/plugins/powerlevel10k ] || \
+  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.zsh/plugins/powerlevel10k
+append_once 'source ~/.zsh/plugins/powerlevel10k/powerlevel10k.zsh-theme'
+append_once '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh'
+
+echo "--- Installing Meslo Nerd Fonts ---"
+mkdir -p ~/.local/share/fonts
+for f in "MesloLGS NF Regular.ttf" "MesloLGS NF Bold.ttf" "MesloLGS NF Italic.ttf" "MesloLGS NF Bold Italic.ttf"; do
+  [ -f ~/.local/share/fonts/"$f" ] || \
+    curl -fLo ~/.local/share/fonts/"$f" "https://github.com/romkatv/powerlevel10k-media/raw/master/${f// /%20}"
+done
+fc-cache -f ~/.local/share/fonts >/dev/null
+echo ">> NOTE: Set your terminal emulator's font to 'MesloLGS NF' so the prompt icons render!"
+
+echo "--- Installing Plugins ---"
+# Autosuggestions
+[ -d ~/.zsh/plugins/zsh-autosuggestions ] || \
+  git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/plugins/zsh-autosuggestions
+append_once 'source ~/.zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh'
+
+# SSH config host suggestions
+[ -d ~/.zsh/plugins/zsh-ssh-config-suggestions ] || \
+  git clone --depth=1 https://github.com/yngc0der/zsh-ssh-config-suggestions.git ~/.zsh/plugins/zsh-ssh-config-suggestions
+append_once 'source ~/.zsh/plugins/zsh-ssh-config-suggestions/zsh-ssh-config-suggestions.plugin.zsh'
+
+# Syntax highlighting: must always be sourced LAST
+[ -d ~/.zsh/plugins/zsh-syntax-highlighting ] || \
+  git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.zsh/plugins/zsh-syntax-highlighting
+append_once 'source ~/.zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh'
+
+echo "--- Porting bash exports and aliases ---"
+# Carry over simple PATH/env/aliases from bash (ignores multi-line edge cases)
+if [ -f ~/.bashrc ]; then
+  while IFS= read -r line; do
+    append_once "$line"
+  done < <(grep -E '^[[:space:]]*(export|alias)[[:space:]]+' ~/.bashrc)
+fi
+
+ECHOHEAD "DONE"
+echonice "Shell update complete. Please restart your terminal or run 'exec zsh' to start using Zsh."
+echonice "First launch will trigger the p10k configuration wizard."
+
+exec zsh
