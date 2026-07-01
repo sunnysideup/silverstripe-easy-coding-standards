@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Updates Go programming language to the latest version"
+SCRIPT_SUMMARY="Updates Shell To Zsh and configures terminal environments"
 
 ############################################ DIR
 dir='./'
@@ -43,10 +43,7 @@ help_and_exit() {
     exit
 }
 
-
 sake_check_help_and_exit
-
-
 
 # Prevent running as root so '~' and '$USER' resolve to the actual user
 if [[ $EUID -eq 0 ]]; then
@@ -105,6 +102,10 @@ append_once 'source ~/.zsh/plugins/zsh-ssh-config-suggestions/zsh-ssh-config-sug
 [ -d ~/.zsh/plugins/zsh-syntax-highlighting ] || \
   git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.zsh/plugins/zsh-syntax-highlighting
 append_once 'source ~/.zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh'
+
+echo "--- Configuring Terminal Tab Titles ---"
+# Sets the tab/window title to the current folder name whenever a command executes
+append_once 'precmd() { print -Pn "\e]0;%1d\a" }'
 
 echo "--- Porting bash exports and aliases ---"
 # Carry over simple PATH/env/aliases from bash (ignores multi-line edge cases)
