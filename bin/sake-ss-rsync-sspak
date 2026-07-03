@@ -58,7 +58,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-ss-sync-sspak my-server:/var/www/website-root"
+    echonice "sake-ss-rsync-sspak my-server:/var/www/website-root"
     echofunctions
     exit
 }
