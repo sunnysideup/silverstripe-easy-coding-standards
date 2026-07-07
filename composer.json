@@ -60,6 +60,7 @@
     "bin/sake-git-find-any-changes",
     "bin/sake-git-info",
     "bin/sake-git-merge-pipeline-ssh",
+    "bin/sake-git-merge-majors",
     "bin/sake-git-merge-towards-production",
     "bin/sake-git-pm-master-to-main",
     "bin/sake-git-pm-my-pull-requests",

@@ -1,0 +1,476 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Merge a version branch into another (e.g. SS5 → SS6) keeping each branch's version-specific code intact"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+help='no'
+source_branch='5'      # merge FROM (default: the Silverstripe 5 branch)
+target_branch='main'   # merge INTO (default: the Silverstripe 6 branch)
+mode='sync'            # sync | preview | setup | abort
+runRector='yes'        # normalise class names to the target SS version after merging
+runVerify='yes'        # run compat/lint/tests before committing
+composerInstall='no'   # refresh vendor/ before verifying
+useOpencode='no'       # print a ready-to-paste opencode prompt at the resolve step
+assumeYes='no'         # skip non-destructive confirmations (for automation)
+
+# Files that are ENTIRELY version-specific and must never merge across branches.
+# `setup` pins these as merge=ours so a merge always keeps the target's copy.
+OURS_FILES=('composer.json')
+
+while (($#)); do
+    case $1 in
+    -s | --source)
+        source_branch=$2
+        shift
+        ;;
+    -t | --target)
+        target_branch=$2
+        shift
+        ;;
+    --setup)
+        mode='setup'
+        ;;
+    -c | --preview | --status | --dry-run)
+        mode='preview'
+        ;;
+    --abort)
+        mode='abort'
+        ;;
+    --no-rector)
+        runRector='no'
+        ;;
+    --no-verify)
+        runVerify='no'
+        ;;
+    --composer-install)
+        composerInstall='yes'
+        ;;
+    --opencode)
+        useOpencode='yes'
+        ;;
+    -y | --yes)
+        assumeYes='yes'
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+############################################ HELP
+
+help_and_exit() {
+    ECHOHEAD "Merge a version branch into another (SS5 ↔ SS6) without dragging version-specific code across"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "directory of script:           $SCRIPT_DIR"
+    echonice "directory to work in:          $dir (relative to $WORKING_DIR)"
+
+    ECHOHEAD "Current settings:"
+    echonice "mode:                          $mode"
+    echonice "merge FROM (-s):               $source_branch"
+    echonice "merge INTO (-t):               $target_branch"
+    echonice "run Rector:                    $runRector"
+    echonice "run verification:              $runVerify"
+    echonice "composer install first:        $composerInstall"
+    echonice "print opencode prompt:         $useOpencode"
+    echonice "assume yes:                    $assumeYes"
+
+    ECHOHEAD "Available settings:"
+    echonice "-s, --source                   branch to merge FROM (default: 5)"
+    echonice "-t, --target                   branch to merge INTO (default: main)"
+    echonice "    --setup                    one-time guardrails: merge=ours driver, rector.php, AGENTS.md"
+    echonice "-c, --preview, --dry-run       do the merge, show the incoming diff, then abort (keep nothing)"
+    echonice "    --abort                    git merge --abort (bail out of an in-progress merge)"
+    echonice "    --no-rector                skip the Rector normalisation step"
+    echonice "    --no-verify                skip compat/lint/test verification"
+    echonice "    --composer-install         run 'composer install' before verifying"
+    echonice "    --opencode                 print a ready-to-paste opencode prompt at the resolve step"
+    echonice "-y, --yes                      auto-confirm non-destructive prompts (not conflicts)"
+    echonice "-h, --help                     show help information"
+    echonice "-q, --quiet                    suppress logging"
+
+    ECHOHEAD "Example usage:"
+    echonice "e.g. sake-git-sync-version-branch --setup"
+    echonice "e.g. sake-git-sync-version-branch -s 5 -t main --preview"
+    echonice "e.g. sake-git-sync-version-branch -s 5 -t main --opencode"
+
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ MOVE INTO THE REPO
+
+cd_or_fail "$WORKING_DIR/$dir" help_and_exit || exit 1
+
+GIT_DIR=$(git rev-parse --show-toplevel 2>/dev/null)
+if [[ -z "$GIT_DIR" ]]; then
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO so I can not sync branches."
+    exit 1
+fi
+
+############################################ HELPERS
+
+merge_in_progress() { git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; }
+unmerged_paths() { git diff --name-only --diff-filter=U; }
+has_conflicts() { [[ -n "$(unmerged_paths)" ]]; }
+branch_exists() { git show-ref --verify --quiet "refs/heads/$1"; }
+current_branch() { git rev-parse --abbrev-ref HEAD; }
+tree_is_clean() { git diff --quiet && git diff --cached --quiet; }
+
+# The merge=ours driver is LOCAL to each clone (not committed), so make sure
+# it is configured every run. `true` always exits 0 → keep the target's copy.
+ensure_ours_driver() {
+    if [[ "$(git config --get merge.ours.driver 2>/dev/null)" != 'true' ]]; then
+        git config merge.ours.driver true
+        echogood "Configured merge.ours.driver (keeps target-branch copy of pinned files)"
+    fi
+}
+
+# Warn if the pinned files are not actually marked merge=ours in .gitattributes.
+check_gitattributes() {
+    local f missing=()
+    for f in "${OURS_FILES[@]}"; do
+        if ! git check-attr merge -- "$f" 2>/dev/null | grep -q ': merge: ours$'; then
+            missing+=("$f")
+        fi
+    done
+    if ((${#missing[@]})); then
+        echowarn "No 'merge=ours' in .gitattributes for: ${missing[*]} — run with --setup."
+    fi
+}
+
+# Ask for confirmation, honouring --yes and refusing to guess without a TTY.
+confirm_or_exit() {
+    local prompt=$1 answer=''
+    if [[ "$assumeYes" == 'yes' ]]; then
+        echowarn "$prompt (auto-confirmed via --yes)"
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then
+        echobad "$prompt"
+        echobad 'Confirmation required but no interactive terminal is available. Re-run with --yes to bypass.'
+        exit 1
+    fi
+    echowarn "$prompt"
+    read -r -p '   Type "yes" to proceed (anything else aborts): ' answer </dev/tty
+    if [[ "$answer" != 'yes' ]]; then
+        echobad 'Aborted: not confirmed.'
+        exit 1
+    fi
+}
+
+# Pause for a human/agent step (conflict resolution, diff review).
+pause_for_user() {
+    local prompt=$1
+    if [[ ! -t 0 ]]; then
+        echobad "$prompt"
+        echobad 'A human/agent step is required but there is no interactive terminal.'
+        exit 1
+    fi
+    read -r -p "   $prompt " _ </dev/tty
+}
+
+print_opencode_prompt() {
+    echoline
+    echonice 'Paste into opencode (start in Plan mode, then Tab to Build):'
+    echoplain ""
+    echoplain "We are merging branch '$source_branch' into '$target_branch' for a Silverstripe module."
+    echoplain "'$target_branch' must stay compatible with Silverstripe CMS 6 (PHP 8.3+, SS6 class names)."
+    echoplain "There is a merge in progress with conflicts. For each conflicted hunk:"
+    echoplain " - keep shared feature/fix content, preferring the SS6-compatible form;"
+    echoplain " - drop SS5-only plumbing (SS5 class names, PHP 8.1/8.2-only syntax, SS5 deps);"
+    echoplain " - do NOT touch composer.json (it is pinned)."
+    echoplain "Then review the FULL staged diff (git diff --cached HEAD) and revert any SS5-only"
+    echoplain "change that auto-merged in, back to $target_branch's version. Do not commit. Do not run Rector."
+    echoplain ""
+    echoline
+}
+
+# Soft, non-fatal check of which SS version the target branch declares.
+report_ss_version() {
+    declare -F sake_determine_ss_version >/dev/null 2>&1 || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    [[ -f composer.json ]] || return 0
+    local ssv
+    ssv=$( { sake_determine_ss_version "$(cat composer.json)"; } 2>/dev/null ) || return 0
+    [[ -n "$ssv" ]] && echonice "Detected Silverstripe version on '$target_branch': $ssv"
+}
+
+# Verification: prefer the sibling sake-lint-* tools, fall back to vendor binaries.
+# dev/build is intentionally NOT run — a bare module checkout has no host app.
+run_verification() {
+    local ok=0
+
+    if [[ "$composerInstall" == 'yes' ]] && command -v composer >/dev/null 2>&1; then
+        ECHOHEAD "composer install"
+        composer install --no-interaction || echowarn "composer install had issues."
+    fi
+
+    if command -v composer >/dev/null 2>&1; then
+        ECHOHEAD "composer validate"
+        composer validate --no-check-publish --no-check-all || ok=1
+    fi
+
+    if command -v sake-lint-compat >/dev/null 2>&1; then
+        ECHOHEAD "sake-lint-compat (SS6 compatibility)"
+        sake-lint-compat ./ || ok=1
+    fi
+
+    if command -v sake-lint-ecs >/dev/null 2>&1; then
+        ECHOHEAD "sake-lint-ecs"
+        sake-lint-ecs ./ || ok=1
+    elif [[ -x vendor/bin/phpstan ]]; then
+        ECHOHEAD "phpstan"
+        vendor/bin/phpstan analyse --no-progress || ok=1
+    fi
+
+    if [[ -x vendor/bin/phpunit ]]; then
+        ECHOHEAD "phpunit"
+        vendor/bin/phpunit || ok=1
+    fi
+
+    return $ok
+}
+
+# Preflight for sync/preview: clean tree, branches present, on target, driver ready.
+preflight_or_exit() {
+    if merge_in_progress; then
+        echobad "A merge is already in progress. Finish it, or run with --abort."
+        exit 1
+    fi
+    if ! branch_exists "$source_branch"; then
+        echobad "Source branch '$source_branch' does not exist."
+        exit 1
+    fi
+    if ! branch_exists "$target_branch"; then
+        echobad "Target branch '$target_branch' does not exist."
+        exit 1
+    fi
+    if ! tree_is_clean; then
+        echobad "Working tree is dirty. Commit or stash before syncing."
+        exit 1
+    fi
+    if [[ "$(current_branch)" != "$target_branch" ]]; then
+        ECHOHEAD "checking out '$target_branch'"
+        git checkout "$target_branch" || {
+            echobad "Could not check out '$target_branch'."
+            exit 1
+        }
+    fi
+    ensure_ours_driver
+    check_gitattributes
+    report_ss_version
+}
+
+# Start the merge without committing. Returns 1 if there was nothing to merge.
+start_merge() {
+    ECHOHEAD "merging '$source_branch' into '$target_branch' (no-commit, no-ff)"
+    git merge --no-ff --no-commit "$source_branch"
+    if ! merge_in_progress; then
+        echogood "Already up to date — nothing to merge."
+        return 1
+    fi
+    return 0
+}
+
+############################################ ACTION: setup
+
+do_setup() {
+    ensure_ours_driver
+
+    touch .gitattributes
+    local f added='no'
+    for f in "${OURS_FILES[@]}"; do
+        if ! grep -qE "^[[:space:]]*${f//./\\.}[[:space:]]+merge=ours\b" .gitattributes; then
+            printf '%s merge=ours\n' "$f" >>.gitattributes
+            echogood "Pinned '$f' as merge=ours in .gitattributes"
+            added='yes'
+        fi
+    done
+    [[ "$added" == 'yes' ]] && echowarn "Commit .gitattributes on BOTH branches so the driver applies everywhere."
+
+    if [[ ! -f rector.php ]]; then
+        cat >rector.php <<'PHP'
+<?php
+
+declare(strict_types=1);
+
+use Netwerkstatt\SilverstripeRector\Set\SilverstripeLevelSetList;
+use Rector\Config\RectorConfig;
+
+// Target = Silverstripe CMS 6 / PHP 8.3. Adjust the paths to your module layout.
+return RectorConfig::configure()
+    ->withPaths([
+        __DIR__ . '/src',
+        __DIR__ . '/tests',
+    ])
+    ->withPhpSets(php83: true)
+    ->withSets([
+        SilverstripeLevelSetList::UP_TO_SS_6_0,
+    ]);
+PHP
+        echogood "Wrote starter rector.php (tune the paths)."
+        echonice "Install the rules with: composer require wernerkrauss/silverstripe-rector:^1 --dev"
+    fi
+
+    if [[ ! -f AGENTS.md ]]; then
+        cat >AGENTS.md <<'MD'
+# Agent rules for this module
+
+Two long-lived branches:
+- `main` = Silverstripe CMS 6 (PHP 8.3+, SS6 class names, PHPUnit 11).
+- `5`    = Silverstripe CMS 5 (PHP 8.1+, SS5 class names, PHPUnit 9).
+
+When resolving a merge INTO `main`:
+- Keep shared feature/fix content. Prefer the SS6-compatible form.
+- Do NOT bring SS5-only plumbing across: composer constraints, SS5 class/namespace
+  names, PHP 8.1/8.2-only syntax. `composer.json` is pinned merge=ours — leave it.
+- If a class name is in its SS5 form after resolving, that's fine — Rector will
+  normalise it to SS6. Don't hand-fix renames; let Rector do it.
+- The result must stay compatible with Silverstripe CMS 6. Verify with phpstan/phpunit.
+
+When resolving a merge INTO `5`:
+- Mirror of the above. Rector only upgrades, so SS6 → SS5 renames are manual.
+MD
+        echogood "Wrote starter AGENTS.md."
+    fi
+
+    echogood "Setup complete."
+}
+
+############################################ ACTION: abort
+
+do_abort() {
+    if merge_in_progress; then
+        git merge --abort
+        echogood "Merge aborted; '$target_branch' restored."
+    else
+        echowarn "No merge in progress."
+    fi
+}
+
+############################################ ACTION: preview
+
+do_preview() {
+    preflight_or_exit
+    start_merge || return 0
+
+    ECHOHEAD "incoming changes ($source_branch → $target_branch)"
+    git --no-pager diff --cached HEAD --stat
+    if has_conflicts; then
+        echowarn "Conflicts in:"
+        unmerged_paths | sed 's/^/    /' >&2
+    fi
+
+    ECHOHEAD "preview only — reverting the working tree"
+    git merge --abort
+    echogood "Aborted. No changes kept."
+}
+
+############################################ ACTION: sync
+
+do_sync() {
+    preflight_or_exit
+
+    local start_sha
+    start_sha=$(git rev-parse --short HEAD)
+
+    start_merge || return 0
+
+    ############ 1. resolve conflicts (human / agent)
+    if has_conflicts; then
+        ECHOHEAD "conflicts to resolve"
+        unmerged_paths | sed 's/^/    /' >&2
+        [[ "$useOpencode" == 'yes' ]] && print_opencode_prompt
+        echonice "Resolve in another shell. Rule: keep shared content in SS6 form,"
+        echonice "drop SS5-only plumbing, leave composer.json alone."
+
+        if [[ "$assumeYes" == 'yes' ]]; then
+            echobad "Conflicts remain and --yes was given; cannot auto-resolve. Run without --yes, or --abort."
+            exit 1
+        fi
+        while has_conflicts; do
+            pause_for_user "Press ⏎ when all conflicts are resolved..."
+            if has_conflicts; then
+                echowarn "Still unmerged:"
+                unmerged_paths | sed 's/^/    /' >&2
+            fi
+        done
+        echogood "No conflicts remain."
+    else
+        echogood "Clean auto-merge (no conflicts)."
+    fi
+
+    git add . -A
+
+    ############ 2. review the ENTIRE incoming change set (human / agent)
+    ECHOHEAD "review the ENTIRE incoming change set"
+    echonice "This includes changes that auto-merged silently. Revert any SS5-only plumbing"
+    echonice "to '$target_branch' now, e.g.:  git restore --source=HEAD -p -- <file>"
+    git --no-pager diff --cached HEAD --stat
+    pause_for_user "Review/revert in another shell if needed, then press ⏎ to continue..."
+    git add . -A
+
+    ############ 3. Rector: normalise class names for the target SS version
+    if [[ "$runRector" == 'yes' ]]; then
+        if [[ -x vendor/bin/rector && -f rector.php ]]; then
+            ECHOHEAD "Rector (normalise to Silverstripe 6)"
+            if vendor/bin/rector process; then
+                git add . -A
+                echogood "Rector applied."
+            else
+                echobad "Rector failed. Fix it, then finish with: git commit --no-edit (or --abort)."
+                exit 1
+            fi
+        else
+            echowarn "Rector not found (vendor/bin/rector + rector.php). Class-name compat NOT guaranteed."
+        fi
+    fi
+
+    ############ 4. verify target compatibility
+    if [[ "$runVerify" == 'yes' ]]; then
+        if run_verification; then
+            echogood "Verification passed."
+        else
+            echobad "Verification FAILED — not committing."
+            echonice "Files are staged and the merge is in progress. Fix, then: git commit --no-edit"
+            echonice "or bail out entirely with: sake-git-sync-version-branch --abort"
+            exit 1
+        fi
+    fi
+
+    ############ 5. commit the merge (advances the merge base → future syncs stay small)
+    ECHOHEAD "commit"
+    git --no-pager diff --cached HEAD --stat
+    confirm_or_exit "Commit this merge of '$source_branch' into '$target_branch'?"
+    git commit --no-edit
+    echogood "Merged. HEAD $start_sha → $(git rev-parse --short HEAD)"
+    echonice "Backport to '$source_branch' is manual — Rector only upgrades, so SS6 → SS5 renames are by hand."
+}
+
+############################################ CODE
+
+case "$mode" in
+setup) do_setup ;;
+abort) do_abort ;;
+preview) do_preview ;;
+sync) do_sync ;;
+esac
+
+echoend
