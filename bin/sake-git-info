@@ -57,6 +57,18 @@ sake_check_help_and_exit
 
 cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
+############################################ REMEMBER ORIGINAL BRANCH
+# branch name, or short SHA if we started in detached HEAD
+ORIGINAL_REF=$(git symbolic-ref --quiet --short HEAD || git rev-parse --short HEAD 2>/dev/null)
+
+return_to_original_ref() {
+    if [ -n "$ORIGINAL_REF" ]; then
+        ECHOHEAD "# returning to original branch: $ORIGINAL_REF"
+        git checkout -q "$ORIGINAL_REF"
+    fi
+}
+trap return_to_original_ref EXIT
+
 ECHOHEAD "# making sure we have the core branches"
 
 git checkout develop
