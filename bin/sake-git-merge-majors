@@ -5,25 +5,32 @@ SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Merge a version branch into another (e.g. SS5 → SS6) keeping each branch's version-specific code intact"
+SCRIPT_SUMMARY="Guided merge of a version branch into another (e.g. SS5 → SS6), keeping each branch's version-specific code intact"
 
 ############################################ DIR
 dir='./'
 
 ############################################ SETTINGS
+# shellcheck disable=SC2034  # set by sake_handle_help_flag, read by sake_check_help_and_exit (both sourced)
 help='no'
-source_branch='5'      # merge FROM (default: the Silverstripe 5 branch)
-target_branch='main'   # merge INTO (default: the Silverstripe 6 branch)
-mode='sync'            # sync | preview | setup | abort
-runRector='yes'        # normalise class names to the target SS version after merging
-runVerify='yes'        # run compat/lint/tests before committing
-composerInstall='no'   # refresh vendor/ before verifying
-useOpencode='no'       # print a ready-to-paste opencode prompt at the resolve step
-assumeYes='no'         # skip non-destructive confirmations (for automation)
+source_branch='5'    # merge FROM (default: the Silverstripe 5 branch)
+target_branch='main' # merge INTO (default: the Silverstripe 6 branch)
+mode='guided'        # guided | preview | setup | abort | cleanup
+runRector='yes'      # normalise class names to the target SS version after merging
+runVerify='yes'      # run compat/lint/tests before committing
+composerInstall='no' # refresh vendor/ before verifying
+useOpencode='no'     # print a ready-to-paste opencode prompt at the resolve step
+assumeYes='no'       # skip proceed/abort gates (for automation); never auto-resolves conflicts
 
 # Files that are ENTIRELY version-specific and must never merge across branches.
 # `setup` pins these as merge=ours so a merge always keeps the target's copy.
 OURS_FILES=('composer.json')
+
+# Helper files that `setup` scaffolds and `cleanup` tears down.
+# NOTE: rector.php is deliberately NOT scaffolded — it is generated as a throwaway
+# config at merge time (see run_rector) and never committed, so nothing stale is
+# shipped to production. A rector.php you keep on purpose is still respected.
+SCAFFOLD_FILES=('AGENTS.md')
 
 while (($#)); do
     case $1 in
@@ -43,6 +50,9 @@ while (($#)); do
         ;;
     --abort)
         mode='abort'
+        ;;
+    --cleanup | --teardown)
+        mode='cleanup'
         ;;
     --no-rector)
         runRector='no'
@@ -73,7 +83,7 @@ done
 ############################################ HELP
 
 help_and_exit() {
-    ECHOHEAD "Merge a version branch into another (SS5 ↔ SS6) without dragging version-specific code across"
+    ECHOHEAD "Guided version-branch merge (SS5 ↔ SS6) without dragging version-specific code across"
     echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
@@ -89,24 +99,29 @@ help_and_exit() {
     echonice "print opencode prompt:         $useOpencode"
     echonice "assume yes:                    $assumeYes"
 
-    ECHOHEAD "Available settings:"
+    ECHOHEAD "Modes:"
+    echonice "(default)                      guided walkthrough: setup → fetch → merge → resolve → review → rector → verify → commit"
+    echonice "-c, --preview, --dry-run       read-only: fetch, show the incoming diff, then abort (keep nothing)"
+    echonice "    --setup                    just create the guardrails (merge=ours pin, AGENTS.md)"
+    echonice "    --abort                    git merge --abort (bail out of an in-progress merge)"
+    echonice "    --cleanup                  TEARDOWN: remove the merge apparatus (only when retiring the source branch)"
+
+    ECHOHEAD "Options:"
     echonice "-s, --source                   branch to merge FROM (default: 5)"
     echonice "-t, --target                   branch to merge INTO (default: main)"
-    echonice "    --setup                    one-time guardrails: merge=ours driver, rector.php, AGENTS.md"
-    echonice "-c, --preview, --dry-run       do the merge, show the incoming diff, then abort (keep nothing)"
-    echonice "    --abort                    git merge --abort (bail out of an in-progress merge)"
     echonice "    --no-rector                skip the Rector normalisation step"
     echonice "    --no-verify                skip compat/lint/test verification"
     echonice "    --composer-install         run 'composer install' before verifying"
     echonice "    --opencode                 print a ready-to-paste opencode prompt at the resolve step"
-    echonice "-y, --yes                      auto-confirm non-destructive prompts (not conflicts)"
+    echonice "-y, --yes                      auto-proceed through gates (automation); still stops on conflicts"
     echonice "-h, --help                     show help information"
     echonice "-q, --quiet                    suppress logging"
 
     ECHOHEAD "Example usage:"
-    echonice "e.g. sake-git-sync-version-branch --setup"
-    echonice "e.g. sake-git-sync-version-branch -s 5 -t main --preview"
-    echonice "e.g. sake-git-sync-version-branch -s 5 -t main --opencode"
+    echonice "e.g. sake-git-sync-version-branch -s 5 -t main            # the guided walkthrough"
+    echonice "e.g. sake-git-sync-version-branch -s 5 -t main --opencode # with the paste-in agent prompt"
+    echonice "e.g. sake-git-sync-version-branch -s 5 -t main --preview  # just look"
+    echonice "e.g. sake-git-sync-version-branch -s 5 -t main -y         # non-interactive"
 
     echofunctions
     exit
@@ -124,7 +139,7 @@ if [[ -z "$GIT_DIR" ]]; then
     exit 1
 fi
 
-############################################ HELPERS
+############################################ PREDICATES
 
 merge_in_progress() { git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; }
 unmerged_paths() { git diff --name-only --diff-filter=U; }
@@ -132,30 +147,73 @@ has_conflicts() { [[ -n "$(unmerged_paths)" ]]; }
 branch_exists() { git show-ref --verify --quiet "refs/heads/$1"; }
 current_branch() { git rev-parse --abbrev-ref HEAD; }
 tree_is_clean() { git diff --quiet && git diff --cached --quiet; }
+has_origin() { git remote get-url origin >/dev/null 2>&1; }
 
-# The merge=ours driver is LOCAL to each clone (not committed), so make sure
-# it is configured every run. `true` always exits 0 → keep the target's copy.
-ensure_ours_driver() {
-    if [[ "$(git config --get merge.ours.driver 2>/dev/null)" != 'true' ]]; then
-        git config merge.ours.driver true
-        echogood "Configured merge.ours.driver (keeps target-branch copy of pinned files)"
-    fi
+# Any leftover conflict markers in the staged files? (Guards against "resolving"
+# a conflict by staging a file that still contains <<<<<<< markers.)
+conflict_markers_present() {
+    local f found=1
+    while IFS= read -r f; do
+        [[ -f "$f" ]] || continue
+        if grep -qE '^(<{7} |={7}$|>{7} )' "$f"; then found=0; fi
+    done < <(git diff --cached --name-only)
+    return $found
 }
 
-# Warn if the pinned files are not actually marked merge=ours in .gitattributes.
-check_gitattributes() {
-    local f missing=()
-    for f in "${OURS_FILES[@]}"; do
-        if ! git check-attr merge -- "$f" 2>/dev/null | grep -q ': merge: ours$'; then
-            missing+=("$f")
-        fi
+setup_has_run() {
+    git config --get merge.ours.driver >/dev/null 2>&1 &&
+        git check-attr merge -- "${OURS_FILES[0]}" 2>/dev/null | grep -q ': merge: ours$'
+}
+
+############################################ INTERACTION
+
+# Abort any in-progress merge and exit non-zero.
+abort_and_exit() {
+    if merge_in_progress; then
+        echowarn "Aborting the in-progress merge..."
+        git merge --abort && echogood "Merge aborted; '$target_branch' restored."
+    fi
+    echobad 'Aborted by user.'
+    exit 1
+}
+
+# gate "Title" "explanation" [skip]  ->  0 = proceed, 1 = skip; aborts+exits on abort.
+gate() {
+    local title=$1 desc=${2:-} allow_skip=${3:-no} prompt ans
+    ECHOHEAD "$title"
+    [[ -n "$desc" ]] && echonice "$desc"
+
+    if [[ "$assumeYes" == 'yes' ]]; then
+        echowarn 'proceeding (--yes)'
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then
+        echobad "Guided step '$title' needs a terminal. Use --yes for automation."
+        abort_and_exit
+    fi
+
+    if [[ "$allow_skip" == 'yes' ]]; then
+        prompt='   [p]roceed / [s]kip / [a]bort: '
+    else
+        prompt='   [p]roceed / [a]bort: '
+    fi
+    while true; do
+        read -r -p "$prompt" ans </dev/tty
+        case "${ans,,}" in
+        p | proceed | '') return 0 ;;
+        s | skip)
+            if [[ "$allow_skip" == 'yes' ]]; then
+                echowarn 'skipped.'
+                return 1
+            fi
+            ;;
+        a | abort) abort_and_exit ;;
+        esac
+        echonice 'Please answer proceed / abort (or skip where offered).'
     done
-    if ((${#missing[@]})); then
-        echowarn "No 'merge=ours' in .gitattributes for: ${missing[*]} — run with --setup."
-    fi
 }
 
-# Ask for confirmation, honouring --yes and refusing to guess without a TTY.
+# Confirm with an explicit "yes", honouring --yes and refusing to guess without a TTY.
 confirm_or_exit() {
     local prompt=$1 answer=''
     if [[ "$assumeYes" == 'yes' ]]; then
@@ -169,165 +227,46 @@ confirm_or_exit() {
     fi
     echowarn "$prompt"
     read -r -p '   Type "yes" to proceed (anything else aborts): ' answer </dev/tty
-    if [[ "$answer" != 'yes' ]]; then
-        echobad 'Aborted: not confirmed.'
-        exit 1
-    fi
-}
-
-# Pause for a human/agent step (conflict resolution, diff review).
-pause_for_user() {
-    local prompt=$1
-    if [[ ! -t 0 ]]; then
-        echobad "$prompt"
-        echobad 'A human/agent step is required but there is no interactive terminal.'
-        exit 1
-    fi
-    read -r -p "   $prompt " _ </dev/tty
+    [[ "$answer" == 'yes' ]] || abort_and_exit
 }
 
 print_opencode_prompt() {
     echoline
     echonice 'Paste into opencode (start in Plan mode, then Tab to Build):'
-    echoplain ""
+    echoplain ''
     echoplain "We are merging branch '$source_branch' into '$target_branch' for a Silverstripe module."
     echoplain "'$target_branch' must stay compatible with Silverstripe CMS 6 (PHP 8.3+, SS6 class names)."
-    echoplain "There is a merge in progress with conflicts. For each conflicted hunk:"
-    echoplain " - keep shared feature/fix content, preferring the SS6-compatible form;"
-    echoplain " - drop SS5-only plumbing (SS5 class names, PHP 8.1/8.2-only syntax, SS5 deps);"
-    echoplain " - do NOT touch composer.json (it is pinned)."
-    echoplain "Then review the FULL staged diff (git diff --cached HEAD) and revert any SS5-only"
+    echoplain 'There is a merge in progress with conflicts. For each conflicted hunk:'
+    echoplain ' - keep shared feature/fix content, preferring the SS6-compatible form;'
+    echoplain ' - drop SS5-only plumbing (SS5 class names, PHP 8.1/8.2-only syntax, SS5 deps);'
+    echoplain ' - do NOT touch composer.json (it is pinned).'
+    echoplain 'Then review the FULL staged diff (git diff --cached HEAD) and revert any SS5-only'
     echoplain "change that auto-merged in, back to $target_branch's version. Do not commit. Do not run Rector."
-    echoplain ""
+    echoplain ''
     echoline
 }
 
-# Soft, non-fatal check of which SS version the target branch declares.
-report_ss_version() {
-    declare -F sake_determine_ss_version >/dev/null 2>&1 || return 0
-    command -v jq >/dev/null 2>&1 || return 0
-    [[ -f composer.json ]] || return 0
-    local ssv
-    ssv=$( { sake_determine_ss_version "$(cat composer.json)"; } 2>/dev/null ) || return 0
-    [[ -n "$ssv" ]] && echonice "Detected Silverstripe version on '$target_branch': $ssv"
+############################################ GUARDRAILS (setup)
+
+ensure_ours_driver() {
+    if [[ "$(git config --get merge.ours.driver 2>/dev/null)" != 'true' ]]; then
+        git config merge.ours.driver true
+        echogood 'Configured merge.ours.driver (keeps target-branch copy of pinned files)'
+    fi
 }
-
-# Verification: prefer the sibling sake-lint-* tools, fall back to vendor binaries.
-# dev/build is intentionally NOT run — a bare module checkout has no host app.
-run_verification() {
-    local ok=0
-
-    if [[ "$composerInstall" == 'yes' ]] && command -v composer >/dev/null 2>&1; then
-        ECHOHEAD "composer install"
-        composer install --no-interaction || echowarn "composer install had issues."
-    fi
-
-    if command -v composer >/dev/null 2>&1; then
-        ECHOHEAD "composer validate"
-        composer validate --no-check-publish --no-check-all || ok=1
-    fi
-
-    if command -v sake-lint-compat >/dev/null 2>&1; then
-        ECHOHEAD "sake-lint-compat (SS6 compatibility)"
-        sake-lint-compat ./ || ok=1
-    fi
-
-    if command -v sake-lint-ecs >/dev/null 2>&1; then
-        ECHOHEAD "sake-lint-ecs"
-        sake-lint-ecs ./ || ok=1
-    elif [[ -x vendor/bin/phpstan ]]; then
-        ECHOHEAD "phpstan"
-        vendor/bin/phpstan analyse --no-progress || ok=1
-    fi
-
-    if [[ -x vendor/bin/phpunit ]]; then
-        ECHOHEAD "phpunit"
-        vendor/bin/phpunit || ok=1
-    fi
-
-    return $ok
-}
-
-# Preflight for sync/preview: clean tree, branches present, on target, driver ready.
-preflight_or_exit() {
-    if merge_in_progress; then
-        echobad "A merge is already in progress. Finish it, or run with --abort."
-        exit 1
-    fi
-    if ! branch_exists "$source_branch"; then
-        echobad "Source branch '$source_branch' does not exist."
-        exit 1
-    fi
-    if ! branch_exists "$target_branch"; then
-        echobad "Target branch '$target_branch' does not exist."
-        exit 1
-    fi
-    if ! tree_is_clean; then
-        echobad "Working tree is dirty. Commit or stash before syncing."
-        exit 1
-    fi
-    if [[ "$(current_branch)" != "$target_branch" ]]; then
-        ECHOHEAD "checking out '$target_branch'"
-        git checkout "$target_branch" || {
-            echobad "Could not check out '$target_branch'."
-            exit 1
-        }
-    fi
-    ensure_ours_driver
-    check_gitattributes
-    report_ss_version
-}
-
-# Start the merge without committing. Returns 1 if there was nothing to merge.
-start_merge() {
-    ECHOHEAD "merging '$source_branch' into '$target_branch' (no-commit, no-ff)"
-    git merge --no-ff --no-commit "$source_branch"
-    if ! merge_in_progress; then
-        echogood "Already up to date — nothing to merge."
-        return 1
-    fi
-    return 0
-}
-
-############################################ ACTION: setup
 
 do_setup() {
+    local f changed='no'
     ensure_ours_driver
 
     touch .gitattributes
-    local f added='no'
     for f in "${OURS_FILES[@]}"; do
         if ! grep -qE "^[[:space:]]*${f//./\\.}[[:space:]]+merge=ours\b" .gitattributes; then
             printf '%s merge=ours\n' "$f" >>.gitattributes
             echogood "Pinned '$f' as merge=ours in .gitattributes"
-            added='yes'
+            changed='yes'
         fi
     done
-    [[ "$added" == 'yes' ]] && echowarn "Commit .gitattributes on BOTH branches so the driver applies everywhere."
-
-    if [[ ! -f rector.php ]]; then
-        cat >rector.php <<'PHP'
-<?php
-
-declare(strict_types=1);
-
-use Netwerkstatt\SilverstripeRector\Set\SilverstripeLevelSetList;
-use Rector\Config\RectorConfig;
-
-// Target = Silverstripe CMS 6 / PHP 8.3. Adjust the paths to your module layout.
-return RectorConfig::configure()
-    ->withPaths([
-        __DIR__ . '/src',
-        __DIR__ . '/tests',
-    ])
-    ->withPhpSets(php83: true)
-    ->withSets([
-        SilverstripeLevelSetList::UP_TO_SS_6_0,
-    ]);
-PHP
-        echogood "Wrote starter rector.php (tune the paths)."
-        echonice "Install the rules with: composer require wernerkrauss/silverstripe-rector:^1 --dev"
-    fi
 
     if [[ ! -f AGENTS.md ]]; then
         cat >AGENTS.md <<'MD'
@@ -348,129 +287,445 @@ When resolving a merge INTO `main`:
 When resolving a merge INTO `5`:
 - Mirror of the above. Rector only upgrades, so SS6 → SS5 renames are manual.
 MD
-        echogood "Wrote starter AGENTS.md."
+        echogood 'Wrote starter AGENTS.md.'
+        changed='yes'
     fi
 
-    echogood "Setup complete."
+    if [[ "$changed" == 'yes' ]]; then
+        git add .gitattributes "${SCAFFOLD_FILES[@]}" 2>/dev/null
+        if git commit -m 'MNT: add Silverstripe version-sync guardrails' >/dev/null 2>&1; then
+            echogood "Committed guardrails on '$(current_branch)'."
+        else
+            echonice 'Guardrails staged; commit them when ready.'
+        fi
+        echowarn "Add .gitattributes to '$source_branch' too, so merges there keep its composer.json."
+    else
+        echogood 'Guardrails already present.'
+    fi
+    echonice 'Rector runs from a throwaway config at merge time — it needs the dev dependency:'
+    echonice '  composer require wernerkrauss/silverstripe-rector:^1 --dev'
 }
 
-############################################ ACTION: abort
+# Auto-run setup only when it has not been done (used by the guided flow).
+ensure_setup() {
+    if setup_has_run; then
+        ensure_ours_driver
+        echogood 'Guardrails in place.'
+        return 0
+    fi
+    echonice 'Guardrails not found — running one-time setup now.'
+    do_setup
+}
+
+############################################ FETCH / UPDATE
+
+# Fast-forward local target + source to origin. Distinguishes behind (ff),
+# ahead-only (leave), and diverged (stop for target / warn for source).
+update_branches() {
+    if ! has_origin; then
+        echowarn "No 'origin' remote — skipping fetch. Using local branches as-is."
+        return 0
+    fi
+    git fetch origin --prune || {
+        echobad 'git fetch failed.'
+        return 1
+    }
+
+    local ahead behind
+    if git rev-parse --verify --quiet "origin/$target_branch" >/dev/null; then
+        behind=$(git rev-list --count "$target_branch..origin/$target_branch")
+        ahead=$(git rev-list --count "origin/$target_branch..$target_branch")
+        if ((behind == 0)); then
+            echogood "'$target_branch' is up to date with origin (ahead by $ahead)."
+        elif ((ahead == 0)); then
+            git merge --ff-only "origin/$target_branch" >/dev/null &&
+                echogood "Fast-forwarded '$target_branch' to origin (+$behind)."
+        else
+            echobad "'$target_branch' has DIVERGED from origin (ahead $ahead / behind $behind)."
+            echonice 'Reconcile first (e.g. git pull --rebase), then re-run.'
+            return 1
+        fi
+    fi
+
+    if git rev-parse --verify --quiet "origin/$source_branch" >/dev/null &&
+        git rev-parse --verify --quiet "$source_branch" >/dev/null; then
+        behind=$(git rev-list --count "$source_branch..origin/$source_branch")
+        ahead=$(git rev-list --count "origin/$source_branch..$source_branch")
+        if ((behind > 0 && ahead == 0)); then
+            git fetch origin "$source_branch:$source_branch" >/dev/null 2>&1 &&
+                echogood "Fast-forwarded '$source_branch' to origin (+$behind)."
+        elif ((behind > 0 && ahead > 0)); then
+            echowarn "'$source_branch' has diverged from origin (ahead $ahead / behind $behind). Using local as-is."
+        else
+            echogood "'$source_branch' is up to date with origin (ahead by $ahead)."
+        fi
+    fi
+    return 0
+}
+
+############################################ RECTOR
+
+# Normalise class names to the target SS version. Uses a THROWAWAY config written
+# to a temp file and passed with --config, so no rector.php is committed or shipped
+# to production. A rector.php the user keeps on purpose is used as-is instead.
+run_rector() {
+    if [[ ! -x vendor/bin/rector ]]; then
+        echowarn 'Rector binary not found (vendor/bin/rector). Class-name compatibility NOT guaranteed — skipping.'
+        return 0
+    fi
+    if [[ ! -d vendor/wernerkrauss/silverstripe-rector ]]; then
+        echowarn 'silverstripe-rector is not installed, so the SS6 sets are unavailable.'
+        echowarn 'Install it with: composer require wernerkrauss/silverstripe-rector:^1 --dev'
+        echowarn 'Skipping Rector — class-name compatibility NOT guaranteed.'
+        return 0
+    fi
+
+    if [[ -f rector.php ]]; then
+        echonice 'Using the rector.php already present in this repo.'
+        vendor/bin/rector process || return 1
+    else
+        _TMP_RECTOR=$(mktemp --suffix=.php "${TMPDIR:-/tmp}/rector-ss6.XXXXXX")
+        cat >"$_TMP_RECTOR" <<'PHP'
+<?php
+
+declare(strict_types=1);
+
+use Netwerkstatt\SilverstripeRector\Set\SilverstripeLevelSetList;
+use Rector\Config\RectorConfig;
+
+// Throwaway config generated by sake-git-sync-version-branch — not committed.
+// Paths resolve from the repo we are running in (getcwd), not from this temp file.
+$root = getcwd();
+$paths = array_values(array_filter([
+    $root . '/src',
+    $root . '/code',
+    $root . '/app',
+    $root . '/tests',
+], 'is_dir'));
+if ($paths === []) {
+    $paths = [$root];
+}
+
+return RectorConfig::configure()
+    ->withPaths($paths)
+    ->withPhpSets(php83: true)
+    ->withSets([
+        SilverstripeLevelSetList::UP_TO_SS_6_0,
+    ]);
+PHP
+        echonice 'Generated a throwaway Rector config (nothing written to the repo).'
+        vendor/bin/rector process --config "$_TMP_RECTOR"
+        local rc=$?
+        rm -f "$_TMP_RECTOR"
+        _TMP_RECTOR=''
+        [[ $rc -eq 0 ]] || return 1
+    fi
+
+    git add . -A
+    echogood 'Rector applied.'
+    return 0
+}
+
+############################################ VERIFY
+
+# Soft, non-fatal readout of the target branch's declared SS version.
+report_ss_version() {
+    declare -F sake_determine_ss_version >/dev/null 2>&1 || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    [[ -f composer.json ]] || return 0
+    local ssv
+    ssv=$({ sake_determine_ss_version "$(cat composer.json)"; } 2>/dev/null) || return 0
+    [[ -n "$ssv" ]] && echonice "Detected Silverstripe version on '$target_branch': $ssv"
+}
+
+# Prefer the sibling sake-lint-* tools, fall back to vendor binaries.
+# dev/build is intentionally NOT run — a bare module checkout has no host app.
+run_verification() {
+    local ok=0
+
+    if [[ "$composerInstall" == 'yes' ]] && command -v composer >/dev/null 2>&1; then
+        ECHOHEAD 'composer install'
+        composer install --no-interaction || echowarn 'composer install had issues.'
+    fi
+
+    if command -v composer >/dev/null 2>&1; then
+        ECHOHEAD 'composer validate'
+        composer validate --no-check-publish --no-check-all || ok=1
+    fi
+
+    if command -v sake-lint-compat >/dev/null 2>&1; then
+        ECHOHEAD 'sake-lint-compat (SS6 compatibility)'
+        sake-lint-compat ./ || ok=1
+    fi
+
+    if command -v sake-lint-ecs >/dev/null 2>&1; then
+        ECHOHEAD 'sake-lint-ecs'
+        sake-lint-ecs ./ || ok=1
+    elif [[ -x vendor/bin/phpstan ]]; then
+        ECHOHEAD 'phpstan'
+        vendor/bin/phpstan analyse --no-progress || ok=1
+    fi
+
+    if [[ -x vendor/bin/phpunit ]]; then
+        ECHOHEAD 'phpunit'
+        vendor/bin/phpunit || ok=1
+    fi
+
+    return $ok
+}
+
+############################################ MERGE PIECES
+
+preflight_repo() {
+    if merge_in_progress; then
+        echobad 'A merge is already in progress. Finish it, or run with --abort.'
+        exit 1
+    fi
+    branch_exists "$source_branch" || {
+        echobad "Source branch '$source_branch' does not exist."
+        exit 1
+    }
+    branch_exists "$target_branch" || {
+        echobad "Target branch '$target_branch' does not exist."
+        exit 1
+    }
+    tree_is_clean || {
+        echobad 'Working tree is dirty. Commit or stash before syncing.'
+        exit 1
+    }
+    if [[ "$(current_branch)" != "$target_branch" ]]; then
+        ECHOHEAD "checking out '$target_branch'"
+        git checkout "$target_branch" || {
+            echobad "Could not check out '$target_branch'."
+            exit 1
+        }
+    fi
+    report_ss_version
+}
+
+# Start the merge without committing. Returns 1 if there was nothing to merge.
+start_merge() {
+    git merge --no-ff --no-commit "$source_branch"
+    if ! merge_in_progress; then
+        echogood 'Already up to date — nothing to merge.'
+        return 1
+    fi
+    return 0
+}
+
+resolve_conflicts() {
+    if ! has_conflicts; then
+        echogood 'Clean auto-merge (no conflicts).'
+        git add . -A
+        return 0
+    fi
+
+    ECHOHEAD 'conflicts to resolve'
+    unmerged_paths | sed 's/^/    /' >&2
+    [[ "$useOpencode" == 'yes' ]] && print_opencode_prompt
+    echonice 'Resolve in another shell. Keep shared content in SS6 form, drop SS5-only'
+    echonice 'plumbing, leave composer.json alone.'
+
+    if [[ "$assumeYes" == 'yes' ]]; then
+        echobad 'Conflicts remain and --yes was given; cannot auto-resolve. Re-run without --yes, or --abort.'
+        abort_and_exit
+    fi
+
+    local ans
+    while true; do
+        read -r -p '   [c]ontinue (resolved) / [a]bort: ' ans </dev/tty
+        [[ "${ans,,}" =~ ^a ]] && abort_and_exit
+        git add . -A
+        if has_conflicts; then
+            echowarn "Still unmerged: $(unmerged_paths | tr '\n' ' ')"
+            continue
+        fi
+        if conflict_markers_present; then
+            echowarn 'Conflict markers (<<<<<<< / ======= / >>>>>>>) still present. Resolve them fully.'
+            continue
+        fi
+        break
+    done
+    echogood 'Conflicts resolved.'
+}
+
+############################################ TEARDOWN (cleanup)
+
+cleanup_core() {
+    local f
+    if [[ -f .gitattributes ]]; then
+        for f in "${OURS_FILES[@]}"; do
+            sed -i "/^[[:space:]]*${f//./\\.}[[:space:]]\+merge=ours\b/d" .gitattributes
+        done
+        [[ -s .gitattributes ]] || rm -f .gitattributes
+        echogood 'Removed merge=ours pin from .gitattributes.'
+    fi
+    git config --unset merge.ours.driver 2>/dev/null && echogood 'Removed local merge.ours.driver.'
+    for f in "${SCAFFOLD_FILES[@]}"; do
+        [[ -e "$f" ]] && rm -f "$f" && echogood "Removed $f."
+    done
+    git add .gitattributes "${SCAFFOLD_FILES[@]}" 2>/dev/null
+    if git commit -m 'MNT: remove Silverstripe version-sync guardrails' >/dev/null 2>&1; then
+        echogood 'Committed the teardown.'
+    else
+        echonice 'Teardown staged; commit when ready.'
+    fi
+    echowarn "Remove .gitattributes from '$source_branch' as well if you are fully retiring the split."
+}
+
+############################################ ACTIONS
+
+do_setup_only() {
+    preflight_repo
+    do_setup
+}
 
 do_abort() {
     if merge_in_progress; then
         git merge --abort
         echogood "Merge aborted; '$target_branch' restored."
     else
-        echowarn "No merge in progress."
+        echowarn 'No merge in progress.'
     fi
 }
 
-############################################ ACTION: preview
+do_cleanup() {
+    preflight_repo
+    ECHOHEAD 'cleanup / teardown'
+    echonice "This removes the dual-version merge apparatus. Do this ONLY when you are"
+    echonice "retiring the '$source_branch' branch and no longer need version syncing."
+    echonice 'Will remove:'
+    echonice "  - the merge=ours pin for: ${OURS_FILES[*]}"
+    echonice '  - the local merge.ours.driver git config'
+    echonice "  - ${SCAFFOLD_FILES[*]}"
+    confirm_or_exit 'Proceed with teardown?'
+    cleanup_core
+}
 
 do_preview() {
-    preflight_or_exit
+    preflight_repo
+    update_branches || abort_and_exit
     start_merge || return 0
 
     ECHOHEAD "incoming changes ($source_branch → $target_branch)"
     git --no-pager diff --cached HEAD --stat
     if has_conflicts; then
-        echowarn "Conflicts in:"
+        echowarn 'Conflicts in:'
         unmerged_paths | sed 's/^/    /' >&2
     fi
 
-    ECHOHEAD "preview only — reverting the working tree"
+    ECHOHEAD 'preview only — reverting the working tree'
     git merge --abort
-    echogood "Aborted. No changes kept."
+    echogood 'Aborted. Nothing kept.'
 }
 
-############################################ ACTION: sync
-
-do_sync() {
-    preflight_or_exit
-
+do_guided() {
+    preflight_repo
     local start_sha
     start_sha=$(git rev-parse --short HEAD)
 
+    ############ 1. guardrails (auto)
+    ECHOHEAD 'step 1/7 — guardrails'
+    ensure_setup
+
+    ############ 2. fetch + update branches
+    gate 'step 2/7 — fetch & update branches' \
+        "Fetch origin and fast-forward '$target_branch' and '$source_branch' to the latest."
+    update_branches || abort_and_exit
+
+    ############ 3. start the merge, size it up
+    gate 'step 3/7 — start the merge' \
+        "Begin merging '$source_branch' into '$target_branch' (no commit yet — fully reversible)."
     start_merge || return 0
+    ECHOHEAD "incoming changes ($source_branch → $target_branch)"
+    git --no-pager diff --cached HEAD --stat
+    gate 'continue?' 'Proceed to resolve/review, or abort and keep nothing.'
 
-    ############ 1. resolve conflicts (human / agent)
-    if has_conflicts; then
-        ECHOHEAD "conflicts to resolve"
-        unmerged_paths | sed 's/^/    /' >&2
-        [[ "$useOpencode" == 'yes' ]] && print_opencode_prompt
-        echonice "Resolve in another shell. Rule: keep shared content in SS6 form,"
-        echonice "drop SS5-only plumbing, leave composer.json alone."
+    ############ 4. resolve conflicts
+    ECHOHEAD 'step 4/7 — resolve conflicts'
+    resolve_conflicts
 
-        if [[ "$assumeYes" == 'yes' ]]; then
-            echobad "Conflicts remain and --yes was given; cannot auto-resolve. Run without --yes, or --abort."
-            exit 1
-        fi
-        while has_conflicts; do
-            pause_for_user "Press ⏎ when all conflicts are resolved..."
-            if has_conflicts; then
-                echowarn "Still unmerged:"
-                unmerged_paths | sed 's/^/    /' >&2
-            fi
-        done
-        echogood "No conflicts remain."
-    else
-        echogood "Clean auto-merge (no conflicts)."
-    fi
-
-    git add . -A
-
-    ############ 2. review the ENTIRE incoming change set (human / agent)
-    ECHOHEAD "review the ENTIRE incoming change set"
-    echonice "This includes changes that auto-merged silently. Revert any SS5-only plumbing"
+    ############ 5. review the ENTIRE incoming change set
+    ECHOHEAD 'step 5/7 — review the entire incoming diff'
+    echonice 'This includes changes that auto-merged silently. Revert any SS5-only plumbing'
     echonice "to '$target_branch' now, e.g.:  git restore --source=HEAD -p -- <file>"
     git --no-pager diff --cached HEAD --stat
-    pause_for_user "Review/revert in another shell if needed, then press ⏎ to continue..."
+    if [[ "$assumeYes" != 'yes' ]]; then
+        local ans
+        read -r -p '   [c]ontinue / [a]bort: ' ans </dev/tty
+        [[ "${ans,,}" =~ ^a ]] && abort_and_exit
+    fi
     git add . -A
 
-    ############ 3. Rector: normalise class names for the target SS version
+    ############ 6. Rector
     if [[ "$runRector" == 'yes' ]]; then
-        if [[ -x vendor/bin/rector && -f rector.php ]]; then
-            ECHOHEAD "Rector (normalise to Silverstripe 6)"
-            if vendor/bin/rector process; then
-                git add . -A
-                echogood "Rector applied."
+        if gate 'step 6/7 — Rector' 'Deterministically rewrite class names to the SS6 form (throwaway config).' skip; then
+            run_rector || {
+                echobad 'Rector failed. Fix it, then: git commit --no-edit (or --abort).'
+                exit 1
+            }
+        fi
+    else
+        echonice 'step 6/7 — Rector skipped (--no-rector).'
+    fi
+
+    ############ 7. verify + commit
+    if [[ "$runVerify" == 'yes' ]]; then
+        if gate 'step 7/7 — verify' 'Run compat/lint/tests before committing.' skip; then
+            if run_verification; then
+                echogood 'Verification passed.'
             else
-                echobad "Rector failed. Fix it, then finish with: git commit --no-edit (or --abort)."
+                echobad 'Verification FAILED — not committing.'
+                echonice 'Files are staged and the merge is in progress. Fix, then: git commit --no-edit'
+                echonice 'or bail out entirely with: sake-git-sync-version-branch --abort'
                 exit 1
             fi
-        else
-            echowarn "Rector not found (vendor/bin/rector + rector.php). Class-name compat NOT guaranteed."
         fi
+    else
+        echonice 'step 7/7 — verification skipped (--no-verify).'
     fi
 
-    ############ 4. verify target compatibility
-    if [[ "$runVerify" == 'yes' ]]; then
-        if run_verification; then
-            echogood "Verification passed."
-        else
-            echobad "Verification FAILED — not committing."
-            echonice "Files are staged and the merge is in progress. Fix, then: git commit --no-edit"
-            echonice "or bail out entirely with: sake-git-sync-version-branch --abort"
-            exit 1
-        fi
-    fi
-
-    ############ 5. commit the merge (advances the merge base → future syncs stay small)
-    ECHOHEAD "commit"
+    ECHOHEAD 'commit'
     git --no-pager diff --cached HEAD --stat
-    confirm_or_exit "Commit this merge of '$source_branch' into '$target_branch'?"
-    git commit --no-edit
+    if [[ "$assumeYes" == 'yes' ]]; then
+        git commit --no-edit
+    else
+        local ans
+        read -r -p '   [y]es commit / [l]eave staged / [a]bort: ' ans </dev/tty
+        case "${ans,,}" in
+        y | yes) git commit --no-edit ;;
+        a | abort) abort_and_exit ;;
+        *)
+            echowarn 'Left staged & uncommitted. Finish with: git commit --no-edit  (or --abort).'
+            exit 0
+            ;;
+        esac
+    fi
     echogood "Merged. HEAD $start_sha → $(git rev-parse --short HEAD)"
+    echonice "Not pushed — push yourself (sake-git-commit-quick or git push) once you are happy."
     echonice "Backport to '$source_branch' is manual — Rector only upgrades, so SS6 → SS5 renames are by hand."
+
+    ############ optional teardown (interactive only, defaults to skip)
+    if [[ "$assumeYes" != 'yes' ]]; then
+        if gate 'teardown (optional)' "Only if you are retiring '$source_branch'. Removes the merge apparatus." skip; then
+            cleanup_core
+        fi
+    fi
 }
 
 ############################################ CODE
 
+_TMP_RECTOR=''
+_on_exit() { [[ -n "$_TMP_RECTOR" && -f "$_TMP_RECTOR" ]] && rm -f "$_TMP_RECTOR"; }
+trap _on_exit EXIT
+trap 'printf "\n" >&2; echowarn "Interrupted. If a merge is in progress, undo with: sake-git-sync-version-branch --abort"; exit 130' INT
+
 case "$mode" in
-setup) do_setup ;;
+setup) do_setup_only ;;
 abort) do_abort ;;
+cleanup) do_cleanup ;;
 preview) do_preview ;;
-sync) do_sync ;;
+guided) do_guided ;;
 esac
 
 echoend
