@@ -32,6 +32,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-diff-analyser
  - sake-git-fork-comparison - finds all the works and sees which one is ahead
  - sake-git-info
+ - sake-git-add-collaborator
  - sake-git-find-any-changes
  - sake-git-remove-stale-branches 
  - sake-git-merge-towards-production - take develop to production 

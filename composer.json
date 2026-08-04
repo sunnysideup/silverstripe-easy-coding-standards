@@ -58,6 +58,7 @@
     "bin/sake-git-diff",
     "bin/sake-git-diff-analyser",
     "bin/sake-git-find-any-changes",
+    "bin/sake-git-add-collaborator",
     "bin/sake-git-info",
     "bin/sake-git-merge-pipeline-ssh",
     "bin/sake-git-merge-majors",
