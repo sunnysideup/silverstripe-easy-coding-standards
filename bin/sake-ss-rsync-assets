@@ -11,9 +11,16 @@ SCRIPT_SUMMARY="Syncs public/assets folder between local and remote server via r
 ############################################ CONSTANTS / DEFAULTS
 LOCAL_ASSETS_DIR="$WORKING_DIR/public/assets"
 REMOTE_ASSETS_SUBPATH='public/assets'
-RSYNC_OPTS=(--stats -chavzPr)
 WWW_DATA_DEFAULT='www-data'
 envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
+
+# The one entry preserved on the DESTINATION during any sync. --exclude does two
+# jobs here: the sender's copy is never transferred (so the destination's own
+# file is left untouched), and --delete never removes it. Everything else in the
+# assets root is mirrored to match the sender exactly (dest-only files, incl.
+# hidden ones like .protected, are deleted).
+KEEP_NAME='.htaccess'
+RSYNC_OPTS=(--stats -chavzPr --delete --exclude="/$KEEP_NAME")
 
 ############################################ SETTINGS (args)
 server=''
@@ -67,12 +74,17 @@ help_and_exit() {
     ECHOHEAD 'Rsync SilverStripe assets'
     echonice "$SCRIPT_SUMMARY"
     echonice ""
-    echonice "Syncs public/assets folder between local and remote server via rsync"
+    echonice "Mirrors the public/assets folder between local and remote via rsync."
+    echonice "The destination is made to match the sender EXACTLY: files that only"
+    echonice "exist on the destination (including hidden ones such as .protected) are"
+    echonice "deleted. The single exception is $KEEP_NAME, which is always left as-is."
     echonice ""
     echonice "Script dir:                    $SCRIPT_DIR"
     echonice "Working dir:                   $WORKING_DIR"
     echonice "Local assets dir:              $LOCAL_ASSETS_DIR"
     echonice "Remote assets subpath:         $REMOTE_ASSETS_SUBPATH"
+    echonice "Preserved on destination:      $KEEP_NAME"
+    echonice "Rsync options:                 ${RSYNC_OPTS[*]}"
     echonice "Server (- none if blank):      $_server_display"
     echonice "To server (post-pull push):    $_to_display"
     echonice "Reverse push (-r):             $reverse"
@@ -88,6 +100,8 @@ help_and_exit() {
     echonice "Pull:       sake-ss-rsync-assets user@host:/var/www/site"
     echonice "Pull+Push:  sake-ss-rsync-assets user@hostA:/var/www/site --to user@hostB:/var/www/site"
     echonice "Push:       sake-ss-rsync-assets -r user@host:/var/www/site"
+    echonice "Note: The destination is mirrored to the sender (--delete); destination-only"
+    echonice "      files are removed. Only $KEEP_NAME is preserved on the destination."
     echonice "Note: Use trailing slashes correctly in rsync semantics (src/ vs src)."
     ECHOHEAD "Setting defaults:"
     echonice "Set default server in .env with key $envServerKey,"
@@ -134,14 +148,13 @@ if [[ "$reverse" == 'yes' ]]; then
     echowarn "Server source:        ${serverSource:-unknown}"
     echowarn "Remote assets dir:    $REMOTE_ASSETS_DIR"
     echowarn "Local assets dir:     $LOCAL_ASSETS_DIR"
-    echowarn "You are about to OVERWRITE remote assets with LOCAL contents."
+    echowarn "This MIRRORS local → remote: remote-only files will be DELETED"
+    echowarn "(everything except $KEEP_NAME, which is left untouched on the remote)."
     read -p "Type the server host name ($SERVER_HOST) to confirm: " confirm
     [[ "$confirm" != "$SERVER_HOST" ]] && echonice 'Aborted (input did not match server host).' && exit 1
     rsync "${RSYNC_OPTS[@]}" "$LOCAL_ASSETS_DIR/" "$server/$REMOTE_ASSETS_SUBPATH"
 else
-    ECHOHEAD 'Now clearing local assets...'
-    sudo rm -rf "$LOCAL_ASSETS_DIR"/*
-    ECHOHEAD "Now syncing $server → LOCAL ..."
+    ECHOHEAD "Now mirroring $server → LOCAL (deletes local-only files, keeps $KEEP_NAME)..."
     rsync "${RSYNC_OPTS[@]}" "$server/$REMOTE_ASSETS_SUBPATH/" "$LOCAL_ASSETS_DIR"
 fi
 

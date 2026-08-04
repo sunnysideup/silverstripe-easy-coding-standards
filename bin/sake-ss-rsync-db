@@ -6,6 +6,84 @@ WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 SCRIPT_SUMMARY="Syncs database between local and remote server via SSH"
 
+############################################ HELPERS
+#
+# ESCAPING MODEL (read before touching any ssh/mysql line):
+#   * LOCAL mysql calls pass through ONE shell, so plain double quotes
+#     ("$var") are enough — an expansion result is not re-scanned, so $, `,
+#     ", \ inside a value are already safe.
+#   * REMOTE calls pass through TWO shells (local build + remote parse). EVERY
+#     value that lands there (user, password, host, db name, file path) is
+#     run through escape_for_single_quotes and wrapped in SINGLE quotes on the
+#     remote side. The DB name is passed as a mysql ARGUMENT and queries filter
+#     with DATABASE(), so no value is ever interpolated into a remote
+#     double-quoted string where $ or ` could be re-expanded.
+#
+# Build a single DROP script from newline-separated table & view name lists.
+# FOREIGN_KEY_CHECKS is toggled inside the same script so it applies to the
+# whole session (must be one mysql invocation, not several).
+build_drop_sql() {
+    local tables="$1" views="$2"
+    local sql line
+    sql="SET FOREIGN_KEY_CHECKS=0;"$'\n'
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        sql+="DROP TABLE IF EXISTS \`$line\`;"$'\n'
+    done <<<"$tables"
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        sql+="DROP VIEW IF EXISTS \`$line\`;"$'\n'
+    done <<<"$views"
+    sql+="SET FOREIGN_KEY_CHECKS=1;"$'\n'
+    printf '%s' "$sql"
+}
+
+# Drop every base table & view from a LOCAL database.
+# DB selected as an argument + DATABASE() filter → the name never enters the
+# SQL text, and the single-column result means no pipe masks mysql's exit code.
+drop_all_tables_local() {
+    local user="$1" pass="$2" host="$3" db="$4"
+    local tables views
+    tables=$(mysql --skip-column-names --batch -u "$user" -p"$pass" -h "$host" "$db" -e \
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE';") || return 1
+    views=$(mysql --skip-column-names --batch -u "$user" -p"$pass" -h "$host" "$db" -e \
+        "SELECT table_name FROM information_schema.views WHERE table_schema = DATABASE();") || return 1
+    if [[ -z "$tables" && -z "$views" ]]; then
+        echonice "Local database '$db' has no tables/views — nothing to drop."
+        return 0
+    fi
+    build_drop_sql "$tables" "$views" | mysql -u "$user" -p"$pass" -h "$host" "$db"
+}
+
+# Drop every base table & view from a REMOTE database (over SSH).
+# All four connection fields are escaped for single quotes; the DB is passed as
+# an arg and DATABASE() does the filtering, so the remote -e string is a plain
+# constant (no $, no `) and can safely sit in remote double quotes.
+drop_all_tables_remote() {
+    local sshHost="$1"
+    local eu ep eh ed tables views
+    eu=$(escape_for_single_quotes "$2")
+    ep=$(escape_for_single_quotes "$3")
+    eh=$(escape_for_single_quotes "$4")
+    ed=$(escape_for_single_quotes "$5")
+    tables=$(ssh "$sshHost" "mysql --skip-column-names --batch -u '$eu' -p'$ep' -h '$eh' '$ed' -e \"SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE';\"") || return 1
+    views=$(ssh "$sshHost" "mysql --skip-column-names --batch -u '$eu' -p'$ep' -h '$eh' '$ed' -e \"SELECT table_name FROM information_schema.views WHERE table_schema = DATABASE();\"") || return 1
+    if [[ -z "$tables" && -z "$views" ]]; then
+        echonice "Remote database '$5' (@ $sshHost) has no tables/views — nothing to drop."
+        return 0
+    fi
+    build_drop_sql "$tables" "$views" | ssh "$sshHost" "mysql -u '$eu' -p'$ep' -h '$eh' '$ed'"
+}
+
+# Read one KEY from a remote .env over SSH. Path escaped + single-quoted on the
+# remote so spaces are safe. head -n1 guards against duplicate keys.
+read_remote_dotenv_value() {
+    local sshHost="$1" envFile="$2" key="$3"
+    local ef
+    ef=$(escape_for_single_quotes "$envFile")
+    ssh "$sshHost" "grep '^$key=' '$ef' | head -n1 | cut -d '=' -f 2- | tr -d '\"'"
+}
+
 ############################################ DIR
 localEnvFile="$WORKING_DIR/.env"
 remoteDumpFile="/tmp/db_dump.sql"
@@ -72,7 +150,7 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     echonice "Server to sync with:           $server"
     echonice "Do reverse sync:               $reverse"
     echonice "To server (if any):            $toServer"
-    echonice "Drop & recreate server DB:     $dropDb"
+    echonice "Drop & recreate whole DB:      $dropDb"
     echonice "Apache user (-w):              $wwwDataUser"
     echonice ""
     echonice "Local .env File:               $localEnvFile"
@@ -84,11 +162,14 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     ECHOHEAD "Available settings:"
     echonice "-r, --reverse                  sync FROM local TO server"
     echonice "-t, --to SERVER[:/path]        after pulling, also push dump to this server and import"
-    echonice "-d, --drop                     drop & recreate the SERVER DB before import (needs DROP privilege)"
+    echonice "-d, --drop                     DROP & recreate the whole DB before import (needs DROP/CREATE DATABASE privilege)"
     echonice "-h, --help                     show help information"
     echonice ""
-    echonice "Note: the LOCAL database is always dropped & recreated on import."
-    echonice "      Use -d to also drop & recreate on the remote / --to server."
+    echonice "Note: on every import, ALL tables/views are dropped from the target DB first,"
+    echonice "      so any extra / superfluous tables are removed. This applies to the LOCAL,"
+    echonice "      the SOURCE server (reverse), and the --to server."
+    echonice "      Use -d to instead DROP & recreate the entire database (resets"
+    echonice "      charset / collation / grants; requires DROP + CREATE DATABASE privilege)."
     echonice ""
     ECHOHEAD "Examples:"
     echonice "sake-ss-rsync-db my-server:/var/www/website-root"
@@ -128,13 +209,10 @@ localDbName=$(read_local_dotenv_value "SS_DATABASE_NAME")
 localDbHost="$(read_local_dotenv_value 'SS_DATABASE_SERVER' || true)"
 localDbHost="${localDbHost:-localhost}"
 
-remoteDbUser=$(ssh "$serverClean" "grep '^SS_DATABASE_USERNAME=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
-remoteDbPass=$(ssh "$serverClean" "grep '^SS_DATABASE_PASSWORD=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
-remoteDbName=$(ssh "$serverClean" "grep '^SS_DATABASE_NAME=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
-remoteDbHost=$(ssh "$serverClean" "grep '^SS_DATABASE_SERVER=' $REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
-
-escapedRemotePass=$(escape_for_single_quotes "$remoteDbPass")
-escapedLocalPass=$(escape_for_single_quotes "$localDbPass")
+remoteDbUser=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_USERNAME")
+remoteDbPass=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_PASSWORD")
+remoteDbName=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_NAME")
+remoteDbHost=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_SERVER")
 
 if [[ -z "$remoteDbUser" || -z "$remoteDbPass" || -z "$remoteDbName" || -z "$remoteDbHost" ]]; then
     echobad "Could not retrieve database credentials from the source server."
@@ -152,16 +230,28 @@ if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localD
     exit 1
 fi
 
+# Pre-escape every source-server field once, for safe reuse inside ssh "..." strings.
+escRemoteUser=$(escape_for_single_quotes "$remoteDbUser")
+escRemotePass=$(escape_for_single_quotes "$remoteDbPass")
+escRemoteHost=$(escape_for_single_quotes "$remoteDbHost")
+escRemoteName=$(escape_for_single_quotes "$remoteDbName")
+escRemoteDump=$(escape_for_single_quotes "$remoteDumpFile")
+
 # If --to: fetch its DB credentials now
 if [[ -n "$toServer" ]]; then
-    toRemoteDbUser=$(ssh "$toServerClean" "grep '^SS_DATABASE_USERNAME=' $TO_REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
-    toRemoteDbPass=$(ssh "$toServerClean" "grep '^SS_DATABASE_PASSWORD=' $TO_REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
-    toRemoteDbName=$(ssh "$toServerClean" "grep '^SS_DATABASE_NAME=' $TO_REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
-    toRemoteDbHost=$(ssh "$toServerClean" "grep '^SS_DATABASE_SERVER=' $TO_REMOTE_ENV_FILE | cut -d '=' -f 2- | tr -d '\"'")
+    toRemoteDbUser=$(read_remote_dotenv_value "$toServerClean" "$TO_REMOTE_ENV_FILE" "SS_DATABASE_USERNAME")
+    toRemoteDbPass=$(read_remote_dotenv_value "$toServerClean" "$TO_REMOTE_ENV_FILE" "SS_DATABASE_PASSWORD")
+    toRemoteDbName=$(read_remote_dotenv_value "$toServerClean" "$TO_REMOTE_ENV_FILE" "SS_DATABASE_NAME")
+    toRemoteDbHost=$(read_remote_dotenv_value "$toServerClean" "$TO_REMOTE_ENV_FILE" "SS_DATABASE_SERVER")
     if [[ -z "$toRemoteDbUser" || -z "$toRemoteDbPass" || -z "$toRemoteDbName" || -z "$toRemoteDbHost" ]]; then
         echobad "Could not retrieve database credentials from the --to server."
         exit 1
     fi
+    escToUser=$(escape_for_single_quotes "$toRemoteDbUser")
+    escToPass=$(escape_for_single_quotes "$toRemoteDbPass")
+    escToHost=$(escape_for_single_quotes "$toRemoteDbHost")
+    escToName=$(escape_for_single_quotes "$toRemoteDbName")
+    escToDump=$(escape_for_single_quotes "$toRemoteDumpFile")
 fi
 
 ############################################ SYNC PROCESS
@@ -171,7 +261,11 @@ if [[ "$reverse" == "yes" ]]; then
     echowarn "Server source:        $serverSource"
     echowarn "Remote DB:            $remoteDbName @ $remoteDbHost (user: $remoteDbUser)"
     echowarn "You are about to OVERWRITE the remote database with your LOCAL database."
-    [[ "$dropDb" == "yes" ]] && echowarn "The remote database will be DROPPED and recreated."
+    if [[ "$dropDb" == "yes" ]]; then
+        echowarn "The remote database will be DROPPED and recreated."
+    else
+        echowarn "ALL tables/views in the remote database will be dropped before import."
+    fi
     read -p "Type the server host name ($serverClean) to confirm: " confirm
     [[ "$confirm" != "$serverClean" ]] && echonice "Aborted (input did not match server host)." && exit 1
 
@@ -187,21 +281,27 @@ if [[ "$reverse" == "yes" ]]; then
 
     if [[ "$dropDb" == "yes" ]]; then
         echonice "Recreating database on source server..."
-        ssh "$serverClean" "mysql -u '$remoteDbUser' -p'$escapedRemotePass' -h '$remoteDbHost' -e 'DROP DATABASE IF EXISTS \`$remoteDbName\`; CREATE DATABASE \`$remoteDbName\`;'" || {
+        ssh "$serverClean" "mysql -u '$escRemoteUser' -p'$escRemotePass' -h '$escRemoteHost' -e 'DROP DATABASE IF EXISTS \`$escRemoteName\`; CREATE DATABASE \`$escRemoteName\`;'" || {
             echobad "Failed to recreate database on source server."
+            exit 1
+        }
+    else
+        echonice "Dropping all tables on source server ($remoteDbName)..."
+        drop_all_tables_remote "$serverClean" "$remoteDbUser" "$remoteDbPass" "$remoteDbHost" "$remoteDbName" || {
+            echobad "Failed to drop tables on source server."
             exit 1
         }
     fi
 
     echonice "Importing on source server..."
-    ssh "$serverClean" "mysql -u '$remoteDbUser' -p'$escapedRemotePass' -h '$remoteDbHost' '$remoteDbName' < '$remoteDumpFile' " || {
+    ssh "$serverClean" "mysql -u '$escRemoteUser' -p'$escRemotePass' -h '$escRemoteHost' '$escRemoteName' < '$escRemoteDump'" || {
         echobad "Failed to import on source server."
         exit 1
     }
 else
     # PULL: source server -> local
     echonice "Dumping remote database (source)..."
-    ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces --add-drop-table -u $remoteDbUser -p$remoteDbPass -h $remoteDbHost $remoteDbName > $remoteDumpFile" || {
+    ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces --add-drop-table -u '$escRemoteUser' -p'$escRemotePass' -h '$escRemoteHost' '$escRemoteName' > '$escRemoteDump'" || {
         echobad "Remote database dump failed."
         exit 1
     }
@@ -212,10 +312,17 @@ else
         exit 1
     }
 
-    # Local is always dropped & recreated.
-    echonice "Recreating local database..."
-    mysql -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" -e "DROP DATABASE IF EXISTS \`$localDbName\`; CREATE DATABASE \`$localDbName\`;" || {
-        echobad "Failed to recreate local database."
+    # Local is always emptied first: every table/view is dropped so that no
+    # superfluous / additional data survives the import.
+    echonice "Ensuring local database exists..."
+    mysql -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" -e "CREATE DATABASE IF NOT EXISTS \`$localDbName\`;" || {
+        echobad "Failed to ensure local database exists."
+        exit 1
+    }
+
+    echonice "Dropping all tables from local database ($localDbName)..."
+    drop_all_tables_local "$localDbUser" "$localDbPass" "$localDbHost" "$localDbName" || {
+        echobad "Failed to drop local tables."
         exit 1
     }
 
@@ -231,8 +338,14 @@ else
 
         if [[ "$dropDb" == "yes" ]]; then
             echonice "Recreating database on --to server..."
-            ssh "$toServerClean" "mysql -u $toRemoteDbUser -p$toRemoteDbPass -h $toRemoteDbHost -e 'DROP DATABASE IF EXISTS \`$toRemoteDbName\`; CREATE DATABASE \`$toRemoteDbName\`;'" || {
+            ssh "$toServerClean" "mysql -u '$escToUser' -p'$escToPass' -h '$escToHost' -e 'DROP DATABASE IF EXISTS \`$escToName\`; CREATE DATABASE \`$escToName\`;'" || {
                 echobad "Failed to recreate database on --to server."
+                exit 1
+            }
+        else
+            echonice "Dropping all tables on --to server ($toRemoteDbName)..."
+            drop_all_tables_remote "$toServerClean" "$toRemoteDbUser" "$toRemoteDbPass" "$toRemoteDbHost" "$toRemoteDbName" || {
+                echobad "Failed to drop tables on --to server."
                 exit 1
             }
         fi
@@ -242,19 +355,19 @@ else
             exit 1
         }
 
-        ssh "$toServerClean" "mysql -u $toRemoteDbUser -p$toRemoteDbPass -h $toRemoteDbHost $toRemoteDbName < $toRemoteDumpFile" || {
+        ssh "$toServerClean" "mysql -u '$escToUser' -p'$escToPass' -h '$escToHost' '$escToName' < '$escToDump'" || {
             echobad "Failed to import on --to server."
             exit 1
         }
 
         # Clean up on --to server
-        ssh "$toServerClean" "rm -f $toRemoteDumpFile" || echowarn "Failed to clean up dump on --to server."
+        ssh "$toServerClean" "rm -f '$escToDump'" || echowarn "Failed to clean up dump on --to server."
     fi
 fi
 
 ############################################ CLEANUP (source server + local)
 echonice "Cleaning up remote dump file on source server..."
-ssh "$serverClean" "rm -f $remoteDumpFile" || echowarn "Failed to clean up the remote dump file."
+ssh "$serverClean" "rm -f '$escRemoteDump'" || echowarn "Failed to clean up the remote dump file."
 
 echonice "Cleaning up local dump file..."
 rm -f "$localDumpFile" || echowarn "Failed to clean up the local dump file."
