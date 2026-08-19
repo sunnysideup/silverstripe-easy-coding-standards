@@ -48,11 +48,11 @@ sake_check_help_and_exit
 
 cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
-ECHOHEAD "Easy to update"
-composer show -oD
+ECHOHEAD "Easy to update (semver-compatible, within constraints)"
+composer outdated -D --minor-only
 
-ECHOHEAD "Directly required packages out of date in composer.lock"
-composer outdated -D --locked
+ECHOHEAD "Needs a composer.json change (major version bumps)"
+composer outdated -D --major-only
 
 composer audit
 
