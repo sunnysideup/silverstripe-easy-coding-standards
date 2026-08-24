@@ -69,14 +69,14 @@ sake_check_help_and_exit
 # Parse the server and optional remote directory
 SERVER_CLEAN=$(echo "$server" | cut -d':' -f1)
 REMOTE_DIR=$(echo "$server" | cut -s -d':' -f2)
-REMOTE_DIR=${REMOTE_DIR:-/container/application}
+REMOTE_DIR=${REMOTE_DIR:-$DEFAULT_SERVER_DIR}
 
 BACKUP_FILE="__backups/backup.sspak"
 LOCAL_BACKUP_DIR=".."
 LOCAL_BACKUP_NAME="$(echo "$server" | sed 's/.*@//').sspak"
 
 if [[ "$server" != *":/"* ]]; then
-    server="$server:/container/application"
+    server="$server:$DEFAULT_SERVER_DIR"
 fi
 
 ############################################ RUN
