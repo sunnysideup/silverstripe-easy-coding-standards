@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Installs the SilverStripe upgrade tool into /var/www/upgrader"
+
+############################################ SETTINGS
+help='no'
+
+while (($#)); do
+    case $1 in
+    *)
+        sake_handle_help_flag "$1" && shift && continue
+        ;;
+    esac
+    shift
+done
+
+############################################ HELP
+
+help_and_exit() {
+    ECHOHEAD "Install SilverStripe Upgrader"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice ""
+    echonice "Sets up two directories:"
+    echonice "  /var/www/upgrader            cloned upgrade tool (git@github.com:sunnysideup/silverstripe-upgrade-silverstripe.git)"
+    echonice "  /var/www/upgrades            working area for upgrade output"
+    echonice ""
+    echonice "Ownership is set to \$USER:www-data for both directories."
+    echonice "If the repo is already cloned the clone step is skipped."
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-install-upgrader"
+
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ RUN
+
+ECHOHEAD "Installing SilverStripe upgrader"
+
+echonice "Creating directories..."
+sudo mkdir -p /var/www/upgrader
+sudo mkdir -p /var/www/upgrades
+
+echonice "Setting ownership to $USER:www-data..."
+sudo chown "$USER:www-data" /var/www/upgrader
+sudo chown "$USER:www-data" /var/www/upgrades
+
+if [ -d /var/www/upgrader/.git ]; then
+    echonice "Upgrader already cloned — skipping clone."
+else
+    echonice "Cloning silverstripe-upgrade-silverstripe..."
+    git clone git@github.com:sunnysideup/silverstripe-upgrade-silverstripe.git /var/www/upgrader
+fi
+
+echonice "Running composer install..."
+(cd /var/www/upgrader && composer install --prefer-source)
+
+echoend
