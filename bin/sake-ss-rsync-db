@@ -424,10 +424,15 @@ else
         # Restore the standard remote dump file FROM A BACKUP instead of a live
         # mysqldump. From here on the flow (download, drop, import) is identical.
         echonice "Preparing dump from BACKUP on source server ($backupLocation)..."
-        prepare_remote_backup_dump "$serverClean" "$backupLocation" "$remoteDumpFile" || {
-            echobad "Failed to prepare dump from backup on source server."
-            exit 1
-        }
+        if prepare_remote_backup_dump "$serverClean" "$backupLocation" "$remoteDumpFile"; then
+            echonice "Backup dump prepared successfully."
+        else
+            echowarn "No backup available at '$backupLocation' on $serverClean — falling back to live mysqldump."
+            ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces --add-drop-table -u '$escRemoteUser' -p'$escRemotePass' -h '$escRemoteHost' '$escRemoteName' > '$escRemoteDump'" || {
+                echobad "Remote database dump (live fallback) failed."
+                exit 1
+            }
+        fi
     else
         echonice "Dumping remote database (source)..."
         ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces --add-drop-table -u '$escRemoteUser' -p'$escRemotePass' -h '$escRemoteHost' '$escRemoteName' > '$escRemoteDump'" || {
