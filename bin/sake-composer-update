@@ -184,8 +184,7 @@ while read -r oldPackage; do
                     git fetch --tags &>/dev/null
                     commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef")
                     if [ -n "$commits" ]; then
-                        commitMessage+=$(echo -e "\n\n$commits \n\n")
-                    else
+                        commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef" | tr -d '\0')                    else
                         commitMessage+=$(echo -e "\n\nNo new commits between $oldRef and $newRef. \n\n")
                     fi
                 else
