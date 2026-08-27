@@ -139,7 +139,7 @@ detect_added_packages() {
         packageName=$(echo "$newPackage" | awk '{print $1}')
         if ! echo "$oldPackages" | grep -q "^$packageName "; then
             echonice "ENH: Package added: $newPackage"
-            commitMessage+=$(echo -e "\n\n+++ Package added: $newPackage \n\n")
+            commitMessage+=$(printf '\n\n+++ Package added: %s\n\n' "$newPackage")
         fi
     done <<<"$newPackages"
 }
@@ -182,10 +182,10 @@ while read -r oldPackage; do
                 cd "$packagePath" || continue
                 if [ -d .git ]; then
                     git fetch --tags &>/dev/null
-                    commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef")
-                    if [ -n "$commits" ]; then
-                        commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef" | tr -d '\0')                    else
-                        commitMessage+=$(echo -e "\n\nNo new commits between $oldRef and $newRef. \n\n")
+                    if commits=$(git log --pretty=format:'%B%n' "$oldRef".."$newRef" 2>/dev/null | tr -d '\0') && [ -n "$commits" ]; then
+                        commitMessage+=$(printf '\n\n%s\n\n' "$commits")
+                    else
+                        commitMessage+=$(printf '\n\nNo new commits between %s and %s.\n\n' "$oldRef" "$newRef")
                     fi
                 else
                     commitMessage+=$(echo -e "\n\nNo git repository found in $packagePath. \n\n")
