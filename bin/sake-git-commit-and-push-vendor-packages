@@ -36,6 +36,7 @@ while (($#)); do
         ;;
     -s | --status-only)
         statusOnly='yes'
+        pullPush='no'
         shift
         ;;
     -f | --full-update)

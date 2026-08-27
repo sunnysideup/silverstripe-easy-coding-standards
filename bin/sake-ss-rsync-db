@@ -18,6 +18,11 @@ SCRIPT_SUMMARY="Syncs database between local and remote server via SSH"
 #     remote side. The DB name is passed as a mysql ARGUMENT and queries filter
 #     with DATABASE(), so no value is ever interpolated into a remote
 #     double-quoted string where $ or ` could be re-expanded.
+#   * BACKUP location (see prepare_remote_backup_dump): user-controlled config,
+#     split into dir + filename and single-quoted on the remote just like every
+#     other value. A wildcard filename (e.g. *.sql.gz) is matched by `find
+#     -name` itself, NOT by the remote shell — that is why single-quoting the
+#     pattern is correct AND safe: find does the globbing, the shell never does.
 #
 # Build a single DROP script from newline-separated table & view name lists.
 # FOREIGN_KEY_CHECKS is toggled inside the same script so it applies to the
@@ -84,12 +89,66 @@ read_remote_dotenv_value() {
     ssh "$sshHost" "grep '^$key=' '$ef' | head -n1 | cut -d '=' -f 2- | tr -d '\"'"
 }
 
+# Prepare the standard remote dump file FROM A BACKUP instead of a live
+# mysqldump. Used only on a PULL (source → local); reverse sync never touches
+# this because there we dump the LOCAL database.
+#
+# The backup "location" is either an explicit --backup-location argument or the
+# SS_DATABASE_SERVER_BACKUP_LOCATION .env value. It may be:
+#   * a literal path  ...databases/backup-2026-08-24.sql.gz
+#   * a wildcard      ...databases/*.sql.gz      (newest match wins)
+#   * plain or gzipped (*.gz is decompressed, anything else is copied as-is)
+#
+# ESCAPING MODEL: the location is split locally with dirname/basename, and BOTH
+# parts are escape_for_single_quotes'd + wrapped in SINGLE quotes on the remote,
+# so $, `, ", \ stay literal. The wildcard is matched by `find -name` itself
+# (not the remote shell) precisely because the pattern is single-quoted — this
+# supports a rotating "latest" dir with a random filename WITHOUT ever letting
+# the remote shell expand user config.
+#
+# Requires GNU find on the remote for -printf (standard on Debian/Ubuntu
+# containers). Assumes the backup path contains no embedded newlines.
+prepare_remote_backup_dump() {
+    local sshHost="$1" location="$2" dumpFile="$3"
+    local dir base edir ebase edump resolved eresolved
+
+    dir=$(dirname -- "$location")
+    base=$(basename -- "$location")
+    edir=$(escape_for_single_quotes "$dir")
+    ebase=$(escape_for_single_quotes "$base")
+    edump=$(escape_for_single_quotes "$dumpFile")
+
+    # Resolve the (possibly wildcarded) location to the NEWEST matching file.
+    # find does its own -name matching, so the single-quoted pattern is safe.
+    resolved=$(ssh "$sshHost" "find '$edir' -maxdepth 1 -type f -name '$ebase' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-")
+    if [[ -z "$resolved" ]]; then
+        echobad "No backup file matching '$location' found on $sshHost."
+        return 1
+    fi
+    echonice "Using backup file: $resolved"
+
+    eresolved=$(escape_for_single_quotes "$resolved")
+
+    # Decompress *.gz, else copy a plain *.sql, into the standard remote dump
+    # file — after this the rest of the PULL flow is identical to a live dump.
+    # -- guards filenames starting with '-'. The case word is the single-quoted
+    # literal path, so the value itself is never glob-expanded by the shell.
+    ssh "$sshHost" "
+        if [ ! -r '$eresolved' ]; then echo 'backup file not readable: $eresolved' >&2; exit 1; fi
+        case '$eresolved' in
+            *.gz) gunzip -c -- '$eresolved' > '$edump' ;;
+            *)    cp -- '$eresolved' '$edump' ;;
+        esac
+    " || return 1
+}
+
 ############################################ DIR
 localEnvFile="$WORKING_DIR/.env"
 remoteDumpFile="/tmp/db_dump.sql"
 localDumpFile="/tmp/db_dump.sql"
 toRemoteDumpFile="/tmp/db_dump_from_local.sql"
 envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
+envBackupKey='SS_DATABASE_SERVER_BACKUP_LOCATION'
 
 ############################################ SETTINGS
 server=''
@@ -97,6 +156,9 @@ toServer=''
 help='no'
 reverse='no'
 dropDb='no'
+useBackup='no'
+backupLocation=''
+backupLocationFromArg=''
 
 serverFromArg=''
 while (($#)); do
@@ -111,6 +173,15 @@ while (($#)); do
     -d | --drop)
         dropDb='yes'
         ;;
+    -b | --backup)
+        useBackup='yes'
+        ;;
+    --backup-location)
+        # Explicit path/glob to the backup on the source server. Implies -b.
+        backupLocationFromArg=$2
+        useBackup='yes'
+        shift
+        ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
@@ -122,6 +193,13 @@ while (($#)); do
 
     shift
 done
+
+# Backups live on the SOURCE server and are only meaningful when pulling FROM it.
+# Reverse sync dumps the LOCAL db, so the two options are mutually exclusive.
+if [[ "$useBackup" == "yes" && "$reverse" == "yes" ]]; then
+    echobad "--backup cannot be combined with --reverse (backups are pulled FROM the source server only)."
+    exit 1
+fi
 
 ############################################ RESOLVE SERVER (arg ALWAYS overrules .env)
 serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
@@ -151,6 +229,8 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     echonice "Do reverse sync:               $reverse"
     echonice "To server (if any):            $toServer"
     echonice "Drop & recreate whole DB:      $dropDb"
+    echonice "Use backup (not live dump):    $useBackup"
+    echonice "Backup location (arg):         ${backupLocationFromArg:-<none; will use .env if -b set>}"
     echonice "Apache user (-w):              $wwwDataUser"
     echonice ""
     echonice "Local .env File:               $localEnvFile"
@@ -163,6 +243,8 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     echonice "-r, --reverse                  sync FROM local TO server"
     echonice "-t, --to SERVER[:/path]        after pulling, also push dump to this server and import"
     echonice "-d, --drop                     DROP & recreate the whole DB before import (needs DROP/CREATE DATABASE privilege)"
+    echonice "-b, --backup                   pull the DB from the latest server BACKUP instead of a live mysqldump"
+    echonice "    --backup-location PATH      explicit path/glob to the backup .sql(.gz) on the source server (implies -b)"
     echonice "-h, --help                     show help information"
     echonice ""
     echonice "Note: on every import, ALL tables/views are dropped from the target DB first,"
@@ -171,16 +253,27 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     echonice "      Use -d to instead DROP & recreate the entire database (resets"
     echonice "      charset / collation / grants; requires DROP + CREATE DATABASE privilege)."
     echonice ""
+    echonice "Backup mode (-b / --backup-location) only applies to a PULL (source → local,"
+    echonice "      and any --to server). It restores from a dump FILE on the source server"
+    echonice "      instead of running mysqldump live. A *.gz backup is decompressed"
+    echonice "      automatically; if the filename is a wildcard the NEWEST match is used."
+    echonice ""
     ECHOHEAD "Examples:"
     echonice "sake-ss-rsync-db my-server:/var/www/website-root"
-    echonice "sake-ss-rsync-db my-server            # default path is /container/application"
+    echonice "sake-ss-rsync-db my-server            # default path is \$DEFAULT_SERVER_DIR ($DEFAULT_SERVER_DIR)"
     echonice "sake-ss-rsync-db --reverse my-server"
     echonice "sake-ss-rsync-db --reverse --drop my-server"
     echonice "sake-ss-rsync-db my-server --to other-server:/var/www/site"
+    echonice "sake-ss-rsync-db my-server -b        # restore from latest backup on my-server"
+    echonice "sake-ss-rsync-db my-server --backup-location '/container/backups/containers/latest/databases/*.sql.gz'"
 
     ECHOHEAD "Setting defaults:"
     echonice "Set default server in .env with key $envServerKey,"
     echonice " e.g. $envServerKey=my-server:/var/www/website-root"
+    echonice ""
+    echonice "Set default backup location with key $envBackupKey."
+    echonice "This is read from the SOURCE server's .env first, then the local .env, e.g."
+    echonice " $envBackupKey=/container/backups/containers/latest/databases/*.sql.gz"
     echofunctions
     exit
 fi
@@ -189,15 +282,15 @@ sake_check_help_and_exit
 
 serverClean=$(echo "$server" | cut -d':' -f1)
 REMOTE_DIR=$(echo "$server" | cut -s -d':' -f2)
-REMOTE_DIR=${REMOTE_DIR:-/container/application}
+REMOTE_DIR=${REMOTE_DIR:-$DEFAULT_SERVER_DIR}
 REMOTE_ENV_FILE="$REMOTE_DIR/.env"
 
 # If --to provided, normalize it as well
 if [[ -n "$toServer" ]]; then
-    [[ "$toServer" != *":/"* ]] && toServer="$toServer:/container/application"
+    [[ "$toServer" != *":/"* ]] && toServer="$toServer:$DEFAULT_SERVER_DIR"
     toServerClean=$(echo "$toServer" | cut -d':' -f1)
     TO_REMOTE_DIR=$(echo "$toServer" | cut -s -d':' -f2)
-    TO_REMOTE_DIR=${TO_REMOTE_DIR:-/container/application}
+    TO_REMOTE_DIR=${TO_REMOTE_DIR:-$DEFAULT_SERVER_DIR}
     TO_REMOTE_ENV_FILE="$TO_REMOTE_DIR/.env"
 fi
 
@@ -228,6 +321,33 @@ fi
 if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localDbHost" ]]; then
     echobad "Could not retrieve database credentials from the local .env file."
     exit 1
+fi
+
+############################################ RESOLVE BACKUP LOCATION (arg > remote .env > local .env)
+if [[ "$useBackup" == "yes" ]]; then
+    if [[ -n "$backupLocationFromArg" ]]; then
+        backupLocation="$backupLocationFromArg"
+        backupSource="argument (--backup-location)"
+    else
+        backupLocation="$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "$envBackupKey")"
+        if [[ -n "$backupLocation" ]]; then
+            backupSource="remote .env ($envBackupKey)"
+        else
+            backupLocation="$(read_local_dotenv_value "$envBackupKey" || true)"
+            [[ -n "$backupLocation" ]] && backupSource="local .env ($envBackupKey)"
+        fi
+    fi
+
+    if [[ -z "$backupLocation" ]]; then
+        echobad "Backup mode requested but no backup location found."
+        echowarn "Provide --backup-location PATH, or set $envBackupKey in the source or local .env, e.g."
+        echowarn "  $envBackupKey=/container/backups/containers/latest/databases/*.sql.gz"
+        exit 1
+    fi
+
+    echonice "Backup mode: ON"
+    echonice "  Location: $backupLocation"
+    echonice "  Source:   $backupSource"
 fi
 
 # Pre-escape every source-server field once, for safe reuse inside ssh "..." strings.
@@ -300,11 +420,26 @@ if [[ "$reverse" == "yes" ]]; then
     }
 else
     # PULL: source server -> local
-    echonice "Dumping remote database (source)..."
-    ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces --add-drop-table -u '$escRemoteUser' -p'$escRemotePass' -h '$escRemoteHost' '$escRemoteName' > '$escRemoteDump'" || {
-        echobad "Remote database dump failed."
-        exit 1
-    }
+    if [[ "$useBackup" == "yes" ]]; then
+        # Restore the standard remote dump file FROM A BACKUP instead of a live
+        # mysqldump. From here on the flow (download, drop, import) is identical.
+        echonice "Preparing dump from BACKUP on source server ($backupLocation)..."
+        if prepare_remote_backup_dump "$serverClean" "$backupLocation" "$remoteDumpFile"; then
+            echonice "Backup dump prepared successfully."
+        else
+            echowarn "No backup available at '$backupLocation' on $serverClean — falling back to live mysqldump."
+            ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces --add-drop-table -u '$escRemoteUser' -p'$escRemotePass' -h '$escRemoteHost' '$escRemoteName' > '$escRemoteDump'" || {
+                echobad "Remote database dump (live fallback) failed."
+                exit 1
+            }
+        fi
+    else
+        echonice "Dumping remote database (source)..."
+        ssh "$serverClean" "mysqldump --column-statistics=0 --no-tablespaces --add-drop-table -u '$escRemoteUser' -p'$escRemotePass' -h '$escRemoteHost' '$escRemoteName' > '$escRemoteDump'" || {
+            echobad "Remote database dump failed."
+            exit 1
+        }
+    fi
 
     echonice "Downloading dump from source server..."
     rsync -chavzP "$serverClean:$remoteDumpFile" "$localDumpFile" || {

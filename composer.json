@@ -107,6 +107,7 @@
     "bin/sake-ss-db-export",
     "bin/sake-ss-dev-build",
     "bin/sake-ss-flush",
+    "bin/sake-ss-install-upgrader",
     "bin/sake-ss-ready",
     "bin/sake-ss-rsync-all",
     "bin/sake-ss-rsync-assets",

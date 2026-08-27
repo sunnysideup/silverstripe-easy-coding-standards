@@ -22,6 +22,7 @@ declare -A varsToAdd=(
     [LLM_PROVIDER]=''
     [LLM_API_KEY]=''
     [LLM_MODEL]=''
+    [DEFAULT_SERVER_DIR]='/container/application'
 )
 
 # Loop through vars and add them if missing
@@ -33,6 +34,17 @@ done
 
 # Load the .env file
 source "$envFileLocation"
+
+# Allow a project-level .env (in the working directory) to override DEFAULT_SERVER_DIR.
+# This means running sake-xxx from a folder with its own .env can set a different server dir.
+if [[ -n "${WORKING_DIR:-}" && -f "$WORKING_DIR/.env" ]]; then
+    _localServerDir=$(grep -E "^[[:space:]]*(export[[:space:]]+)?DEFAULT_SERVER_DIR=" "$WORKING_DIR/.env" \
+        | tail -n 1 \
+        | sed -E "s/^[[:space:]]*(export[[:space:]]+)?DEFAULT_SERVER_DIR=//" \
+        | tr -d '"'"'")
+    [[ -n "$_localServerDir" ]] && DEFAULT_SERVER_DIR="$_localServerDir"
+    unset _localServerDir
+fi
 
 ############################################ COMMON INITIALIZATION FUNCTIONS
 

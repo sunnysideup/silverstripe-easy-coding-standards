@@ -9,6 +9,95 @@ SCRIPT_SUMMARY="Runs complete security update workflow with tests and composer u
 ############################################ DIR
 dir='./'
 
+############################################ BRANCHES
+# Branch names used by the decision + finalise logic below.
+DEVELOP_BRANCH='develop'
+PRODUCTION_BRANCH='production'
+HOTFIX_BRANCH='hotfix/security-update'
+
+# Set at runtime by sake_decide_work_branch (a step in the workflow below):
+#   develop     -> production and develop are identical; work happens on develop.
+#   hotfix/...  -> production is behind; work happens on a hotfix branch cut from
+#                  production, so the security release does NOT drag develop's
+#                  un-released changes into production.
+WORK_BRANCH="$DEVELOP_BRANCH"
+
+############################################ BRANCH DECISION + FINALISE HELPERS
+# These are shell functions so they can be called from the STEPS array via eval,
+# and (crucially) can set the global WORK_BRANCH that later steps read back.
+
+# Decide which branch the security work happens on.
+# Run this AFTER the reverse merge (production -> develop) and BEFORE composer/lint work,
+# so the diff reflects only pre-existing (un-released) develop changes.
+sake_decide_work_branch() {
+    git checkout "$DEVELOP_BRANCH" || return 1
+
+    # Resolve the production ref: prefer local branch, fall back to origin.
+    local prod_ref="$PRODUCTION_BRANCH"
+    git show-ref --verify --quiet "refs/heads/$PRODUCTION_BRANCH" \
+        || prod_ref="origin/$PRODUCTION_BRANCH"
+
+    # "Functionally the same?" -- compare the actual file trees of the two branch
+    # tips, ignoring commit history entirely. Merge commits, rebases, cherry-picks,
+    # etc. do NOT matter: all we care about is whether the resulting content differs.
+    # git diff --quiet exits 0 when the trees are identical, non-zero when they differ.
+    if git diff --quiet "$prod_ref" "$DEVELOP_BRANCH"; then
+        WORK_BRANCH="$DEVELOP_BRANCH"
+        echonice "production and develop are functionally identical."
+        echonice "-> working on '$DEVELOP_BRANCH'."
+        git checkout "$DEVELOP_BRANCH" || return 1
+    else
+        local changed
+        changed=$(git diff --name-only "$prod_ref" "$DEVELOP_BRANCH" | wc -l)
+        WORK_BRANCH="$HOTFIX_BRANCH"
+        echonice "production and develop differ ($changed file(s) changed)."
+        echonice "-> cutting hotfix branch '$HOTFIX_BRANCH' from '$PRODUCTION_BRANCH'."
+        git checkout "$PRODUCTION_BRANCH" || return 1
+        if git show-ref --verify --quiet "refs/heads/$HOTFIX_BRANCH"; then
+            echonice "   hotfix branch already exists -- checking it out (not recreating)."
+            git checkout "$HOTFIX_BRANCH" || return 1
+        else
+            git checkout -b "$HOTFIX_BRANCH" || return 1
+        fi
+    fi
+    echonice "WORK_BRANCH = $WORK_BRANCH"
+}
+
+# Finalise the release. Behaviour depends on the branch we worked on:
+#   - hotfix branch : merge hotfix -> production, push production, then reverse
+#                     merge production -> develop (same as the start of the run).
+#   - develop       : original behaviour -- print the ship reminder, deploy manually.
+# Uses WORK_BRANCH, but also treats the currently checked-out branch as the hotfix
+# path, so it still does the right thing when resuming via --from/--to.
+sake_finalise_release() {
+    local current
+    current=$(git rev-parse --abbrev-ref HEAD) || return 1
+
+    if [[ "$current" == "$HOTFIX_BRANCH" || "$WORK_BRANCH" == "$HOTFIX_BRANCH" ]]; then
+        echonice "Finalising HOTFIX release:"
+        echonice "  1. merge '$HOTFIX_BRANCH' -> '$PRODUCTION_BRANCH' (and push)"
+        echonice "  2. reverse merge '$PRODUCTION_BRANCH' -> '$DEVELOP_BRANCH'"
+
+        # Merge the hotfix into production.
+        # If sake-git-merge-towards-production --ship ships the *current* branch,
+        # you can replace the next three git lines with a checkout + --ship instead.
+        git checkout "$PRODUCTION_BRANCH" || return 1
+        git merge --no-ff "$HOTFIX_BRANCH" \
+            -m "MERGE: security update hotfix into production" || return 1
+        git push origin "$PRODUCTION_BRANCH" || return 1
+
+        # Bring the security fix back into develop (same op as the start of the run).
+        sake-git-merge-towards-production -r || return 1
+
+        # Optional cleanup once you're happy the release is out:
+        #   git branch -d "$HOTFIX_BRANCH"
+        echonice "Hotfix merged into production and back-merged into develop."
+    else
+        echonice "production and develop were identical -- standard release from '$DEVELOP_BRANCH'."
+        echonice 'Now run:  sake-git-merge-towards-production --ship   to release!'
+    fi
+}
+
 ############################################ STEPS
 # Each entry: "Label ::: command"
 # Add / remove / reorder steps here -- everything else adapts.
@@ -46,6 +135,10 @@ add_step \
     'Merge production into develop' \
     'sake-git-merge-towards-production -r' \
     ''
+add_step \
+    'Decide work branch (develop vs hotfix)' \
+    'sake_decide_work_branch' \
+    'If production == develop -> keep working on develop. If production is behind -> cut hotfix/security-update from production and work there.'
 add_step \
     'Check diff from server' \
     'sake-git-prod-diff' \
@@ -134,10 +227,11 @@ add_step \
     'sake-git-commit-and-push -m "FIX: update security checker - final"' \
     ''
 
+## FINALISE:
 add_step \
-    'Push to production' \
-    'echo "now run sake-git-merge-towards-production --ship" to release!' \
-    'Make sure you have carried out all your checks and are ready to deploy before running this step!'
+    'Finalise release' \
+    'sake_finalise_release' \
+    'Hotfix path: merges hotfix -> production (and PUSHES production), then reverse merges production -> develop. Develop path: prints the ship reminder so you can deploy manually. Make sure all checks passed before running this!'
 
 TOTAL_STEPS=${#STEPS[@]}
 
@@ -180,6 +274,11 @@ while (($#)); do
         to_step=$2
         shift
         ;;
+    -o | --only | --step)
+        from_step=$2
+        to_step=$2
+        shift
+        ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
@@ -216,15 +315,12 @@ help_and_exit() {
     echonice "-l, --list                    list all steps and exit"
     echonice "    --from N                  start from step N (1..$TOTAL_STEPS)"
     echonice "    --to N                    stop after step N"
+    echonice "-o, --only N                  run only step N (alias: --step N)"
     echonice "-h, --help                    display this help message and exit"
 
     ECHOHEAD "Per-step controls:"
-    echonice "Before each step you'll be prompted with:"
-    echonice "    [O]K           run the step"
-    echonice "    [S]kip         skip and move on"
-    echonice "    [Q]uit         exit the script"
-    echonice "After each step you'll be prompted with:"
-    echonice "    [O]K           continue to next step"
+    echonice "After each step runs (the prompt also shows the next step) you'll be asked:"
+    echonice "    [O]K           continue to the next step"
     echonice "    [R]un again    run this step again"
     echonice "    [C]ontinue     (only if the step failed) continue anyway"
     echonice "    [Q]uit         exit the script"
@@ -235,6 +331,7 @@ help_and_exit() {
     echonice "sake-ss-security-update --list"
     echonice "sake-ss-security-update --from 5"
     echonice "sake-ss-security-update --from 3 --to 7"
+    echonice "sake-ss-security-update --only 6"
     exit 1
 }
 
@@ -309,6 +406,27 @@ run_step_cmd() {
     return $rc
 }
 
+# If the working tree has any changes, commit them with a clearly-labelled message.
+# Steps that already commit (e.g. sake-git-commit-and-push) leave nothing behind,
+# so this is a no-op after them.
+# auto_commit_step <step_num> <total_steps> <label>
+auto_commit_step() {
+    local n="$1" total="$2" label="$3"
+
+    # Nothing staged, unstaged, or untracked? -> nothing to do.
+    if [[ -z "$(git status --porcelain)" ]]; then
+        return 0
+    fi
+
+    local msg="FIX: security update step $n / $total - $label"
+    ECHOHEAD "Committing changes for step $n/$total"
+    echonice "$msg"
+    git add -A || return 1
+    git commit -m "$msg" || return 1
+    # Uncomment to push each auto-commit immediately:
+    #   git push || return 1
+}
+
 ############################################ RUN STEPS
 ECHOHEAD "Running steps $from_step..$to_step of $TOTAL_STEPS"
 for ((i = from_step - 1; i < to_step; i++)); do
@@ -321,21 +439,6 @@ for ((i = from_step - 1; i < to_step; i++)); do
     echonice "Command: $cmd"
     echonice "Comment: $comment"
 
-    # Decide whether to run this step at all.
-    if [[ "$force" != "yes" ]]; then
-        action=$(prompt_choice "[O]K / [S]kip / [Q]uit (default O):" "o" "o|s|q")
-        case "$action" in
-        s)
-            echonice "-> Skipped step $step_num."
-            continue
-            ;;
-        q)
-            echonice "-> Quit at step $step_num."
-            exit 0
-            ;;
-        esac
-    fi
-
     # Run (and optionally re-run) the command.
     while true; do
         run_step_cmd "$cmd"
@@ -343,6 +446,7 @@ for ((i = from_step - 1; i < to_step; i++)); do
         echo
         if ((rc == 0)); then
             echonice "OK  Step $step_num completed."
+            auto_commit_step "$step_num" "$TOTAL_STEPS" "$label"
         else
             echonice "ERR Step $step_num failed (exit $rc)."
         fi
@@ -356,6 +460,14 @@ for ((i = from_step - 1; i < to_step; i++)); do
                 exit "$rc"
             fi
             break
+        fi
+
+        # Show the upcoming step (if any) before asking whether to continue.
+        if ((i + 1 < to_step)); then
+            echonice "Next: step $((i + 2))/$TOTAL_STEPS: $(step_label "$((i + 1))")"
+            echonice "      \$ $(step_cmd "$((i + 1))")"
+        else
+            echonice "Next: (this is the last step in the range)"
         fi
 
         if ((rc == 0)); then
