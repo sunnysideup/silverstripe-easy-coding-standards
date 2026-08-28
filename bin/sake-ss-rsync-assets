@@ -2,6 +2,9 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
+# Catch unexpected early exits (e.g. from set -e) and show a hint rather than silence.
+trap 'echo "sake-ss-rsync-assets: unexpected error on line $LINENO — run with bash -x for details." >&2' ERR
+
 ############################################ BASICS
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
@@ -112,7 +115,6 @@ help_and_exit() {
 sake_check_help_and_exit
 
 if [[ -z "${server:-}" ]]; then
-    echobad 'No server specified.'
     help_and_exit
 fi
 

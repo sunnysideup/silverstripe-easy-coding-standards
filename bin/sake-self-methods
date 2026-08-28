@@ -41,8 +41,8 @@ if [[ -n "${WORKING_DIR:-}" && -f "$WORKING_DIR/.env" ]]; then
     _localServerDir=$(grep -E "^[[:space:]]*(export[[:space:]]+)?DEFAULT_SERVER_DIR=" "$WORKING_DIR/.env" \
         | tail -n 1 \
         | sed -E "s/^[[:space:]]*(export[[:space:]]+)?DEFAULT_SERVER_DIR=//" \
-        | tr -d '"'"'")
-    [[ -n "$_localServerDir" ]] && DEFAULT_SERVER_DIR="$_localServerDir"
+        | tr -d '"'"'" || true)
+    if [[ -n "$_localServerDir" ]]; then DEFAULT_SERVER_DIR="$_localServerDir"; fi
     unset _localServerDir
 fi
 
