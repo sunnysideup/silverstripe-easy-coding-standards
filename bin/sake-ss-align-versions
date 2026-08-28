@@ -223,7 +223,7 @@ fi
 # user happens to be standing in any git repository. The equivalent cleanup
 # inside the per-repo loop (after `cd "$repo_dir"`) is safe and sufficient.
 while read -r repo; do
-    [[ -z "$repo" ]] && continue
+    if [[ -z "$repo" ]]; then continue; fi
 
     org_repo="$GITHUB_ORG/$repo"
     echoline

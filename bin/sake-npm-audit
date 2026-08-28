@@ -161,7 +161,7 @@ if [[ -n "${OUTDATED_JSON}" && "${OUTDATED_JSON}" != "null" ]]; then
         jq -r 'to_entries[] | "\(.key)\t\(.value.current)\t\(.value.wanted)\t\(.value.latest)\t\(.value.type // "-")"' |
         while IFS=$'\t' read -r name current wanted latest type; do
             installed="$(get_installed_ver "$name")"
-            [[ -n "${current}" && "${current}" != "null" ]] && installed="${current}"
+            if [[ -n "${current}" && "${current}" != "null" ]]; then installed="${current}"; fi
             echo "## ${name}"
             echo "  - installed: ${installed:-"-"}"
             echo "  - wanted (fits your semver): ${wanted}"

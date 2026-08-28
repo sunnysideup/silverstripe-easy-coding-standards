@@ -629,7 +629,7 @@ check_repo "$owner/$repo"
 main_ready=0
 for key in "${!BRANCH_RESULTS[@]}"; do
     full="${key%%|||*}"
-    [[ "$full" != "$owner/$repo" ]] && continue
+    if [[ "$full" != "$owner/$repo" ]]; then continue; fi
     value="${BRANCH_RESULTS[$key]}"
     matched="${value%%|||*}"
     if [[ "$matched" != "NOT_A_SILVERSTRIPE_DEPENDENCY" ]] && [[ "$matched" != "NONE" ]]; then

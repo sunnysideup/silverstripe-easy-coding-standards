@@ -118,13 +118,10 @@ confirm_or_skip() {
 
 ############################################ VALIDATION
 
-message=$(check_commit_message "$message")
-retVal=$?
-
-if [[ $retVal -ne 0 ]]; then
+message=$(check_commit_message "$message") || {
     echobad "Invalid commit message. Exiting script."
     exit 1
-fi
+}
 
 if ! [[ "$numberOfCommits" =~ ^[0-9]+$ ]]; then
     echobad "Error: number-of-commits must be a positive integer, got: $numberOfCommits"

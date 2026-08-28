@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ############################################ BASICS
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:-}"
 WORKING_DIR="$(pwd)"
-[[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/sake-self-methods" ]] && source "$SCRIPT_DIR/sake-self-methods"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/sake-self-methods" ]]; then source "$SCRIPT_DIR/sake-self-methods"; fi
 SCRIPT_SUMMARY="Runs comprehensive security checks including composer audit and vulnerability scans"
 
 ############################################ CHECK REGISTRY
@@ -77,7 +77,7 @@ help_and_exit() {
     for key in "${ALL_CHECKS[@]}"; do
         local marker=" "
         for k in "${KEY_CHECKS[@]}"; do
-            [[ "$k" == "$key" ]] && marker="*" && break
+            if [[ "$k" == "$key" ]]; then marker="*"; break; fi
         done
         echonice "  [$marker] $key — ${CHECK_DESC[$key]}"
     done
@@ -99,7 +99,7 @@ list_checks() {
     for key in "${ALL_CHECKS[@]}"; do
         local marker=" "
         for k in "${KEY_CHECKS[@]}"; do
-            [[ "$k" == "$key" ]] && marker="*" && break
+            if [[ "$k" == "$key" ]]; then marker="*"; break; fi
         done
         echo "  [$marker] $key — ${CHECK_DESC[$key]}"
     done
@@ -359,7 +359,7 @@ if should_run public-files; then
         # Build find args
         find_args=(public -type f '(')
         for i in "${!SENSITIVE_NAMES[@]}"; do
-            [[ $i -gt 0 ]] && find_args+=(-o)
+            if [[ $i -gt 0 ]]; then find_args+=(-o); fi
             find_args+=(-name "${SENSITIVE_NAMES[$i]}")
         done
         find_args+=(')')
@@ -459,7 +459,7 @@ if should_run env-permissions; then
 
     while IFS= read -r -d '' envfile; do
         # Skip .env.example — not sensitive
-        [[ "$(basename "$envfile")" == ".env.example" ]] && continue
+        if [[ "$(basename "$envfile")" == ".env.example" ]]; then continue; fi
 
         perms=$(stat -c '%a' "$envfile" 2>/dev/null || stat -f '%Lp' "$envfile" 2>/dev/null)
         group=$(stat -c '%G' "$envfile" 2>/dev/null || stat -f '%Sg' "$envfile" 2>/dev/null)
