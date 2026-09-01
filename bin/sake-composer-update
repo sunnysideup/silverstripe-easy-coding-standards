@@ -76,7 +76,6 @@ sake_check_help_and_exit
 
 ############################################ CODE
 # Ensure jq is installed
-# Ensure jq is installed
 if ! command -v jq &>/dev/null; then
     echobad "Error: jq is not installed. Please install jq to proceed."
     exit 1
