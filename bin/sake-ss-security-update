@@ -9,6 +9,14 @@ SCRIPT_SUMMARY="Runs complete security update workflow with tests and composer u
 ############################################ DIR
 dir='./'
 
+############################################ LINT SETTINGS
+# Used by the individual lint steps below — the tasks that `sake-lint-all`
+# would otherwise run internally. Defined here so they expand into the
+# STEPS array when it is built (add_step runs immediately, so these must
+# already be set).
+phpVersion='8.3'            # sake-lint-compat -p
+lintAlso='app/_config.php'  # extra -a target for ecs / rector / stan
+
 ############################################ BRANCHES
 # Branch names used by the decision + finalise logic below.
 DEVELOP_BRANCH='develop'
@@ -74,28 +82,26 @@ sake_finalise_release() {
     current=$(git rev-parse --abbrev-ref HEAD) || return 1
 
     if [[ "$current" == "$HOTFIX_BRANCH" || "$WORK_BRANCH" == "$HOTFIX_BRANCH" ]]; then
-        echonice "Finalising HOTFIX release:"
-        echonice "  1. merge '$HOTFIX_BRANCH' -> '$PRODUCTION_BRANCH' (and push)"
-        echonice "  2. reverse merge '$PRODUCTION_BRANCH' -> '$DEVELOP_BRANCH'"
-
+        echonice "Now merging $HOTFIX_BRANCH into develop."
         # Merge the hotfix into production.
         # If sake-git-merge-towards-production --ship ships the *current* branch,
         # you can replace the next three git lines with a checkout + --ship instead.
-        git checkout "$PRODUCTION_BRANCH" || return 1
-        git merge --no-ff "$HOTFIX_BRANCH" \
-            -m "MERGE: security update hotfix into production" || return 1
-        git push origin "$PRODUCTION_BRANCH" || return 1
+        git checkout develop || return 1
+        git pull || return 1
+        git merge --no-ff "$HOTFIX_BRANCH" -m "MERGE: security update hotfix into develop" || return 1
+        git push origin develop || return 1
 
-        # Bring the security fix back into develop (same op as the start of the run).
-        sake-git-merge-towards-production -r || return 1
+        echo "Hotfix merged into develop and pushed."
 
         # Optional cleanup once you're happy the release is out:
         #   git branch -d "$HOTFIX_BRANCH"
-        echonice "Hotfix merged into production and back-merged into develop."
     else
         echonice "production and develop were identical -- standard release from '$DEVELOP_BRANCH'."
-        echonice 'Now run:  sake-git-merge-towards-production --ship   to release!'
     fi
+    echonice "Merging towards staging..."
+    sake-git-merge-towards-production --to staging
+    echonice 'Now run:  merge staging into production on  bitbucket.'
+    echonice '          or run sake-git-merge-towards-production --ship   to release!'
 }
 
 ############################################ STEPS
@@ -114,9 +120,14 @@ add_step() {
 
 ## CLEAN PROJECT:
 add_step \
+    'Git fetch all' \
+    'git fetch origin' \
+    ''
+add_step \
     'Checkout develop branch' \
     'git checkout develop' \
     ''
+
 add_step \
     'Show git status' \
     'git status' \
@@ -129,24 +140,42 @@ add_step \
     'Check vendor packages' \
     'sake-git-commit-and-push-vendor-packages . -s "yes"' \
     ''
+add_step \
+    'Check if there are any lose ends in our git branches' \
+    'sake-git-merge-towards-production ./ --check-sync' \
+    ''
+## CHECK DIFF FROM SERVER
+
+add_step \
+    'Check diff from server' \
+    'sake-git-prod-diff' \
+    'Make sure you have SS_SERVER_FOR_EXAMPLE_DATA set in your .env and that it points to the correct server before running this step!'
 
 ## REVERSE MERGE:
 add_step \
     'Merge production into develop' \
     'sake-git-merge-towards-production -r' \
     ''
+
+## CHOSE BRANCH!
+
 add_step \
     'Decide work branch (develop vs hotfix)' \
     'sake_decide_work_branch' \
     'If production == develop -> keep working on develop. If production is behind -> cut hotfix/security-update from production and work there.'
+
+
+## GET DATA FROM SERVER
 add_step \
-    'Check diff from server' \
-    'sake-git-prod-diff' \
-    'Make sure you have SS_SERVER_FOR_EXAMPLE_DATA set in your .env and that it points to the correct server before running this step!'
-add_step \
-    'Rsync all - ' \
-    'sake-ss-rsync-all' \
+    'Get database from server: Rsync database - ' \
+    'sake-ss-rsync-db -b' \
     'make sure you have set up your preferred server in your .env SS_SERVER_FOR_EXAMPLE_DATA'
+add_step \
+    'Get assets from server: Rsync assets - ' \
+    'sake-ss-rsync-assets' \
+    'make sure you have set up your preferred server in your .env SS_SERVER_FOR_EXAMPLE_DATA'
+
+## DEV BUILD (PASS 1)
 add_step \
     'Dev build (pass 1)' \
     'sake-ss-dev-build' \
@@ -159,38 +188,47 @@ add_step \
 #     'Run tests (pass 2)' \
 #     'bin/tests.sh' \
 #     ''
-add_step \
-    'Commit and push!' \
-    'sake-git-commit-and-push -m "FIX: update security checker - pre composer"' \
-    ''
+
 ## COMPOSER UPDATE:
 add_step \
     'Composer update (pass 1)' \
     'sake-composer-update' \
     ''
 
-# LINT AND CHECK:
+## LINT: individual tasks (broken-out equivalent of `sake-lint-all`).
+## Mirrors the exact order sake-lint-all runs its tools in:
+##   remove-origs -> compat -> annotator/ecs/rector (pass 1) -> commit
+##   -> annotator/ecs/rector (pass 2) -> ecs (pass 3) -> stan.
 add_step \
-    'Commit and push!' \
-    'sake-git-commit-and-push -m "FIX: update security checker - post composer"' \
-    ''
-
-add_step \
-    'Lint app' \
-    'sake-lint-all [APP_FOLDERS]' \
-    ''
-add_step \
-    'Lint app' \
-    'sake-lint-rector [APP_FOLDERS] -c' \
-    ''
-add_step \
-    'Commit and push!' \
-    'sake-git-commit-and-push -m "FIX: update security checker - post lint"' \
-    ''
-
-add_step \
-    'Lint app' \
+    'Lint: remove .orig files' \
     'sake-lint-remove-origs [APP_FOLDERS]' \
+    ''
+
+add_step \
+    'Lint: PHP compatibility' \
+    "sake-lint-compat [APP_FOLDERS]" \
+    ''
+add_step \
+    'Lint: IDE annotator' \
+    'sake-lint-ide-annotator [APP_FOLDERS]' \
+    ''
+add_step \
+    'Lint: Easy Coding Standards' \
+    "sake-lint-ecs -a $lintAlso [APP_FOLDERS]" \
+    ''
+add_step \
+    'Lint: Rector GENERAL' \
+    "sake-lint-rector -a $lintAlso [APP_FOLDERS]" \
+    ''
+
+add_step \
+    'Lint: PHPStan (level 2)' \
+    "sake-lint-stan -a $lintAlso -l 2 [APP_FOLDERS]" \
+    ''
+
+add_step \
+    'Lint app Silverstripe VERSION!' \
+    'sake-lint-rector [APP_FOLDERS] -c' \
     ''
 add_step \
     'Check namespaces' \
@@ -220,12 +258,10 @@ add_step \
     'Check all end-points' \
     'sudo -u www-data vendor/bin/sake dev/tasks/smoketestcli' \
     'This does not work in SS5, and you will need to run this manually.'
-
-## COMMIT AND PUSH TOWARDS PRODUCTION:
 add_step \
-    'Commit and push!' \
-    'sake-git-commit-and-push -m "FIX: update security checker - final"' \
-    ''
+    'Merge int develop' \
+    'sudo -u www-data vendor/bin/sake dev/tasks/smoketestcli' \
+    'This does not work in SS5, and you will need to run this manually.'
 
 ## FINALISE:
 add_step \
@@ -423,6 +459,7 @@ auto_commit_step() {
     echonice "$msg"
     git add -A || return 1
     git commit -m "$msg" || return 1
+    git push -u origin HEAD || return 1
     # Uncomment to push each auto-commit immediately:
     #   git push || return 1
 }

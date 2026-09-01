@@ -17,7 +17,7 @@ commitAndPush='yes'
 newVersion='no'
 message='MNT: linter'
 javascriptAlso='no'
-phpVersion='8.0'
+phpVersion='8.3'
 help='no'
 while (($#)); do
     case $1 in

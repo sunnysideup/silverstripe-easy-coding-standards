@@ -22,6 +22,7 @@ toProd='no'    # shorthand: set --to production
 toStage='no'   # shorthand: set --to staging
 toTest='no'    # shorthand: set --to testing
 status='no'    # only show ahead/behind comparison, do NOT merge anything
+checkSync='no' # only check local vs origin for each env branch, exit 1 on any discrepancy
 assumeYes='no' # skip the "are you sure" prompt for production (for automation)
 
 while (($#)); do
@@ -67,6 +68,10 @@ while (($#)); do
         status='yes'
         shift
         ;;
+    -k | --check-sync | --verify-sync)
+        checkSync='yes'
+        shift
+        ;;
     -q | --yes)
         assumeYes='yes'
         shift
@@ -98,6 +103,7 @@ help_and_exit() {
     echonice "to staging:                    $toStage"
     echonice "to testing:                    $toTest"
     echonice "status only (no merge):        $status"
+    echonice "check sync only (no merge):    $checkSync"
     echonice "assume yes (skip prompt):      $assumeYes"
 
     ECHOHEAD "Available settings:"
@@ -112,6 +118,7 @@ help_and_exit() {
     echonice "-s, --stage                     shorthand: sets --to staging"
     echonice "-t, --test                      shorthand: sets --to testing"
     echonice "-c, --status, --compare         only SHOW the ahead/behind comparison, do not merge"
+    echonice "-k, --check-sync                only CHECK each env branch (local vs origin); exit 1 on discrepancy"
     echonice "-y, --yes                       skip the production confirmation prompt (use with care)"
 
     echonice 'Usage example:'
@@ -120,6 +127,7 @@ help_and_exit() {
     echonice '  sake-git-merge-towards-production ./ --from develop --to production'
     echonice '  sake-git-merge-towards-production ./ --from production --to develop --reverse'
     echonice '  sake-git-merge-towards-production ./ --status'
+    echonice '  sake-git-merge-towards-production ./ --check-sync'
     echofunctions
     exit
 }
@@ -314,6 +322,86 @@ production_in_steps() {
     return 1
 }
 
+# ---------- Check each env branch: local vs origin. Exit 1 on any discrepancy.
+# "Discrepancy" means the local branch and its origin counterpart are not
+# identical. Three outcomes per branch in FLOW_ACTUAL:
+#   - both local + remote exist  -> compare ahead/behind; non-zero => discrepancy
+#   - local exists, no remote    -> discrepancy (nothing on origin to match)
+#   - remote exists, no local    -> NOT a failure; skipped with a note (there is
+#                                   no local branch to diverge). Flip STRICT_SYNC=yes
+#                                   below to treat "not checked out locally" as a failure.
+# Returns nothing; calls exit 1 itself when discrepancies are found.
+check_local_vs_origin_or_exit() {
+    local STRICT_SYNC='no' # set to 'yes' to fail when an env branch is not checked out locally
+    local b counts ahead behind hasLocal hasRemote
+    local -a problems=()
+
+    ECHOHEAD 'Checking each env branch: local vs origin'
+    git fetch origin >/dev/null 2>&1 || true
+
+    for b in "${FLOW_ACTUAL[@]}"; do
+        hasLocal='no'
+        hasRemote='no'
+        git show-ref --verify --quiet "refs/heads/${b}" && hasLocal='yes'
+        branch_exists_remote "$b" && hasRemote='yes'
+
+        # remote only: no local branch to diverge -> pass (unless strict).
+        if [[ "$hasLocal" == 'no' && "$hasRemote" == 'yes' ]]; then
+            if [[ "$STRICT_SYNC" == 'yes' ]]; then
+                echobad "  $b: exists on origin but is NOT checked out locally"
+                problems+=("$b (not checked out locally)")
+            else
+                echowarn "  $b: on origin but not checked out locally — skipped"
+            fi
+            continue
+        fi
+
+        # local only: something exists here with no upstream -> discrepancy.
+        if [[ "$hasLocal" == 'yes' && "$hasRemote" == 'no' ]]; then
+            echobad "  $b: exists locally but NOT on origin"
+            problems+=("$b (missing on origin)")
+            continue
+        fi
+
+        # neither side has a real branch (e.g. only an origin-tracking ref) -> skip.
+        if [[ "$hasLocal" == 'no' && "$hasRemote" == 'no' ]]; then
+            continue
+        fi
+
+        # both exist: compare the tips.
+        counts=$(git rev-list --left-right --count "${b}...origin/${b}" 2>/dev/null)
+        if [[ $? -ne 0 || -z "$counts" ]]; then
+            echobad "  $b: could not compare with origin/$b"
+            problems+=("$b (comparison failed)")
+            continue
+        fi
+
+        ahead=$(echo "$counts" | awk '{print $1}')
+        behind=$(echo "$counts" | awk '{print $2}')
+
+        if ((ahead != 0 || behind != 0)); then
+            echobad "  $b: OUT OF SYNC — local ahead $ahead, behind $behind"
+            problems+=("$b (ahead $ahead / behind $behind)")
+        else
+            echonice "  $b: in sync with origin/$b"
+        fi
+    done
+
+    if ((${#problems[@]} > 0)); then
+        local p
+        echonice ''
+        echobad 'Local/origin discrepancies detected:'
+        for p in "${problems[@]}"; do
+            echobad "  - $p"
+        done
+        echobad 'Resolve these (push/pull as appropriate) before continuing.'
+        exit 1
+    fi
+
+    echonice ''
+    echonice 'All env branches are in sync with origin.'
+}
+
 # ---------- Show ahead/behind comparison for the env flow (no merging).
 show_branch_status() {
     local title=${1:-'Branch status'}
@@ -391,6 +479,12 @@ fi
 if ((${#FLOW_ACTUAL[@]} < 2)); then
     echobad 'Not enough env branches exist (need at least two of develop/test/(stage|staging)/production).'
     exit 1
+fi
+
+############################################ CHECK SYNC ONLY (local vs origin) — early exit
+if [[ "$checkSync" == 'yes' ]]; then
+    check_local_vs_origin_or_exit
+    exit 0
 fi
 
 ############################################ STATUS ONLY (no merges) — early exit
