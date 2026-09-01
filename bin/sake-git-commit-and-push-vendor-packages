@@ -278,10 +278,12 @@ else
 fi
 
 # Always scan vendor directories directly to ensure we don't miss any
-ECHOHEAD "Scanning for git repositories in $WORKING_DIR/vendor"
-find "$WORKING_DIR/vendor" -type d -name ".git" -exec dirname {} \; | while read repo; do
-    process_directory "$repo" "$message"
-done
+if [[ -d "$WORKING_DIR/vendor" ]]; then
+    ECHOHEAD "Scanning for git repositories in $WORKING_DIR/vendor"
+    find "$WORKING_DIR/vendor" -type d -name ".git" -exec dirname {} \; | while read repo; do
+        process_directory "$repo" "$message"
+    done
+fi
 
 # Check themes directory if it exists
 if [[ -d "$WORKING_DIR/themes" ]]; then

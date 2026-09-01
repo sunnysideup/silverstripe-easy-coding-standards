@@ -180,7 +180,7 @@ else
 fi
 
 while read -r repo; do
-    [[ -z "$repo" ]] && continue
+    if [[ -z "$repo" ]]; then continue; fi
 
     org_repo="$GITHUB_ORG/$repo"
     echoline

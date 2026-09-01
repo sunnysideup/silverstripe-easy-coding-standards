@@ -66,7 +66,7 @@ die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 
 # --- Parse arguments -------------------------------------------------------
 
-[[ $# -lt 2 || $# -gt 3 ]] && help_and_exit
+if [[ $# -lt 2 || $# -gt 3 ]]; then help_and_exit; fi
 
 REPO="$1"
 USERNAME="$2"
