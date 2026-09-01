@@ -12,7 +12,8 @@ SCRIPT_SUMMARY="Checks code compatibility with specified PHP versions using PHPC
 dir='app/src'
 
 ############################################ SETTINGS
-phpVersion="8.2"
+phpVersion=""          # empty = auto-detect the running PHP version
+fallbackVersion="8.2"  # used only if php is not on PATH
 help='no'
 severity="1,2"
 while (($#)); do
@@ -36,6 +37,15 @@ while (($#)); do
     shift
 done
 
+############################################ DETECT PHP VERSION
+if [[ -z "$phpVersion" ]]; then
+    if command -v php >/dev/null 2>&1; then
+        phpVersion=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
+    else
+        phpVersion="$fallbackVersion"
+        echonice "php not found on PATH — falling back to PHP $phpVersion"
+    fi
+fi
 
 ############################################ HELP
 
@@ -49,13 +59,11 @@ help_and_exit() {
 
     ECHOHEAD "Current settings:"
     echonice "PHP Version (-p):              $phpVersion"
-    echonice "PHP Version (-s):              $severity"
-    echonice "Also Check (-a):               $also"
+    echonice "Severity (-s):                 $severity"
 
     ECHOHEAD "Available settings:"
-    echonice "-p, --php-version              php version, default: 8.0"
+    echonice "-p, --php-version              php version, default: current PHP ($phpVersion)"
     echonice "-s, --severity                 what errors? 1 (errors) -> 5 (warnings), default: 1,2"
-    echonice "-a, --also                     also lint, e.g. app/_config.php OR mysite"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
