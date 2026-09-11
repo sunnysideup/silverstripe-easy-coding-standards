@@ -1,0 +1,302 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Compares a source branch (develop) against a destination branch (production), summarises the diff + commit messages, and adds a categorised entry to CHANGELOG.md"
+
+
+############################################ DEFAULTS
+# The compare branch defaults to the CURRENT git branch, resolved after we
+# enter the repo (see INPUT RESOLUTION). Leave it empty here as the sentinel.
+DEFAULT_DESTINATION_BRANCH='production'
+
+# The runner that already knows how to resolve provider/model/auth and call opencode.
+LLM_RUNNER="$SCRIPT_DIR/sake-llm-opencode"
+
+# Paths (kept under .agents/ so sake-llm-opencode's gitignore handling covers them).
+AGENTS_DIR='.agents/pre-prod'
+INPUT_DIR="$AGENTS_DIR/input"          # only diff + commits live here (fed to opencode via --files)
+COMMITS_FILE="$INPUT_DIR/commits.md"
+DIFF_FILE="$INPUT_DIR/diff.patch"
+PROMPT_FILE="$AGENTS_DIR/prompt.txt"   # kept OUTSIDE input/ so it isn't fed as an input file
+
+# Files excluded from the diff (noise the model shouldn't waste tokens on).
+DIFF_EXCLUDES=(
+    ':(exclude)composer.lock'
+    ':(exclude)package-lock.json'
+    ':(exclude)yarn.lock'
+    ':(exclude)*.min.js'
+    ':(exclude)*.min.css'
+)
+
+# Default instructions. Override with -i / --instructions FILE.
+DEFAULT_INSTRUCTIONS="\
+Read the two attached files: the git commit list and the full diff.
+
+Summarise ONLY the meaningful, human-facing changes going to the destination
+branch. Ignore mechanical noise (formatting-only churn, dependency lock files,
+build artefacts).
+
+Categorise every change under these Keep a Changelog headings, omitting any
+heading that would be empty:
+- Added
+- Changed
+- Deprecated
+- Removed
+- Fixed
+- Security
+
+Then edit CHANGELOG.md in the repository root:
+- Insert your new section at the TOP of the file, immediately under the main
+  '# Changelog' title (create the file with that title if it does not exist).
+- Do NOT modify, reorder, or reformat any existing entries.
+- Use the exact version heading supplied below so the range is recorded and
+  re-runs do not double up."
+
+
+############################################ SETTINGS
+dir='./'
+compareBranch=''   # empty = use the current git branch (resolved below)
+destinationBranch="$DEFAULT_DESTINATION_BRANCH"
+instructionsFile=''
+modelOverride=''
+providerOverride=''
+doFetch='yes'
+dryRun='no'
+help='no'
+
+
+############################################ ARG PARSING
+# Both 'space' (--foo VALUE) and '=' (--foo=VALUE) forms are accepted,
+# matching the house style of sake-llm-opencode.
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        ;;
+
+    -b | --branch)
+        compareBranch=$2
+        shift
+        ;;
+    --branch=*)
+        compareBranch="${1#*=}"
+        ;;
+
+    -d | --destination | -p | --production)
+        destinationBranch=$2
+        shift
+        ;;
+    --destination=* | --production=*)
+        destinationBranch="${1#*=}"
+        ;;
+
+    -i | --instructions)
+        instructionsFile=$2
+        shift
+        ;;
+    --instructions=*)
+        instructionsFile="${1#*=}"
+        ;;
+
+    -m | --model)
+        modelOverride=$2
+        shift
+        ;;
+    --model=*)
+        modelOverride="${1#*=}"
+        ;;
+
+    --provider)
+        providerOverride=$2
+        shift
+        ;;
+    --provider=*)
+        providerOverride="${1#*=}"
+        ;;
+
+    --no-fetch)
+        doFetch='no'
+        ;;
+
+    -r | --dry-run)
+        dryRun='yes'
+        ;;
+
+    *)
+        if [[ "$1" == -* ]]; then
+            if ! sake_handle_help_flag "$1"; then
+                echobad "Unknown option: $1"
+                exit 1
+            fi
+        else
+            dir=$1
+        fi
+        ;;
+    esac
+    shift
+done
+
+
+############################################ HELP
+help_and_exit() {
+    ECHOHEAD "Pre-production analysis"
+    echonice "Summarises everything going to the destination branch and adds it to CHANGELOG.md"
+    echonice ""
+    echonice "Directory of script:             $SCRIPT_DIR"
+    echonice "Working dir:                     $WORKING_DIR"
+
+    ECHOHEAD "Current settings:"
+    echonice "target dir (positional):         $dir"
+    echonice "compare branch (-b):             ${compareBranch:-'(current branch)'}"
+    echonice "destination branch (-d):         $destinationBranch"
+    echonice "instructions file (-i):          ${instructionsFile:-'(built-in default)'}"
+    echonice "model (-m):                      ${modelOverride:-'(runner default)'}"
+    echonice "provider (--provider):           ${providerOverride:-'(runner default)'}"
+    echonice "git fetch first:                 $doFetch"
+    echonice "dry run (-r):                    $dryRun"
+    echonice "llm runner:                      $LLM_RUNNER"
+
+    ECHOHEAD "Available settings (both 'space' and '=' forms accepted):"
+    echonice "-b, --branch BRANCH              compare/source branch (default: current branch)"
+    echonice "-d, --destination BRANCH         destination branch (default: $DEFAULT_DESTINATION_BRANCH)"
+    echonice "                                 (-p / --production accepted as aliases)"
+    echonice "-i, --instructions FILE          alternative instructions file"
+    echonice "-m, --model MODEL                model to pass to the runner"
+    echonice "    --provider PROVIDER          provider to pass to the runner"
+    echonice "    --no-fetch                   skip 'git fetch' before comparing"
+    echonice "-r, --dry-run                    show what would be sent, do not call the LLM"
+    echonice "-h, --help                       show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-commit-pre-prod-analysis ."
+    echonice "sake-git-commit-pre-prod-analysis . -b staging -d live"
+    echonice "sake-git-commit-pre-prod-analysis . -b origin/develop -d origin/production --dry-run"
+
+    echofunctions
+    exit
+}
+
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+sake_check_help_and_exit
+
+
+############################################ INPUT RESOLUTION
+cd "$WORKING_DIR"
+if [[ ! -d "$dir" ]]; then
+    echobad "Error: directory not found (relative to $WORKING_DIR): $dir"
+    exit 1
+fi
+cd "$dir"
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echobad "Error: not a git repository: $(pwd)"
+    exit 1
+fi
+
+if [[ -n "$instructionsFile" && ! -r "$instructionsFile" ]]; then
+    echobad "Error: cannot read instructions file: $instructionsFile"
+    exit 1
+fi
+
+if [[ ! -x "$LLM_RUNNER" && "$dryRun" != "yes" ]]; then
+    echobad "Error: LLM runner not found or not executable: $LLM_RUNNER"
+    exit 1
+fi
+
+
+############################################ GIT PREP
+if [[ "$doFetch" == "yes" ]]; then
+    echonice "Fetching latest refs..."
+    git fetch --quiet --all --prune || echonice "(fetch failed or offline; continuing with local refs)"
+fi
+
+verify_ref() {
+    git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1
+}
+
+if ! verify_ref "$compareBranch"; then
+    echobad "Error: compare branch not found: $compareBranch"
+    echonice "(if it only exists on the remote, try: -b origin/$compareBranch)"
+    exit 1
+fi
+if ! verify_ref "$destinationBranch"; then
+    echobad "Error: destination branch not found: $destinationBranch"
+    echonice "(if it only exists on the remote, try: -d origin/$destinationBranch)"
+    exit 1
+fi
+
+logRange="$destinationBranch..$compareBranch"     # commits in compare, not in destination
+diffRange="$destinationBranch...$compareBranch"    # changes compare added since the merge base
+
+baseHash="$(git merge-base "$destinationBranch" "$compareBranch")"
+fromHash="$(git rev-parse --short "$baseHash")"
+untilHash="$(git rev-parse --short "$compareBranch")"
+today="$(date +%Y-%m-%d)"
+
+
+############################################ BUILD INPUTS
+mkdir -p "$INPUT_DIR"
+
+git log --no-merges --date=short \
+    --pretty=format:'- %h %s (%an, %ad)' \
+    "$logRange" > "$COMMITS_FILE" || true
+
+if [[ ! -s "$COMMITS_FILE" ]]; then
+    echonice "No commits on '$compareBranch' that are missing from '$destinationBranch'. Nothing to do."
+    exit 0
+fi
+
+git diff "$diffRange" -- . "${DIFF_EXCLUDES[@]}" > "$DIFF_FILE" || true
+
+commitCount="$(grep -c '^- ' "$COMMITS_FILE" || true)"
+
+
+############################################ BUILD PROMPT
+if [[ -n "$instructionsFile" ]]; then
+    instructionsText="$(cat "$instructionsFile")"
+else
+    instructionsText="$DEFAULT_INSTRUCTIONS"
+fi
+
+cat > "$PROMPT_FILE" <<EOF
+$instructionsText
+
+Use this EXACT heading for the new CHANGELOG.md section:
+
+## [Unreleased] — from ${fromHash} to ${untilHash} (${today})
+
+Comparing: ${compareBranch}  ->  ${destinationBranch}
+The attached input files are:
+- ${COMMITS_FILE} : the list of commits going to the destination branch
+- ${DIFF_FILE} : the full diff (composer.lock and other lock/min files excluded)
+EOF
+
+
+############################################ REPORT + RUN
+ECHOHEAD "Pre-production analysis"
+echonice "compare -> destination:          $compareBranch -> $destinationBranch"
+echonice "commit range:                    $logRange"
+echonice "diff range:                      $diffRange"
+echonice "hash range:                      $fromHash .. $untilHash"
+echonice "commits found:                   $commitCount"
+echonice "diff size (lines):               $(wc -l < "$DIFF_FILE" | tr -d ' ')"
+
+# Delegate to the existing runner (handles provider/model/auth/install/opencode).
+runnerArgs=( "./" --files "$INPUT_DIR/*" --prompt "$PROMPT_FILE" )
+[[ -n "$modelOverride" ]]    && runnerArgs+=( --model "$modelOverride" )
+[[ -n "$providerOverride" ]] && runnerArgs+=( --provider "$providerOverride" )
+[[ "$dryRun" == "yes" ]]     && runnerArgs+=( --dry-run )
+
+ECHOHEAD "Handing off to: $LLM_RUNNER"
+echonice "${runnerArgs[*]}"
+
+"$LLM_RUNNER" "${runnerArgs[@]}"
+
+echoend
