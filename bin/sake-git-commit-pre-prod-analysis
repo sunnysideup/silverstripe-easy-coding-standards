@@ -33,6 +33,10 @@ DIFF_EXCLUDES=(
     ':(exclude)*.min.css'
 )
 
+# Guardrail: refuse diffs larger than this many lines (they blow the model's
+# context window). Override at runtime with --max-diff-lines N.
+DEFAULT_MAX_DIFF_LINES=50000
+
 # Default instructions. Override with -i / --instructions FILE.
 DEFAULT_INSTRUCTIONS="\
 Read the two attached files: the git commit list and the full diff.
@@ -65,6 +69,7 @@ destinationBranch="$DEFAULT_DESTINATION_BRANCH"
 instructionsFile=''
 modelOverride=''
 providerOverride=''
+maxDiffLines="$DEFAULT_MAX_DIFF_LINES"
 doFetch='yes'
 dryRun='no'
 help='no'
@@ -119,6 +124,14 @@ while (($#)); do
         providerOverride="${1#*=}"
         ;;
 
+    --max-diff-lines)
+        maxDiffLines=$2
+        shift
+        ;;
+    --max-diff-lines=*)
+        maxDiffLines="${1#*=}"
+        ;;
+
     --no-fetch)
         doFetch='no'
         ;;
@@ -157,6 +170,7 @@ help_and_exit() {
     echonice "instructions file (-i):          ${instructionsFile:-'(built-in default)'}"
     echonice "model (-m):                      ${modelOverride:-'(runner default)'}"
     echonice "provider (--provider):           ${providerOverride:-'(runner default)'}"
+    echonice "max diff lines:                  $maxDiffLines"
     echonice "git fetch first:                 $doFetch"
     echonice "dry run (-r):                    $dryRun"
     echonice "llm runner:                      $LLM_RUNNER"
@@ -168,6 +182,7 @@ help_and_exit() {
     echonice "-i, --instructions FILE          alternative instructions file"
     echonice "-m, --model MODEL                model to pass to the runner"
     echonice "    --provider PROVIDER          provider to pass to the runner"
+    echonice "    --max-diff-lines N           refuse diffs bigger than N lines (default: $DEFAULT_MAX_DIFF_LINES)"
     echonice "    --no-fetch                   skip 'git fetch' before comparing"
     echonice "-r, --dry-run                    show what would be sent, do not call the LLM"
     echonice "-h, --help                       show help information"
@@ -188,6 +203,16 @@ sake_check_help_and_exit
 
 
 ############################################ INPUT RESOLUTION
+if ! command -v git >/dev/null 2>&1; then
+    echobad "Error: 'git' is not installed or not on PATH."
+    exit 1
+fi
+
+if ! [[ "$maxDiffLines" =~ ^[0-9]+$ ]]; then
+    echobad "Error: --max-diff-lines must be a positive integer (got: $maxDiffLines)"
+    exit 1
+fi
+
 cd "$WORKING_DIR"
 if [[ ! -d "$dir" ]]; then
     echobad "Error: directory not found (relative to $WORKING_DIR): $dir"
@@ -198,6 +223,17 @@ cd "$dir"
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echobad "Error: not a git repository: $(pwd)"
     exit 1
+fi
+
+# Default the compare branch to the branch currently checked out.
+if [[ -z "$compareBranch" ]]; then
+    compareBranch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    if [[ -z "$compareBranch" || "$compareBranch" == "HEAD" ]]; then
+        echobad "Error: could not determine the current branch (detached HEAD?)."
+        echonice "Pass one explicitly with -b BRANCH."
+        exit 1
+    fi
+    echonice "Using current branch as compare branch: $compareBranch"
 fi
 
 if [[ -n "$instructionsFile" && ! -r "$instructionsFile" ]]; then
@@ -242,20 +278,43 @@ today="$(date +%Y-%m-%d)"
 
 
 ############################################ BUILD INPUTS
+# Start from a clean slate so a previous run's files can never leak into this one
+# (the whole input dir is fed to the model via --files).
+rm -rf "${INPUT_DIR:?INPUT_DIR is empty}"
 mkdir -p "$INPUT_DIR"
 
-git log --no-merges --date=short \
+# Let git fail loudly: both refs are already verified, so a failure here is a
+# real problem (corruption, OOM, etc.) and must not silently ship empty files.
+if ! git log --no-merges --date=short \
     --pretty=format:'- %h %s (%an, %ad)' \
-    "$logRange" > "$COMMITS_FILE" || true
+    "$logRange" > "$COMMITS_FILE"; then
+    echobad "Error: 'git log $logRange' failed."
+    exit 1
+fi
 
 if [[ ! -s "$COMMITS_FILE" ]]; then
     echonice "No commits on '$compareBranch' that are missing from '$destinationBranch'. Nothing to do."
     exit 0
 fi
 
-git diff "$diffRange" -- . "${DIFF_EXCLUDES[@]}" > "$DIFF_FILE" || true
+if ! git diff "$diffRange" -- . "${DIFF_EXCLUDES[@]}" > "$DIFF_FILE"; then
+    echobad "Error: 'git diff $diffRange' failed."
+    exit 1
+fi
 
 commitCount="$(grep -c '^- ' "$COMMITS_FILE" || true)"
+diffLines="$(wc -l < "$DIFF_FILE" | tr -d ' ')"
+
+# Guardrail: an oversized diff will blow the model's context window. Stop rather
+# than truncate — a diff cut mid-hunk yields a plausible but wrong changelog.
+if (( diffLines > maxDiffLines )); then
+    echobad "Error: diff is $diffLines lines (limit: $maxDiffLines)."
+    echonice "This will likely exceed the model's context window. Options:"
+    echonice "  - narrow the range with -b / -d"
+    echonice "  - add more paths to DIFF_EXCLUDES near the top of this script"
+    echonice "  - raise the cap with --max-diff-lines N (at your own risk)"
+    exit 1
+fi
 
 
 ############################################ BUILD PROMPT
@@ -286,7 +345,7 @@ echonice "commit range:                    $logRange"
 echonice "diff range:                      $diffRange"
 echonice "hash range:                      $fromHash .. $untilHash"
 echonice "commits found:                   $commitCount"
-echonice "diff size (lines):               $(wc -l < "$DIFF_FILE" | tr -d ' ')"
+echonice "diff size (lines):               $diffLines / $maxDiffLines"
 
 # Delegate to the existing runner (handles provider/model/auth/install/opencode).
 runnerArgs=( "./" --files "$INPUT_DIR/*" --prompt "$PROMPT_FILE" )

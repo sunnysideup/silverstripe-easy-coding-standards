@@ -251,6 +251,10 @@ add_step \
     'sake-lint-security --all' \
     ''
 add_step \
+    'Review changes' \
+    'sake-git-commit-pre-prod-analysis' \
+    'Review the changes and add to changelog'
+add_step \
     'Write all Data Objects!' \
     'sudo -u www-data vendor/bin/sake dev/tasks/write-all-data-objects' \
     ''

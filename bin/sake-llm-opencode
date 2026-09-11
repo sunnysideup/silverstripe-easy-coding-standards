@@ -211,7 +211,14 @@ add_to_git_ignore() {
     local ignoreLine='.agents/'
 
     touch .gitignore
-    grep -Fqx "$ignoreLine" .gitignore || printf '%s\n' "$ignoreLine" >> .gitignore
+    if ! grep -Fqx "$ignoreLine" .gitignore; then
+        # Ensure the file ends with a newline before appending, otherwise the
+        # new entry gets glued onto the last existing line (e.g. node_modules.agents/).
+        if [[ -s .gitignore && -n "$(tail -c1 .gitignore)" ]]; then
+            printf '\n' >> .gitignore
+        fi
+        printf '%s\n' "$ignoreLine" >> .gitignore
+    fi
 
     git rm -r --cached "${ignoreLine%/}/" >/dev/null 2>&1 || true
     git add .gitignore >/dev/null 2>&1 || true
@@ -282,10 +289,19 @@ fi
 echonice "Using prompt file: $prompt"
 add_to_git_ignore
 
-# Expand the glob safely (supports ** via globstar)
+# Expand the glob safely (supports ** via globstar).
+# Neutralise IFS around the expansion so a pattern that itself contains spaces
+# (e.g. 'app/my code/*.php') is treated as ONE pattern instead of being
+# word-split into 'app/my' and 'code/*.php' before globbing. Pathname expansion
+# is independent of IFS, so glob *results* containing spaces stay intact either
+# way and multi-match results still land in separate array elements.
+_oldIFS="$IFS"
+IFS=''
 shopt -s nullglob globstar
+# shellcheck disable=SC2206  # intentional pathname expansion of the pattern
 matches=( $filesPattern )
 shopt -u nullglob globstar
+IFS="$_oldIFS"
 
 if (( ${#matches[@]} == 0 )); then
     echobad "Error: no files matched: $filesPattern"
