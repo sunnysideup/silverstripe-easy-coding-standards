@@ -26,6 +26,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-find-large-folders
 
 # git
+ - sake-git-add-collaborator
  - sake-git-quick
  - sake-git-commit-and-push
  - sake-git-commit-and-push-vendor-packages - goes through all vendor packages for uncommitted work
