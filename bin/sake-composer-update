@@ -82,48 +82,10 @@ if ! command -v jq &>/dev/null; then
 fi
 
 # Switch PHP to whatever composer.json requires, before any composer work
-switch_php_version
+sake-php-switch-versions
 
 ############################################ SWITCH PHP VERSION (from composer.json)
-switch_php_version() {
-    local composerJson="composer.json"
 
-    if [[ ! -f "$composerJson" ]]; then
-        echobad "No composer.json in $(pwd) — skipping PHP version switch."
-        return
-    fi
-
-    local phpConstraint
-    phpConstraint=$(jq -r '.require.php // empty' "$composerJson")
-
-    if [[ -z "$phpConstraint" ]]; then
-        echonice "No 'require.php' in composer.json — skipping PHP switch."
-        return
-    fi
-
-    # Grab the first major.minor mentioned in the constraint:
-    # ">8.4" -> 8.4 | ">=8.3" -> 8.3 | "^8.4" -> 8.4 | "8.3.*" -> 8.3 | ">=8.1 <8.5" -> 8.1
-    local targetVersion
-    targetVersion=$(echo "$phpConstraint" | grep -oE '[0-9]+\.[0-9]+' | head -n1)
-
-    if [[ -z "$targetVersion" ]]; then
-        echobad "Could not parse a PHP version from '$phpConstraint' — skipping switch."
-        return
-    fi
-
-    echonice "composer.json requires PHP '$phpConstraint' -> switching to PHP $targetVersion"
-
-    if ! command -v php-switch &>/dev/null; then
-        echobad "php-switch not found on PATH — cannot switch to PHP $targetVersion."
-        return
-    fi
-
-    php-switch "$targetVersion"
-
-    local activeVersion
-    activeVersion=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;' 2>/dev/null)
-    echonice "Active PHP version is now: ${activeVersion:-unknown}"
-}
 
 
 

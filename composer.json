@@ -95,6 +95,7 @@
     "bin/sake-npm-publish-on-npmjs-org",
     "bin/sake-npm-update-self",
     "bin/sake-npm-watch",
+    "bin/sake-php-fix-version",
     "bin/sake-php-line-counter",
     "bin/sake-php-set-timezone",
     "bin/sake-self-methods",

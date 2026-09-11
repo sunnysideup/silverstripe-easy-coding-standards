@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Reads the require.php constraint from composer.json and switches the active PHP version to match (via php-switch)"
+
+
+############################################ DEFAULTS
+DEFAULT_COMPOSER_FILE='composer.json'
+DEFAULT_SWITCH_CMD='php-switch'
+
+
+############################################ SETTINGS
+dir='./'
+forcedVersion=''                       # -p / --php : skip composer detection, switch to this
+composerFile="$DEFAULT_COMPOSER_FILE"  # -c / --composer
+switchCmd="$DEFAULT_SWITCH_CMD"        # -s / --switch-cmd
+dryRun='no'
+help='no'
+
+
+############################################ ARG PARSING
+# Both 'space' (--foo VALUE) and '=' (--foo=VALUE) forms are accepted,
+# matching the house style of the other sake scripts.
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        ;;
+
+    -p | --php)
+        forcedVersion=$2
+        shift
+        ;;
+    --php=*)
+        forcedVersion="${1#*=}"
+        ;;
+
+    -c | --composer)
+        composerFile=$2
+        shift
+        ;;
+    --composer=*)
+        composerFile="${1#*=}"
+        ;;
+
+    -s | --switch-cmd)
+        switchCmd=$2
+        shift
+        ;;
+    --switch-cmd=*)
+        switchCmd="${1#*=}"
+        ;;
+
+    -d | --dry-run)
+        dryRun='yes'
+        ;;
+
+    *)
+        # Defensive: anything starting with '-' must be a known flag.
+        # Otherwise it's the positional dir argument.
+        if [[ "$1" == -* ]]; then
+            if ! sake_handle_help_flag "$1"; then
+                echobad "Unknown option: $1"
+                exit 1
+            fi
+        else
+            dir=$1
+        fi
+        ;;
+    esac
+    shift
+done
+
+
+############################################ HELP
+help_and_exit() {
+    ECHOHEAD "PHP version switch (from composer.json)"
+    echonice "Reads 'require.php' from composer.json and switches the active PHP version to match."
+    echonice ""
+    echonice "Directory of script:             $SCRIPT_DIR"
+    echonice "Working dir:                     $WORKING_DIR"
+
+    ECHOHEAD "Current settings:"
+    echonice "target dir (positional):         $dir"
+    echonice "forced version (-p):             ${forcedVersion:-'(detect from composer)'}"
+    echonice "composer file (-c):              $composerFile"
+    echonice "switch command (-s):             $switchCmd"
+    echonice "dry run (-d):                    $dryRun"
+
+    ECHOHEAD "Available settings (both 'space' and '=' forms accepted):"
+    echonice "-p, --php VERSION                switch to this version, ignoring composer.json"
+    echonice "-c, --composer FILE              composer.json path (default: $DEFAULT_COMPOSER_FILE)"
+    echonice "-s, --switch-cmd CMD             switcher binary to call (default: $DEFAULT_SWITCH_CMD)"
+    echonice "-d, --dry-run                    show the target version + command, do not switch"
+    echonice "-h, --help                       show help information"
+
+    ECHOHEAD "Version parsing (first major.minor in the constraint wins):"
+    echonice '">8.4"        -> 8.4'
+    echonice '">=8.3"       -> 8.3'
+    echonice '"^8.4"        -> 8.4'
+    echonice '"8.3.*"       -> 8.3'
+    echonice '">=8.1 <8.5"  -> 8.1'
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-php-fix-version ."
+    echonice "sake-php-fix-version . --dry-run"
+    echonice "sake-php-fix-version . -p 8.3"
+    echonice "sake-php-fix-version vendor/sunnysideup/mymodule"
+
+    echofunctions
+    exit
+}
+
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+sake_check_help_and_exit
+
+
+############################################ FUNCTIONS
+
+switch_php_version() {
+    local targetVersion=''
+
+    if [[ -n "$forcedVersion" ]]; then
+        targetVersion="$forcedVersion"
+        echonice "Using forced PHP version: $targetVersion ($composerFile ignored)"
+    else
+        local composerJson="$composerFile"
+
+        if [[ ! -f "$composerJson" ]]; then
+            echobad "No $composerJson in $(pwd) — skipping PHP version switch."
+            return 0
+        fi
+
+        if ! command -v jq &>/dev/null; then
+            echobad "jq not found on PATH — cannot read $composerJson."
+            return 1
+        fi
+
+        local phpConstraint
+        if ! phpConstraint=$(jq -r '.require.php // empty' "$composerJson" 2>/dev/null); then
+            echobad "Could not parse $composerJson (invalid JSON?)."
+            return 1
+        fi
+
+        if [[ -z "$phpConstraint" ]]; then
+            echonice "No 'require.php' in $composerJson — skipping PHP switch."
+            return 0
+        fi
+
+        # Grab the first major.minor mentioned in the constraint:
+        # ">8.4" -> 8.4 | ">=8.3" -> 8.3 | "^8.4" -> 8.4 | "8.3.*" -> 8.3 | ">=8.1 <8.5" -> 8.1
+        # NB: '|| true' keeps this safe under 'set -o pipefail' — head closing the
+        # pipe would otherwise SIGPIPE grep and abort the script even on a match.
+        targetVersion=$(echo "$phpConstraint" | grep -oE '[0-9]+\.[0-9]+' | head -n1 || true)
+
+        if [[ -z "$targetVersion" ]]; then
+            echobad "Could not parse a PHP version from '$phpConstraint' — skipping switch."
+            return 1
+        fi
+
+        echonice "$composerJson requires PHP '$phpConstraint' -> switching to PHP $targetVersion"
+    fi
+
+    if ! command -v "$switchCmd" &>/dev/null; then
+        echobad "$switchCmd not found on PATH — cannot switch to PHP $targetVersion."
+        return 0
+    fi
+
+    if [[ "$dryRun" == "yes" ]]; then
+        ECHOHEAD "Dry run — no changes made"
+        echonice "Would run: $switchCmd $targetVersion"
+        return 0
+    fi
+
+    "$switchCmd" "$targetVersion"
+
+    local activeVersion
+    activeVersion=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;' 2>/dev/null || true)
+    echonice "Active PHP version is now: ${activeVersion:-unknown}"
+}
+
+
+############################################ CODE
+
+cd "$WORKING_DIR"
+if [[ ! -d "$dir" ]]; then
+    echobad "Error: directory not found (relative to $WORKING_DIR): $dir"
+    exit 1
+fi
+cd "$dir"
+
+switch_php_version
+
+echoend

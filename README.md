@@ -30,6 +30,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-quick
  - sake-git-commit-and-push
  - sake-git-commit-and-push-vendor-packages - goes through all vendor packages for uncommitted work
+ - sake-git-commit-pre-prod-analysis
  - sake-git-diff-analyser
  - sake-git-fork-comparison - finds all the works and sees which one is ahead
  - sake-git-info
@@ -47,6 +48,7 @@ Install as global composer package and then try to access the commands, starting
 
 
 # php
+ - sake-php-fix-version
  - sake-php-set-timezone
  - sake-php-line-counter
 
