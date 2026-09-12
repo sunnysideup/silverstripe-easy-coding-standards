@@ -30,7 +30,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-git-quick
  - sake-git-commit-and-push
  - sake-git-commit-and-push-vendor-packages - goes through all vendor packages for uncommitted work
- - sake-git-commit-pre-prod-analysis
+ - sake-git-merge-towards-production-changes
  - sake-git-diff-analyser
  - sake-git-fork-comparison - finds all the works and sees which one is ahead
  - sake-git-info

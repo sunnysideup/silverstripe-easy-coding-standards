@@ -188,9 +188,9 @@ help_and_exit() {
     echonice "-h, --help                       show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-commit-pre-prod-analysis ."
-    echonice "sake-git-commit-pre-prod-analysis . -b staging -d live"
-    echonice "sake-git-commit-pre-prod-analysis . -b origin/develop -d origin/production --dry-run"
+    echonice "sake-git-merge-towards-production-changes ."
+    echonice "sake-git-merge-towards-production-changes . -b staging -d live"
+    echonice "sake-git-merge-towards-production-changes . -b origin/develop -d origin/production --dry-run"
 
     echofunctions
     exit

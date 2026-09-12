@@ -252,7 +252,7 @@ add_step \
     ''
 add_step \
     'Review changes' \
-    'sake-git-commit-pre-prod-analysis' \
+    'sake-git-merge-towards-production-changes' \
     'Review the changes and add to changelog'
 add_step \
     'Write all Data Objects!' \

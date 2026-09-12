@@ -89,6 +89,44 @@ read_remote_dotenv_value() {
     ssh "$sshHost" "grep '^$key=' '$ef' | head -n1 | cut -d '=' -f 2- | tr -d '\"'"
 }
 
+# Loud, explicit confirmation before OVERWRITING a database on a server.
+# Called for EVERY destructive remote write (reverse, --to push, --from-local)
+# so there is ONE consistent gate in front of anything that replaces a server's
+# database. Requires the operator to type the target host name; -y/--yes skips
+# it (for scripts/CI only).
+#   $1 label     human-readable role of the target (e.g. "--to server")
+#   $2 sshHost   host name the operator must type to confirm
+#   $3 dbName    target database name
+#   $4 dbHost    target database host
+#   $5 dbUser    target database user
+#   $6 dropMode  "yes" = DROP DATABASE + recreate, else drop all tables/views
+confirm_destructive_write() {
+    local label="$1" sshHost="$2" dbName="$3" dbHost="$4" dbUser="$5" dropMode="$6"
+
+    ECHOHEAD "DANGER: about to OVERWRITE a database on a REMOTE server"
+    echowarn "Target:     $label"
+    echowarn "Server:     $sshHost"
+    echowarn "Database:   $dbName @ $dbHost (user: $dbUser)"
+    if [[ "$dropMode" == "yes" ]]; then
+        echowarn "Action:     DROP DATABASE and recreate, then import your LOCAL database."
+    else
+        echowarn "Action:     DROP ALL tables/views, then import your LOCAL database."
+    fi
+    echowarn "This REPLACES the target database with your local data and CANNOT be undone."
+
+    if [[ "$assumeYes" == "yes" ]]; then
+        echowarn "-y/--yes supplied: skipping interactive confirmation."
+        return 0
+    fi
+
+    local confirm
+    read -r -p "Type the server host name ($sshHost) to confirm: " confirm
+    if [[ "$confirm" != "$sshHost" ]]; then
+        echobad "Aborted (input did not match server host: expected '$sshHost')."
+        exit 1
+    fi
+}
+
 # Prepare the standard remote dump file FROM A BACKUP instead of a live
 # mysqldump. Used only on a PULL (source → local); reverse sync never touches
 # this because there we dump the LOCAL database.
@@ -159,10 +197,15 @@ dropDb='no'
 useBackup='no'
 backupLocation=''
 backupLocationFromArg=''
+pushLocal='no'      # --from-local : push LOCAL db straight to --to, no pull
+assumeYes='no'      # -y / --yes   : skip the typed-hostname confirmation
 
 serverFromArg=''
 while (($#)); do
     case $1 in
+    -h | --help)
+        help='yes'
+        ;;
     -r | --reverse)
         reverse='yes'
         ;;
@@ -182,6 +225,14 @@ while (($#)); do
         useBackup='yes'
         shift
         ;;
+    --from-local | --push-local)
+        # Push the LOCAL database directly to the --to server. No pull happens,
+        # and the source server / backup location are never consulted.
+        pushLocal='yes'
+        ;;
+    -y | --yes | --force)
+        assumeYes='yes'
+        ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
@@ -194,6 +245,7 @@ while (($#)); do
     shift
 done
 
+############################################ MODE GUARDS
 # Backups live on the SOURCE server and are only meaningful when pulling FROM it.
 # Reverse sync dumps the LOCAL db, so the two options are mutually exclusive.
 if [[ "$useBackup" == "yes" && "$reverse" == "yes" ]]; then
@@ -201,36 +253,65 @@ if [[ "$useBackup" == "yes" && "$reverse" == "yes" ]]; then
     exit 1
 fi
 
-############################################ RESOLVE SERVER (arg ALWAYS overrules .env)
-serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
-if [[ -n "$serverFromArg" ]]; then
-    server="$serverFromArg"
-    serverSource="argument"
-    if [[ -n "$serverFromEnv" && "$(normalize_server "$serverFromArg")" != "$(normalize_server "$serverFromEnv")" ]]; then
-        echowarn "Note: argument server ($serverFromArg) differs from .env $envServerKey ($serverFromEnv)."
-        echowarn "Using the argument server."
-    fi
-elif [[ -n "$serverFromEnv" ]]; then
-    server="$serverFromEnv"
-    serverSource=".env ($envServerKey)"
-else
-    echobad 'No server specified (no argument, no .env value).'
-    echowarn "Set a default in .env: $envServerKey=my-server:/var/www/website-root"
+# --from-local pushes your LOCAL database to the --to server. It has no source,
+# so it cannot pull (--reverse) or use a source-side backup, and it needs a --to.
+if [[ "$pushLocal" == "yes" && "$reverse" == "yes" ]]; then
+    echobad "--from-local cannot be combined with --reverse."
     exit 1
 fi
-server="$(normalize_server "$server")"
+if [[ "$pushLocal" == "yes" && "$useBackup" == "yes" ]]; then
+    echobad "--from-local cannot be combined with --backup (--from-local uses your LOCAL database; backups live on the source server)."
+    exit 1
+fi
+if [[ "$pushLocal" == "yes" && -z "$toServer" ]]; then
+    echobad "--from-local requires a destination: --to SERVER[:/path]"
+    echowarn "e.g. sake-ss-rsync-db --from-local --to my-server"
+    exit 1
+fi
 
-if [[ -z "$server" || "$help" == "yes" ]]; then
+############################################ RESOLVE SERVER (arg ALWAYS overrules .env)
+if [[ "$pushLocal" == "yes" ]]; then
+    # No source server at all — the dump comes from the LOCAL database and the
+    # destination is --to. $envServerKey and the backup location are ignored.
+    server=''
+    serverSource='(none — --from-local uses your LOCAL database)'
+    if [[ -n "$serverFromArg" ]]; then
+        echowarn "Ignoring positional server '$serverFromArg': --from-local has no source (destination is --to)."
+    fi
+else
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    if [[ -n "$serverFromArg" ]]; then
+        server="$serverFromArg"
+        serverSource="argument"
+        if [[ -n "$serverFromEnv" && "$(normalize_server "$serverFromArg")" != "$(normalize_server "$serverFromEnv")" ]]; then
+            echowarn "Note: argument server ($serverFromArg) differs from .env $envServerKey ($serverFromEnv)."
+            echowarn "Using the argument server."
+        fi
+    elif [[ -n "$serverFromEnv" ]]; then
+        server="$serverFromEnv"
+        serverSource=".env ($envServerKey)"
+    else
+        echobad 'No server specified (no argument, no .env value).'
+        echowarn "Set a default in .env: $envServerKey=my-server:/var/www/website-root"
+        exit 1
+    fi
+    server="$(normalize_server "$server")"
+fi
+
+if [[ "$help" == "yes" || ( -z "$server" && "$pushLocal" != "yes" ) ]]; then
     ECHOHEAD "Sync Database"
     echonice "Syncs MySQL database between local and remote server via dump files"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Server to sync with:           $server"
+    echonice "Server source:                 ${serverSource:-<unset>}"
     echonice "Do reverse sync:               $reverse"
+    echonice "Push LOCAL -> --to only:       $pushLocal"
     echonice "To server (if any):            $toServer"
     echonice "Drop & recreate whole DB:      $dropDb"
     echonice "Use backup (not live dump):    $useBackup"
     echonice "Backup location (arg):         ${backupLocationFromArg:-<none; will use .env if -b set>}"
+    echonice "Skip confirmation (-y):        $assumeYes"
     echonice "Apache user (-w):              $wwwDataUser"
     echonice ""
     echonice "Local .env File:               $localEnvFile"
@@ -240,12 +321,20 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
 
     echonice ""
     ECHOHEAD "Available settings:"
-    echonice "-r, --reverse                  sync FROM local TO server"
-    echonice "-t, --to SERVER[:/path]        after pulling, also push dump to this server and import"
+    echonice "-r, --reverse                  sync FROM local TO the (source) server"
+    echonice "-t, --to SERVER[:/path]        also push the dump to this server and import"
+    echonice "    --from-local               push your LOCAL db straight to --to; NO pull,"
+    echonice "                               ignores $envServerKey and the backup location"
     echonice "-d, --drop                     DROP & recreate the whole DB before import (needs DROP/CREATE DATABASE privilege)"
     echonice "-b, --backup                   pull the DB from the latest server BACKUP instead of a live mysqldump"
     echonice "    --backup-location PATH      explicit path/glob to the backup .sql(.gz) on the source server (implies -b)"
+    echonice "-y, --yes                      skip the typed-hostname confirmation (DANGEROUS; scripts/CI only)"
     echonice "-h, --help                     show help information"
+    echonice ""
+    ECHOHEAD "Safety:"
+    echonice "Every write to a server (--reverse, --to, --from-local) requires you to type the"
+    echonice "      target host name to confirm before anything is dropped or imported."
+    echonice "      Use -y/--yes to skip that prompt (for non-interactive scripts only)."
     echonice ""
     echonice "Note: on every import, ALL tables/views are dropped from the target DB first,"
     echonice "      so any extra / superfluous tables are removed. This applies to the LOCAL,"
@@ -261,9 +350,11 @@ if [[ -z "$server" || "$help" == "yes" ]]; then
     ECHOHEAD "Examples:"
     echonice "sake-ss-rsync-db my-server:/var/www/website-root"
     echonice "sake-ss-rsync-db my-server            # default path is \$DEFAULT_SERVER_DIR ($DEFAULT_SERVER_DIR)"
-    echonice "sake-ss-rsync-db --reverse my-server"
+    echonice "sake-ss-rsync-db --reverse my-server                  # local → my-server (with confirm)"
     echonice "sake-ss-rsync-db --reverse --drop my-server"
-    echonice "sake-ss-rsync-db my-server --to other-server:/var/www/site"
+    echonice "sake-ss-rsync-db my-server --to other-server:/var/www/site   # pull my-server, then push to other-server"
+    echonice "sake-ss-rsync-db --from-local --to my-server          # local → my-server, NO pull"
+    echonice "sake-ss-rsync-db --from-local --drop --to my-server   # local → my-server, drop & recreate"
     echonice "sake-ss-rsync-db my-server -b        # restore from latest backup on my-server"
     echonice "sake-ss-rsync-db my-server --backup-location '/container/backups/containers/latest/databases/*.sql.gz'"
 
@@ -280,10 +371,13 @@ fi
 
 sake_check_help_and_exit
 
-serverClean=$(echo "$server" | cut -d':' -f1)
-REMOTE_DIR=$(echo "$server" | cut -s -d':' -f2)
-REMOTE_DIR=${REMOTE_DIR:-$DEFAULT_SERVER_DIR}
-REMOTE_ENV_FILE="$REMOTE_DIR/.env"
+# Source-server-derived paths are only needed when there IS a source (pull/reverse).
+if [[ "$pushLocal" != "yes" ]]; then
+    serverClean=$(echo "$server" | cut -d':' -f1)
+    REMOTE_DIR=$(echo "$server" | cut -s -d':' -f2)
+    REMOTE_DIR=${REMOTE_DIR:-$DEFAULT_SERVER_DIR}
+    REMOTE_ENV_FILE="$REMOTE_DIR/.env"
+fi
 
 # If --to provided, normalize it as well
 if [[ -n "$toServer" ]]; then
@@ -302,20 +396,23 @@ localDbName=$(read_local_dotenv_value "SS_DATABASE_NAME")
 localDbHost="$(read_local_dotenv_value 'SS_DATABASE_SERVER' || true)"
 localDbHost="${localDbHost:-localhost}"
 
-remoteDbUser=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_USERNAME")
-remoteDbPass=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_PASSWORD")
-remoteDbName=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_NAME")
-remoteDbHost=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_SERVER")
+# Source-server credentials are only fetched when there IS a source.
+if [[ "$pushLocal" != "yes" ]]; then
+    remoteDbUser=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_USERNAME")
+    remoteDbPass=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_PASSWORD")
+    remoteDbName=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_NAME")
+    remoteDbHost=$(read_remote_dotenv_value "$serverClean" "$REMOTE_ENV_FILE" "SS_DATABASE_SERVER")
 
-if [[ -z "$remoteDbUser" || -z "$remoteDbPass" || -z "$remoteDbName" || -z "$remoteDbHost" ]]; then
-    echobad "Could not retrieve database credentials from the source server."
-    exit 1
-else
-    echonice "Retrieved source server DB credentials:"
-    echonice "  User: $remoteDbUser"
-    echonice "  Name: $remoteDbName"
-    echonice "  Host: $remoteDbHost"
-    echonice "  Password: ******"
+    if [[ -z "$remoteDbUser" || -z "$remoteDbPass" || -z "$remoteDbName" || -z "$remoteDbHost" ]]; then
+        echobad "Could not retrieve database credentials from the source server."
+        exit 1
+    else
+        echonice "Retrieved source server DB credentials:"
+        echonice "  User: $remoteDbUser"
+        echonice "  Name: $remoteDbName"
+        echonice "  Host: $remoteDbHost"
+        echonice "  Password: ******"
+    fi
 fi
 
 if [[ -z "$localDbUser" || -z "$localDbPass" || -z "$localDbName" || -z "$localDbHost" ]]; then
@@ -351,11 +448,13 @@ if [[ "$useBackup" == "yes" ]]; then
 fi
 
 # Pre-escape every source-server field once, for safe reuse inside ssh "..." strings.
-escRemoteUser=$(escape_for_single_quotes "$remoteDbUser")
-escRemotePass=$(escape_for_single_quotes "$remoteDbPass")
-escRemoteHost=$(escape_for_single_quotes "$remoteDbHost")
-escRemoteName=$(escape_for_single_quotes "$remoteDbName")
-escRemoteDump=$(escape_for_single_quotes "$remoteDumpFile")
+if [[ "$pushLocal" != "yes" ]]; then
+    escRemoteUser=$(escape_for_single_quotes "$remoteDbUser")
+    escRemotePass=$(escape_for_single_quotes "$remoteDbPass")
+    escRemoteHost=$(escape_for_single_quotes "$remoteDbHost")
+    escRemoteName=$(escape_for_single_quotes "$remoteDbName")
+    escRemoteDump=$(escape_for_single_quotes "$remoteDumpFile")
+fi
 
 # If --to: fetch its DB credentials now
 if [[ -n "$toServer" ]]; then
@@ -375,19 +474,47 @@ if [[ -n "$toServer" ]]; then
 fi
 
 ############################################ SYNC PROCESS
-if [[ "$reverse" == "yes" ]]; then
-    ECHOHEAD "DANGER: REVERSE SYNC (LOCAL → REMOTE)"
-    echowarn "Target server:        $server"
-    echowarn "Server source:        $serverSource"
-    echowarn "Remote DB:            $remoteDbName @ $remoteDbHost (user: $remoteDbUser)"
-    echowarn "You are about to OVERWRITE the remote database with your LOCAL database."
+if [[ "$pushLocal" == "yes" ]]; then
+    ############ FROM-LOCAL: local database -> --to server (no pull, no source)
+    echonice "FROM-LOCAL: your LOCAL database -> $toServerClean (no pull; $envServerKey and backup ignored)"
+    confirm_destructive_write "--to server" "$toServerClean" "$toRemoteDbName" "$toRemoteDbHost" "$toRemoteDbUser" "$dropDb"
+
+    echonice "Dumping local database..."
+    mysqldump --no-tablespaces --add-drop-table -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" >"$localDumpFile"
+    [[ $? -ne 0 ]] && echobad "Local database dump failed." && exit 1
+
     if [[ "$dropDb" == "yes" ]]; then
-        echowarn "The remote database will be DROPPED and recreated."
+        echonice "Recreating database on --to server..."
+        ssh "$toServerClean" "mysql -u '$escToUser' -p'$escToPass' -h '$escToHost' -e 'DROP DATABASE IF EXISTS \`$escToName\`; CREATE DATABASE \`$escToName\`;'" || {
+            echobad "Failed to recreate database on --to server."
+            exit 1
+        }
     else
-        echowarn "ALL tables/views in the remote database will be dropped before import."
+        echonice "Dropping all tables on --to server ($toRemoteDbName)..."
+        drop_all_tables_remote "$toServerClean" "$toRemoteDbUser" "$toRemoteDbPass" "$toRemoteDbHost" "$toRemoteDbName" || {
+            echobad "Failed to drop tables on --to server."
+            exit 1
+        }
     fi
-    read -p "Type the server host name ($serverClean) to confirm: " confirm
-    [[ "$confirm" != "$serverClean" ]] && echonice "Aborted (input did not match server host)." && exit 1
+
+    echonice "Uploading dump to --to server..."
+    rsync -chavzP "$localDumpFile" "$toServerClean:$toRemoteDumpFile" || {
+        echobad "Failed to upload dump to --to server."
+        exit 1
+    }
+
+    echonice "Importing on --to server..."
+    ssh "$toServerClean" "mysql -u '$escToUser' -p'$escToPass' -h '$escToHost' '$escToName' < '$escToDump'" || {
+        echobad "Failed to import on --to server."
+        exit 1
+    }
+
+    ssh "$toServerClean" "rm -f '$escToDump'" || echowarn "Failed to clean up dump on --to server."
+
+elif [[ "$reverse" == "yes" ]]; then
+    ############ REVERSE: local database -> source server
+    echonice "REVERSE: your LOCAL database -> $serverClean ($serverSource)"
+    confirm_destructive_write "source server ($serverSource)" "$serverClean" "$remoteDbName" "$remoteDbHost" "$remoteDbUser" "$dropDb"
 
     echonice "Dumping local database..."
     mysqldump --no-tablespaces --add-drop-table -u "$localDbUser" -p"$localDbPass" -h "$localDbHost" "$localDbName" >"$localDumpFile"
@@ -419,7 +546,15 @@ if [[ "$reverse" == "yes" ]]; then
         exit 1
     }
 else
-    # PULL: source server -> local
+    ############ PULL: source server -> local (+ optional push to --to)
+    # If a --to push is part of this run, confirm it UP FRONT so nothing starts
+    # before the operator has agreed to overwrite that server.
+    if [[ -n "$toServer" ]]; then
+        echowarn "This will PULL from $serverClean ($serverSource) into your LOCAL database,"
+        echowarn "then PUSH the same data to the --to server and overwrite it."
+        confirm_destructive_write "--to server" "$toServerClean" "$toRemoteDbName" "$toRemoteDbHost" "$toRemoteDbUser" "$dropDb"
+    fi
+
     if [[ "$useBackup" == "yes" ]]; then
         # Restore the standard remote dump file FROM A BACKUP instead of a live
         # mysqldump. From here on the flow (download, drop, import) is identical.
@@ -467,9 +602,10 @@ else
         exit 1
     }
 
-    # If --to provided: send THIS downloaded dump to the --to server and import there
+    # If --to provided: send THIS downloaded dump to the --to server and import
+    # there. Confirmation was already collected up front (see above).
     if [[ -n "$toServer" ]]; then
-        echowarn "Also importing the same dump into --to server ($toServer)..."
+        echowarn "Now pushing the same dump into the --to server ($toServer)..."
 
         if [[ "$dropDb" == "yes" ]]; then
             echonice "Recreating database on --to server..."
@@ -501,8 +637,11 @@ else
 fi
 
 ############################################ CLEANUP (source server + local)
-echonice "Cleaning up remote dump file on source server..."
-ssh "$serverClean" "rm -f '$escRemoteDump'" || echowarn "Failed to clean up the remote dump file."
+# --from-local never touches a source server, so there is no source dump to remove.
+if [[ "$pushLocal" != "yes" ]]; then
+    echonice "Cleaning up remote dump file on source server..."
+    ssh "$serverClean" "rm -f '$escRemoteDump'" || echowarn "Failed to clean up the remote dump file."
+fi
 
 echonice "Cleaning up local dump file..."
 rm -f "$localDumpFile" || echowarn "Failed to clean up the local dump file."
