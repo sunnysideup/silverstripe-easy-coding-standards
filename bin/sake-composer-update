@@ -88,7 +88,6 @@ sake-php-switch-versions
 
 
 
-
 echonice "Updating composer.lock ..."
 git add composer.lock
 git commit -m 'MNT: update composer.lock before composer update'
