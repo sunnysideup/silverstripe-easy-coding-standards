@@ -660,6 +660,7 @@ done
 ############################################ FINAL STATUS
 show_branch_status 'Branch status after merges'
 
+ECHOHEAD "Branches compared to origin"
 # Always end on develop (if it exists)
 if git show-ref --verify --quiet 'refs/heads/develop' || git show-ref --verify --quiet 'refs/remotes/origin/develop'; then
     ensure_local_branch 'develop' >/dev/null 2>&1 || true
