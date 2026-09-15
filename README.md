@@ -47,7 +47,7 @@ Install as global composer package and then try to access the commands, starting
 
 
 # php
- - sake-php-fix-version
+ - sake-php-switch-versions
  - sake-php-set-timezone
  - sake-php-line-counter
 
