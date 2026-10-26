@@ -6,13 +6,12 @@ SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR="$(pwd)"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Compares a source branch (develop) against a destination branch (production), summarises the diff + commit messages, and adds a categorised entry to CHANGELOG.md"
+SCRIPT_SUMMARY="Reviews everything on a branch since the last commit recorded in CHANGELOG.md (or the last year if there is no entry yet), and adds a categorised entry to CHANGELOG.md"
 
 
 ############################################ DEFAULTS
-# The compare branch defaults to the CURRENT git branch, resolved after we
+# The branch to review defaults to the CURRENT git branch, resolved after we
 # enter the repo (see INPUT RESOLUTION). Leave it empty here as the sentinel.
-DEFAULT_DESTINATION_BRANCH='production'
 
 # The runner that already knows how to resolve provider/model/auth and call opencode.
 LLM_RUNNER="$SCRIPT_DIR/sake-llm-opencode"
@@ -28,6 +27,7 @@ COMPOSER_LOCK='composer.lock'          # relative to the repo root we cd into
 
 # Files excluded from the diff (noise the model shouldn't waste tokens on).
 DIFF_EXCLUDES=(
+    ':(exclude)CHANGELOG.md'   # our own entries (and their commits) are not "changes"
     ':(exclude)composer.lock'
     ':(exclude)package-lock.json'
     ':(exclude)yarn.lock'
@@ -47,8 +47,8 @@ DEFAULT_PRICE_INPUT_PER_M=''
 
 # Default instructions. Override with -i / --instructions FILE.
 DEFAULT_INSTRUCTIONS="\
-You are preparing a CHANGELOG entry for changes about to be deployed to the
-destination branch. Read the attached files: the git commit list, the full
+You are preparing a CHANGELOG entry for changes made since the last CHANGELOG entry.
+Read the attached files: the git commit list, the full
 code diff, and (if present) the composer dependency delta.
 
 Write for a human reader. Explain WHAT changed and WHY it matters in plain
@@ -88,7 +88,6 @@ Then edit CHANGELOG.md in the repository root:
 ############################################ SETTINGS
 dir='./'
 compareBranch=''   # empty = use the current git branch (resolved below)
-destinationBranch="$DEFAULT_DESTINATION_BRANCH"
 instructionsFile=''
 modelOverride=''
 providerOverride=''
@@ -114,14 +113,6 @@ while (($#)); do
         ;;
     --branch=*)
         compareBranch="${1#*=}"
-        ;;
-
-    -d | --destination | -p | --production)
-        destinationBranch=$2
-        shift
-        ;;
-    --destination=* | --production=*)
-        destinationBranch="${1#*=}"
         ;;
 
     -i | --instructions)
@@ -190,7 +181,8 @@ done
 ############################################ HELP
 help_and_exit() {
     ECHOHEAD "Pre-production analysis"
-    echonice "Summarises everything going to the destination branch and adds it to CHANGELOG.md"
+    echonice "Summarises everything since the last commit recorded in CHANGELOG.md and adds it to CHANGELOG.md"
+    echonice "(no CHANGELOG entry yet: summarises the last year; no changes in the last year: does nothing)"
     echonice ""
     echonice "Directory of script:             $SCRIPT_DIR"
     echonice "Working dir:                     $WORKING_DIR"
@@ -198,7 +190,6 @@ help_and_exit() {
     ECHOHEAD "Current settings:"
     echonice "target dir (positional):         $dir"
     echonice "compare branch (-b):             ${compareBranch:-'(current branch)'}"
-    echonice "destination branch (-d):         $destinationBranch"
     echonice "instructions file (-i):          ${instructionsFile:-'(built-in default)'}"
     echonice "model (-m):                      ${modelOverride:-'(runner default)'}"
     echonice "provider (--provider):           ${providerOverride:-'(runner default)'}"
@@ -210,8 +201,6 @@ help_and_exit() {
 
     ECHOHEAD "Available settings (both 'space' and '=' forms accepted):"
     echonice "-b, --branch BRANCH              compare/source branch (default: current branch)"
-    echonice "-d, --destination BRANCH         destination branch (default: $DEFAULT_DESTINATION_BRANCH)"
-    echonice "                                 (-p / --production accepted as aliases)"
     echonice "-i, --instructions FILE          alternative instructions file"
     echonice "-m, --model MODEL                model to pass to the runner"
     echonice "    --provider PROVIDER          provider to pass to the runner"
@@ -223,8 +212,8 @@ help_and_exit() {
 
     ECHOHEAD "Example usage:"
     echonice "sake-git-commit-pre-prod-analysis ."
-    echonice "sake-git-commit-pre-prod-analysis . -b staging -d live"
-    echonice "sake-git-commit-pre-prod-analysis . -b origin/develop -d origin/production --dry-run"
+    echonice "sake-git-commit-pre-prod-analysis . -b staging"
+    echonice "sake-git-commit-pre-prod-analysis . -b origin/develop --dry-run"
 
     echofunctions
     exit
@@ -287,18 +276,16 @@ fi
 
 
 ############################################ GIT PREP
-# 'git fetch --all' updates the remote-tracking refs (origin/*), which is all we
-# need to compare against the LATEST destination — no branch checkout or 'git
-# pull' required. Avoiding checkout means we never touch your working tree, never
-# fail on uncommitted changes, and never leave you sitting on a different branch.
+# 'git fetch --all' updates the remote-tracking refs (origin/*) so a branch that
+# only exists on the remote can still be resolved. No checkout or pull happens,
+# so your working tree is never touched.
 if [[ "$doFetch" == "yes" ]]; then
     echonice "Fetching latest refs..."
     git fetch --quiet --all --prune || echonice "(fetch failed or offline; continuing with local refs)"
 fi
 
 # Resolve a branch NAME to a ref that actually exists: prefer a local branch,
-# then fall back to origin/<name>. This is what fixes "could not find
-# production" — a production branch commonly exists only on the remote.
+# then fall back to origin/<name>.
 resolve_ref() {
     local b="$1"
     if git rev-parse --verify --quiet "$b^{commit}" >/dev/null 2>&1; then
@@ -309,26 +296,55 @@ resolve_ref() {
 }
 
 compareRef="$(resolve_ref "$compareBranch")"
-destinationRef="$(resolve_ref "$destinationBranch")"
-
 if [[ -z "$compareRef" ]]; then
-    echobad "Error: compare branch not found locally or on origin: $compareBranch"
+    echobad "Error: branch not found locally or on origin: $compareBranch"
     exit 1
 fi
-if [[ -z "$destinationRef" ]]; then
-    echobad "Error: destination branch not found locally or on origin: $destinationBranch"
-    echonice "Tried '$destinationBranch' and 'origin/$destinationBranch'. Fetch first, or pass -d origin/<branch>."
-    exit 1
+[[ "$compareRef" != "$compareBranch" ]] && echonice "Resolved branch to: $compareRef"
+
+# The review starts at the "until" hash of the NEWEST CHANGELOG entry. Entries are
+# written by this script as a level-2 heading:
+#   ## [Unreleased] — from <fromHash> to <untilHash> (<date>)
+# Anchoring on '^## ' and the exact 'from X to Y (' shape means hashes mentioned
+# in the entry body (or in older prose) can never be mistaken for a range.
+CHANGELOG_HEADING_RE='^## .*from [0-9a-f]{7,40} to [0-9a-f]{7,40} \('
+changelogUntil=''
+if [[ -f CHANGELOG.md ]]; then
+    # Newest entry is at the top, so the first match wins.
+    changelogUntil="$(grep -m1 -E "$CHANGELOG_HEADING_RE" CHANGELOG.md | sed -E 's/.* to ([0-9a-f]{7,40}) \(.*/\1/' || true)"
 fi
 
-[[ "$compareRef" != "$compareBranch" ]] && echonice "Resolved compare branch to: $compareRef"
-[[ "$destinationRef" != "$destinationBranch" ]] && echonice "Resolved destination branch to: $destinationRef"
+emptyTree="$(git hash-object -t tree /dev/null)"
+baseRef=''
+if [[ -n "$changelogUntil" ]] \
+    && git rev-parse --verify --quiet "$changelogUntil^{commit}" >/dev/null 2>&1 \
+    && git merge-base --is-ancestor "$changelogUntil" "$compareRef" 2>/dev/null; then
+    baseRef="$(git rev-parse "$changelogUntil^{commit}")"
+    echonice "Reviewing from last CHANGELOG commit: $changelogUntil"
+else
+    [[ -n "$changelogUntil" ]] && echonice "CHANGELOG commit $changelogUntil is not in the history of $compareRef; ignoring it."
+    # No usable entry: look back one year. Nothing in that window = nothing to do.
+    if [[ -z "$(git log -1 --no-merges --since='1 year ago' --format=%H "$compareRef" -- . "${DIFF_EXCLUDES[@]}")" ]]; then
+        echonice "No CHANGELOG entry and no changes on '$compareBranch' in the last year. Nothing to do."
+        exit 0
+    fi
+    baseRef="$(git rev-list -1 --before='1 year ago' "$compareRef" || true)"
+    if [[ -z "$baseRef" ]]; then
+        baseRef="$emptyTree"   # whole history is younger than a year
+        echonice "No CHANGELOG entry yet. Summarising the whole history (under a year old)."
+    else
+        echonice "No CHANGELOG entry yet. Summarising the last year."
+    fi
+fi
 
-logRange="$destinationRef..$compareRef"     # commits in compare, not in destination
-diffRange="$destinationRef...$compareRef"    # changes compare added since the merge base
-
-baseHash="$(git merge-base "$destinationRef" "$compareRef")"
-fromHash="$(git rev-parse --short "$baseHash")"
+if [[ "$baseRef" == "$emptyTree" ]]; then
+    logRange="$compareRef"
+    fromHash="start"
+else
+    logRange="$baseRef..$compareRef"
+    fromHash="$(git rev-parse --short "$baseRef")"
+fi
+diffRange="$baseRef..$compareRef"
 untilHash="$(git rev-parse --short "$compareRef")"
 today="$(date +%Y-%m-%d)"
 
@@ -343,13 +359,13 @@ mkdir -p "$INPUT_DIR"
 # real problem (corruption, OOM, etc.) and must not silently ship empty files.
 if ! git log --no-merges --date=short \
     --pretty=format:'- %h %s (%an, %ad)' \
-    "$logRange" > "$COMMITS_FILE"; then
+    "$logRange" -- . "${DIFF_EXCLUDES[@]}" > "$COMMITS_FILE"; then
     echobad "Error: 'git log $logRange' failed."
     exit 1
 fi
 
 if [[ ! -s "$COMMITS_FILE" ]]; then
-    echonice "No commits on '$compareBranch' that are missing from '$destinationBranch'. Nothing to do."
+    echonice "No new commits on '$compareBranch' since the last reviewed point ($fromHash). Nothing to do."
     exit 0
 fi
 
@@ -406,7 +422,7 @@ build_composer_changes() {
 }
 
 composerChangeCount=0
-if build_composer_changes "$destinationRef" "$compareRef" "$PACKAGES_FILE"; then
+if build_composer_changes "$baseRef" "$compareRef" "$PACKAGES_FILE"; then
     composerChangeCount="$(grep -c '^- ' "$PACKAGES_FILE" || true)"
     echonice "Composer package delta: $composerChangeCount change(s) -> $PACKAGES_FILE"
 fi
@@ -419,7 +435,7 @@ diffLines="$(wc -l < "$DIFF_FILE" | tr -d ' ')"
 if (( diffLines > maxDiffLines )); then
     echobad "Error: diff is $diffLines lines (limit: $maxDiffLines)."
     echonice "This will likely exceed the model's context window. Options:"
-    echonice "  - narrow the range with -b / -d"
+    echonice "  - run it more often so each range is smaller"
     echonice "  - add more paths to DIFF_EXCLUDES near the top of this script"
     echonice "  - raise the cap with --max-diff-lines N (at your own risk)"
     exit 1
@@ -443,9 +459,9 @@ Use this EXACT heading for the new CHANGELOG.md section:
 
 ## [Unreleased] — from ${fromHash} to ${untilHash} (${today})
 
-Comparing: ${compareRef}  ->  ${destinationRef}
+Reviewing: ${fromHash}  ->  ${untilHash} (branch: ${compareRef})
 The attached input files are:
-- ${COMMITS_FILE} : the list of commits going to the destination branch
+- ${COMMITS_FILE} : the list of commits in the range
 - ${DIFF_FILE} : the full code diff (composer.lock and other lock/min files excluded)
 ${packagesLine}
 EOF
@@ -453,7 +469,7 @@ EOF
 
 ############################################ REPORT + RUN
 ECHOHEAD "Pre-production analysis"
-echonice "compare -> destination:          $compareRef -> $destinationRef"
+echonice "branch:                          $compareRef"
 echonice "commit range:                    $logRange"
 echonice "diff range:                      $diffRange"
 echonice "hash range:                      $fromHash .. $untilHash"
@@ -494,7 +510,22 @@ if [[ "$dryRun" != "yes" ]]; then
 fi
 
 
+if [[ "$dryRun" == "yes" ]]; then
+    echonice "Dry run: CHANGELOG.md not touched, nothing committed."
+    echoend
+    exit 0
+fi
+
+# The next run finds its starting point from this exact heading, so refuse to
+# commit if the model did not write it.
+expectedHeading="from ${fromHash} to ${untilHash} ("
+if ! grep -m1 -E "$CHANGELOG_HEADING_RE" CHANGELOG.md 2>/dev/null | grep -qF "$expectedHeading"; then
+    echobad "Error: CHANGELOG.md does not start with a '... ${expectedHeading}...' entry. Not committing."
+    echonice "Fix the heading by hand (the next run relies on it), then commit."
+    exit 1
+fi
+
 git add CHANGELOG.md
-git commit . -m "DOC: adding notes in CHANGELOG.md"
+git commit CHANGELOG.md -m "DOC: adding notes in CHANGELOG.md"
 
 echoend
