@@ -1,0 +1,290 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Net diff per GitHub repo (public + private) for the last X days"
+
+############################################ HELPERS
+#
+# HOW THE DIFF IS BUILT (read before changing the git lines):
+#   * Repos are listed with `gh repo list` and kept only if pushed within the
+#     window (pushedAt >= cutoff). pushedAt counts ANY branch, so a repo can
+#     still turn out to have no change on its default branch — it is skipped.
+#   * Each repo is kept as a BLOBLESS BARE clone in the cache dir: full commit
+#     history, but file contents are only downloaded when a diff needs them.
+#     Later runs only fetch, so they are fast.
+#   * The diff runs from the last default-branch commit BEFORE the cutoff
+#     (--first-parent, committer date) to the current tip. That is the NET
+#     change over the period: one diff per repo, not one patch per commit.
+#   * A repo created inside the window has no commit before the cutoff, so it
+#     is diffed against git's empty tree (everything shows as added).
+#   * Everything runs locally; no value ever passes through a remote shell, so
+#     plain double quotes are enough everywhere.
+
+# git with gh's token for HTTPS, without touching the global git config.
+gh_git() {
+    git -c credential.helper= -c 'credential.helper=!gh auth git-credential' "$@"
+}
+
+# Clone (first run) or fetch (later runs) a blobless bare copy of a repo.
+sync_repo_cache() {
+    local repo="$1" dir="$2"
+    if [[ -d "$dir" ]]; then
+        gh_git -C "$dir" fetch --quiet --prune origin '+refs/heads/*:refs/heads/*'
+    else
+        gh_git clone --quiet --bare --filter=blob:none "https://github.com/$repo.git" "$dir"
+    fi
+}
+
+############################################ SETTINGS
+days=2
+owner="${GITHUB_USER_NAME:-}"
+outDir=''
+cacheDir="${XDG_CACHE_HOME:-$HOME/.cache}/sake-git-diff-recent"
+limit=1000
+noForks='no'
+help='no'
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        ;;
+    -d | --days)
+        days=$2
+        shift
+        ;;
+    -u | --owner)
+        owner=$2
+        shift
+        ;;
+    -o | --out)
+        outDir=$2
+        shift
+        ;;
+    -c | --cache)
+        cacheDir=$2
+        shift
+        ;;
+    -l | --limit)
+        limit=$2
+        shift
+        ;;
+    --no-forks)
+        noForks='yes'
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        if [[ "$1" == -* ]]; then
+            echobad "Unknown option: $1 (run with -h for help)"
+            exit 1
+        fi
+        # Positional argument = number of days
+        days=$1
+        ;;
+    esac
+
+    shift
+done
+
+outDir="${outDir:-$WORKING_DIR/repo-diffs-$(date +%Y%m%d-%H%M%S)}"
+
+if [[ "$help" == "yes" ]]; then
+    ECHOHEAD "Diff Recent Repos"
+    echonice "Writes ONE net diff per GitHub repo (public + private) covering"
+    echonice "everything that changed on its default branch in the last X days."
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Number of days:                $days"
+    echonice "Owner (user / org):            ${owner:-<authenticated gh user>}"
+    echonice "Output dir:                    $outDir"
+    echonice "Cache dir (bare clones):       $cacheDir"
+    echonice "Max repos listed:              $limit"
+    echonice "Exclude forks:                 $noForks"
+
+    echonice ""
+    ECHOHEAD "Available settings:"
+    echonice "DAYS                           number of days to look back (positional, default 2)"
+    echonice "-d, --days DAYS                same as the positional DAYS"
+    echonice "-u, --owner OWNER              GitHub user or org (default: \$GITHUB_USER_NAME)"
+    echonice "-o, --out DIR                  where to write the .diff files"
+    echonice "-c, --cache DIR                where the bare clones are cached"
+    echonice "-l, --limit N                  max repos to list from GitHub (default $limit)"
+    echonice "    --no-forks                 skip forked repos"
+    echonice "-q, --quiet                    no progress output (only the output dir on stdout)"
+    echonice "-h, --help                     show help information"
+    echonice ""
+    ECHOHEAD "Output:"
+    echonice "One <owner>__<repo>.diff per changed repo, each starting with a --stat"
+    echonice "      summary, plus ALL-REPOS.diff with everything in one file."
+    echonice "      The output dir path is printed on stdout, so you can pipe it."
+    echonice ""
+    ECHOHEAD "Notes:"
+    echonice "Only the DEFAULT branch counts. Pushes to other branches are skipped."
+    echonice "The cutoff uses commit dates (a commit made last week but pushed today"
+    echonice "      is not included). Requires: git, gh (logged in), jq."
+    echonice ""
+    ECHOHEAD "Examples:"
+    echonice "sake-git-diff-recent                    # last 2 days, \$GITHUB_USER_NAME"
+    echonice "sake-git-diff-recent 7                  # last 7 days"
+    echonice "sake-git-diff-recent 3 -u my-org        # an organisation's repos"
+    echonice "sake-git-diff-recent 2 -o ~/diffs --no-forks"
+    echonice "less \"\$(sake-git-diff-recent -q 1)/ALL-REPOS.diff\""
+
+    ECHOHEAD "Setting defaults:"
+    echonice "Set the default owner in ~/.config/composer/.env with key GITHUB_USER_NAME,"
+    echonice " e.g. GITHUB_USER_NAME=my-github-user"
+    echofunctions
+    exit
+fi
+
+sake_check_help_and_exit
+
+############################################ CHECKS
+if [[ ! "$days" =~ ^[1-9][0-9]*$ ]]; then
+    echobad "Number of days must be a positive whole number (got '$days')."
+    exit 1
+fi
+if [[ ! "$limit" =~ ^[1-9][0-9]*$ ]]; then
+    echobad "--limit must be a positive whole number (got '$limit')."
+    exit 1
+fi
+
+for cmd in git gh jq; do
+    if ! command -v "$cmd" &>/dev/null; then
+        echobad "'$cmd' is not installed."
+        echonice "Install it with: sudo apt install $cmd"
+        exit 1
+    fi
+done
+
+check_gh_auth
+if ! gh auth status &>/dev/null; then
+    echobad "GitHub CLI is still not logged in — cannot list private repos."
+    exit 1
+fi
+
+############################################ FIND REPOS
+since=$(date -u -d "$days days ago" +%Y-%m-%dT%H:%M:%SZ)
+emptyTree=$(git hash-object -t tree /dev/null)
+
+mkdir -p "$outDir" "$cacheDir" || {
+    echobad "Could not create output or cache dir."
+    exit 1
+}
+
+ECHOHEAD "Repos changed since $since ($days day(s))"
+echonice "Owner:  ${owner:-<authenticated gh user>}"
+echonice "Output: $outDir"
+echonice "Cache:  $cacheDir"
+echoline
+
+repoJson=$(gh repo list ${owner:+"$owner"} --limit "$limit" \
+    --json nameWithOwner,pushedAt,defaultBranchRef,isFork) || {
+    echobad "Could not list repos from GitHub (owner: ${owner:-<authenticated gh user>})."
+    exit 1
+}
+
+# nameWithOwner<TAB>defaultBranch for every repo pushed within the window
+mapfile -t repos < <(
+    jq -r --arg since "$since" --arg noForks "$noForks" '
+        .[]
+        | select(.pushedAt >= $since and .defaultBranchRef != null)
+        | select($noForks != "yes" or (.isFork | not))
+        | "\(.nameWithOwner)\t\(.defaultBranchRef.name)"' <<<"$repoJson"
+)
+
+if ((${#repos[@]} == 0)); then
+    echonice "No repos pushed in the last $days day(s)."
+    rmdir "$outDir" 2>/dev/null
+    echoend
+    exit 0
+fi
+
+echonice "${#repos[@]} repo(s) pushed in the window — checking default branches..."
+
+############################################ DIFF EACH REPO
+written=()
+failed=()
+
+for line in "${repos[@]}"; do
+    IFS=$'\t' read -r repo branch <<<"$line"
+    slug="${repo//\//__}"
+    dir="$cacheDir/$slug.git"
+    outFile="$outDir/$slug.diff"
+
+    if ! sync_repo_cache "$repo" "$dir"; then
+        echobad "$repo: clone / fetch failed."
+        failed+=("$repo")
+        continue
+    fi
+
+    if ! tip=$(git -C "$dir" rev-parse --verify -q "refs/heads/$branch^{commit}"); then
+        echowarn "$repo: default branch '$branch' not found — skipped."
+        continue
+    fi
+
+    # State of the default branch at the cutoff.
+    base=$(git -C "$dir" rev-list -1 --first-parent --before="$since" "$tip")
+
+    if [[ -z "$base" ]]; then
+        # Repo is newer than the cutoff: diff against the empty tree.
+        base="$emptyTree"
+        commits=$(git -C "$dir" rev-list --count --first-parent "$tip")
+    elif [[ "$base" == "$tip" ]]; then
+        echonice "$repo: no change on $branch (pushes were to other branches)."
+        continue
+    else
+        commits=$(git -C "$dir" rev-list --count --first-parent "$base..$tip")
+    fi
+
+    if ! {
+        printf '# Repo:    %s\n' "$repo"
+        printf '# Branch:  %s\n' "$branch"
+        printf '# Range:   %s..%s\n' "${base:0:12}" "${tip:0:12}"
+        printf '# Commits: %s since %s\n#\n' "$commits" "$since"
+        git -C "$dir" diff --no-ext-diff --no-color --find-renames --stat=120 "$base" "$tip" | sed 's/^/# /'
+        echo
+        git -C "$dir" diff --no-ext-diff --no-color --find-renames "$base" "$tip"
+    } >"$outFile"; then
+        echobad "$repo: writing the diff failed."
+        rm -f "$outFile"
+        failed+=("$repo")
+        continue
+    fi
+
+    written+=("$outFile")
+    echonice "$repo ($branch): $commits commit(s)"
+done
+
+############################################ SUMMARY
+if ((${#written[@]} == 0)); then
+    echonice "No default-branch changes in the last $days day(s)."
+    rmdir "$outDir" 2>/dev/null
+    echoend
+    exit 0
+fi
+
+# One file with everything, in addition to the per-repo files.
+for f in "${written[@]}"; do
+    cat "$f"
+    printf '\n\n'
+done >"$outDir/ALL-REPOS.diff"
+
+ECHOHEAD "Summary"
+echonice "Repos with changes:   ${#written[@]}"
+echonice "Per-repo diffs:       $outDir/<owner>__<repo>.diff"
+echonice "Everything combined:  $outDir/ALL-REPOS.diff"
+if ((${#failed[@]} > 0)); then
+    echowarn "Failed (${#failed[@]}): ${failed[*]}"
+fi
+
+# Pure data output: the output dir, so the script can be piped.
+printf '%s\n' "$outDir"
+
+echoend
