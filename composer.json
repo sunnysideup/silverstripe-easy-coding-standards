@@ -61,6 +61,7 @@
     "bin/sake-git-diff-analyser",
     "bin/sake-git-diff-recent",
     "bin/sake-git-find-any-changes",
+    "bin/sake-git-fix-bitbucket-ssh",
     "bin/sake-git-info",
     "bin/sake-git-merge-pipeline-ssh",
     "bin/sake-git-merge-majors",
