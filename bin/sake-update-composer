@@ -28,7 +28,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "Update Composer"
-    echonice "Updates Composer dependency manager to the latest version"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
 

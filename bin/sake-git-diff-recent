@@ -114,8 +114,7 @@ outDir="${outDir:-$WORKING_DIR/repo-diffs-$(date +%Y%m%d-%H%M%S)}"
 
 if [[ "$help" == "yes" ]]; then
     ECHOHEAD "Diff Recent Repos"
-    echonice "Writes ONE net diff per GitHub repo (public + private) covering"
-    echonice "everything that changed in the last X days."
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Number of days:                $days"

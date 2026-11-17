@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+// SCRIPT_SUMMARY="Analyses git commits by committer over a period and estimates the effort involved"
 
 foreach ([__DIR__ . '/../../../autoload.php', __DIR__ . '/../vendor/autoload.php'] as $file) {
     if (file_exists($file)) {

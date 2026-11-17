@@ -49,7 +49,7 @@ done
 
 help_and_exit() {
     ECHOHEAD "Git commit and push"
-    echonice "Creates new feature branch and syncs database from server to start development"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $dir (relative to $WORKING_DIR)"

@@ -34,7 +34,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "Create a .env file for Silverstripe based on a yml file of data"
-    echonice "Generates a SilverStripe .env file from YAML configuration data"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "If the yml file does not exist yet, it is created for you to complete."
     echonice "Once the yml file exists, running again builds the .env file from it."

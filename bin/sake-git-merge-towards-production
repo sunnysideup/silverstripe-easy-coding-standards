@@ -91,6 +91,8 @@ done
 
 help_and_exit() {
     ECHOHEAD 'Merge branches stepwise (skipping missing): develop ↔ test ↔ (stage|staging) ↔ production'
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $WORKING_DIR/$dir"
     echonice "from:                          $from"

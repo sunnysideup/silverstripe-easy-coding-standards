@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+// SCRIPT_SUMMARY="Analyses recent git changes across repos and estimates the time spent"
 
 // Usage information
 if (in_array('--help', $argv) || in_array('-h', $argv)) {

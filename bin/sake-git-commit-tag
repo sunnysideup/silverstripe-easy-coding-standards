@@ -4,7 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Creates semantic version tags based on commit message prefixes"
+SCRIPT_SUMMARY="Creates semantic version tags based on commit message prefixes (API:, ENH:, FIX:)"
 
 ############################################ DIR
 if [ "$1" != "" ]; then
@@ -34,7 +34,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "Git Commit Tag"
-    echonice "Automatically creates semantic version tags based on commit message prefixes (API:, ENH:, FIX:)"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"

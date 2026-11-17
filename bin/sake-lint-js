@@ -41,7 +41,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "JS Standard"
-    echonice "Lints and auto-fixes JavaScript files using the Standard JS style."
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Make sure you have intalled and updated:"
     echonice "sudo npm install standard --global"

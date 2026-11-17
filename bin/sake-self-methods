@@ -172,6 +172,45 @@ echofunctions() {
 
 ############################################ HELP
 
+# Reads SCRIPT_SUMMARY from a script file without executing it.
+# Works for bash (SCRIPT_SUMMARY="...") and for php/other scripts
+# via a comment line (// SCRIPT_SUMMARY="..." or # SCRIPT_SUMMARY="...").
+sake_get_script_summary() {
+    local path="$1"
+    [[ -f "$path" ]] || return 0
+    grep -m 1 -E '^(//|#)?[[:space:]]*SCRIPT_SUMMARY=' "$path" 2>/dev/null \
+        | sed -E 's/^(\/\/|#)?[[:space:]]*SCRIPT_SUMMARY=//' \
+        | tr -d '"' | tr -d "'" || true
+}
+
+# Lists sake commands whose name or summary contains the keyword (case-insensitive).
+echosearchresults() {
+    local keyword="${1:-}"
+    local ACTUAL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local matches=() entry script summary
+
+    ECHOHEAD "Commands matching \"$keyword\""
+
+    for entry in "$ACTUAL_SCRIPT_DIR"/sake-*; do
+        [[ -f "$entry" && -x "$entry" ]] || continue
+        script="$(basename "$entry")"
+        [[ "$script" == "sake-self-methods" || "$script" == "sake-self-update" ]] && continue
+
+        summary="$(sake_get_script_summary "$entry")"
+        if [[ "${script,,}" == *"${keyword,,}"* || "${summary,,}" == *"${keyword,,}"* ]]; then
+            matches+=("$(printf ' %-37s %s' "$script:" "${summary:-(No summary - run $script -h for details)}")")
+        fi
+    done
+
+    if ((${#matches[@]} == 0)); then
+        echowarn "No commands found matching \"$keyword\""
+    else
+        echo "" >&2
+        printf '%s\n' "${matches[@]}" >&2
+    fi
+    echo "" >&2
+}
+
 echolistoffunctions() {
     ECHOHEAD 'List of Available Functions'
 
@@ -338,32 +377,9 @@ echodetailedhelp() {
                 fi
             fi
 
-            # Extract compact summary
-            local summary=""
-            if [[ -f "$path" ]]; then
-                summary=$(grep -m 1 '^SCRIPT_SUMMARY=' "$path" 2>/dev/null | sed 's/^SCRIPT_SUMMARY=//' | tr -d '"' | tr -d "'")
-            fi
-
-            if [[ -z "$summary" ]] && output=$("$path" -h 2>&1); then
-                local clean_output=$(echo "$output" | sed 's/\x1b\[[0-9;]*m//g')
-                summary=$(echo "$clean_output" | awk '
-                    /^.*# / { if (found_title) next; found_title=1; next }
-                    found_title && /^.*# / { exit }
-                    found_title && /^[-]+$/ { next }
-                    found_title && /Directory of script:/ { next }
-                    found_title && /Directory to [a-z]+:/ { next }
-                    found_title && /directory of script:/ { next }
-                    found_title && /directory to [a-z]+:/ { next }
-                    found_title && /^[[:space:]]*$/ { next }
-                    found_title && NF > 0 {
-                        gsub(/^[[:space:]]+/, "");
-                        if (length($0) > 5 && $0 !~ /^[-]+$/) {
-                            print;
-                            if (++count >= 1) exit
-                        }
-                    }
-                ' | head -1 | sed 's/^[[:space:]]*//')
-            fi
+            # Extract compact summary (never executes the script)
+            local summary
+            summary="$(sake_get_script_summary "$path")"
 
             # Format the output line
             local output_line

@@ -49,7 +49,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "PHP STAN"
-    echonice "Performs static analysis on PHP code using PHPStan to find bugs without running code."
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
     echonice "Directory to analyse:         $WORKING_DIR/$dir"

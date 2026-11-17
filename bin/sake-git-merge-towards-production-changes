@@ -6,7 +6,7 @@ SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR="$(pwd)"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Reviews everything on a branch since the last commit recorded in CHANGELOG.md (or the last year if there is no entry yet), and adds a categorised entry to CHANGELOG.md"
+SCRIPT_SUMMARY="Summarises everything since the last commit in CHANGELOG.md and adds a categorised entry to it"
 
 
 ############################################ DEFAULTS
@@ -181,7 +181,7 @@ done
 ############################################ HELP
 help_and_exit() {
     ECHOHEAD "Pre-production analysis"
-    echonice "Summarises everything since the last commit recorded in CHANGELOG.md and adds it to CHANGELOG.md"
+    echonice "$SCRIPT_SUMMARY"
     echonice "(no CHANGELOG entry yet: summarises the last year; no changes in the last year: does nothing)"
     echonice ""
     echonice "Directory of script:             $SCRIPT_DIR"

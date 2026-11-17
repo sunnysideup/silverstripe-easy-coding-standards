@@ -34,7 +34,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "Checking Vendor Packages for Changes"
-    echonice "Clones a repository, creates a fork, sets up remotes, and creates a working branch for contributing"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"

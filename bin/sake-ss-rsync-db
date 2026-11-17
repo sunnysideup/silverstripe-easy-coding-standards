@@ -300,7 +300,7 @@ fi
 
 if [[ "$help" == "yes" || ( -z "$server" && "$pushLocal" != "yes" ) ]]; then
     ECHOHEAD "Sync Database"
-    echonice "Syncs MySQL database between local and remote server via dump files"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Server to sync with:           $server"

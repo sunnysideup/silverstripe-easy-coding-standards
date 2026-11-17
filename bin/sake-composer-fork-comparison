@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+// SCRIPT_SUMMARY="Compares a GitHub repo and its forks to find forks with changes ahead of the base repo"
 
 class ForkDiffChecker
 {

@@ -6,7 +6,7 @@ SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR="$(pwd)"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Reads the require.php constraint from composer.json and switches the active PHP version to match (via php-switch)"
+SCRIPT_SUMMARY="Switches the active PHP version to match require.php in composer.json (via php-switch)"
 
 
 ############################################ DEFAULTS
@@ -80,7 +80,7 @@ done
 ############################################ HELP
 help_and_exit() {
     ECHOHEAD "PHP version switch (from composer.json)"
-    echonice "Reads 'require.php' from composer.json and switches the active PHP version to match."
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:             $SCRIPT_DIR"
     echonice "Working dir:                     $WORKING_DIR"

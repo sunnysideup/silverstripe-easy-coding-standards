@@ -4,7 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Diffs remote uncommitted changes and lists untracked files against your local codebase"
+SCRIPT_SUMMARY="Diffs remote uncommitted changes and untracked files against your local codebase"
 
 ############################################ SETTINGS
 server=''
@@ -45,9 +45,7 @@ server="$(normalize_server "$server")"
 
 help_and_exit() {
     ECHOHEAD "Diff Remote Uncommitted vs Local Code"
-    echonice "Fetches uncommitted file modifications and untracked files from"
-    echonice "the remote server. It lists untracked files and diffs modifications"
-    echonice "against your current local files to reveal discrepancies."
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Working Directory:             $WORKING_DIR"

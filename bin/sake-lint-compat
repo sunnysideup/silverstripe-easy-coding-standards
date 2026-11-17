@@ -52,7 +52,7 @@ fi
 help_and_exit() {
 
     ECHOHEAD "Running PHP Compatability"
-    echonice "Checks code compatibility with specified PHP versions using PHPCompatibility standard."
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to analyse:          $WORKING_DIR/$dir"

@@ -5,7 +5,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:-}"
 WORKING_DIR="$(pwd)"
 if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/sake-self-methods" ]]; then source "$SCRIPT_DIR/sake-self-methods"; fi
-SCRIPT_SUMMARY="Runs comprehensive security checks including composer audit and vulnerability scans"
+SCRIPT_SUMMARY="Runs security checks including composer audit, semgrep, and vulnerability scanning"
 
 ############################################ CHECK REGISTRY
 # Each check: KEY="description"
@@ -58,7 +58,7 @@ only_check=""
 
 help_and_exit() {
     ECHOHEAD "Security Scan"
-    echonice "Runs comprehensive security checks including composer audit, semgrep, and vulnerability scanning."
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     ECHOHEAD "Current settings:"
     echonice "project dir:                 $WORKING_DIR"

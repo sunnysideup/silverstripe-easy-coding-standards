@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Updates Shell To Zsh and configures terminal environments"
+SCRIPT_SUMMARY="Updates the shell to Zsh and configures terminal environments"
 
 ############################################ DIR
 dir='./'
@@ -28,15 +28,15 @@ done
 
 help_and_exit() {
 
-    echoHEAD "Update Your Shell Experience"
-    echonice "Updates Shell To Zsh "
+    ECHOHEAD "Update Your Shell Experience"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
 
-    echoHEAD "Available settings:"
+    ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
 
-    echoHEAD "Example usage:"
+    ECHOHEAD "Example usage:"
     echonice "sake-update-shell"
 
     echofunctions

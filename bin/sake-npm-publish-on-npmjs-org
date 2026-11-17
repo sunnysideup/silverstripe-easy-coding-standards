@@ -38,7 +38,7 @@ esac
 
 help_and_exit() {
     ECHOHEAD "NPM Publish on npmjs.org"
-    echonice "Publishes an npm package to npmjs.org with automatic version bumping"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:          $SCRIPT_DIR"
 

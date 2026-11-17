@@ -37,7 +37,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "Dev/Build"
-    echonice "Runs SilverStripe dev/build with proper permissions and folder setup"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"

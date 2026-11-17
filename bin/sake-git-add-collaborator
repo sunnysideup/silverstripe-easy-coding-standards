@@ -58,7 +58,7 @@ set -- "${args[@]}"
 
 help_and_exit() {
     ECHOHEAD "Git add collaborator"
-    echonice "Adds, removes and lists collaborators on GitHub repositories"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
 

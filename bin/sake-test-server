@@ -5,6 +5,17 @@
 # Usage:   ./server-check.sh [path/to/.env]
 # Tunable: IO_TEST_SIZE_MB, CPU_TEST_SECONDS, DB_QUERY_ROWS env vars.
 
+SCRIPT_SUMMARY="Gentle server health check and benchmark (CPU, RAM, disk I/O, database)"
+
+case "${1:-}" in
+  -h|--help)
+    echo "$SCRIPT_SUMMARY"
+    echo "Usage: sake-test-server [path/to/.env]"
+    echo "Tunable env vars: IO_TEST_SIZE_MB, CPU_TEST_SECONDS, DB_QUERY_ROWS"
+    exit 0
+    ;;
+esac
+
 set -uo pipefail
 
 # ---------- config ----------

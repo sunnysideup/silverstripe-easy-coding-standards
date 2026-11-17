@@ -35,6 +35,8 @@ done
 
 help_and_exit() {
     ECHOHEAD "Silverstripe SQL Runner/Exporter"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
     echonice "Usage: sake-sql -q \"SELECT * FROM Member\" [-o output.csv]"
     echonice ""
     echonice "-q, --query \"SQL\"           The SQL statement to run"

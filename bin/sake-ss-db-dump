@@ -35,7 +35,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "Dump database"
-    echonice "Exports SilverStripe database to an .sspak file"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
 

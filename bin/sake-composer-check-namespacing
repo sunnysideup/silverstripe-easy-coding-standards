@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+// SCRIPT_SUMMARY="Scans PHP files and validates how each class is referenced (use statements, FQCNs) across the project"
 
 /**
  * sake-composer-check-namespacing

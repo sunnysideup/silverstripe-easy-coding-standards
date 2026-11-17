@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+// SCRIPT_SUMMARY="Validates and auto-corrects PHP namespaces for PSR-4 compliance"
 
 declare(strict_types=1);
 

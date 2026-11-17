@@ -42,7 +42,7 @@ done
 help_and_exit() {
 
     ECHOHEAD 'Find Large Files'
-    echonice "Finds and lists files and directories larger than specified size"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"

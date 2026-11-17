@@ -4,7 +4,7 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="Moves Bitbucket SSH access from bitbucket.org to ssh.bitbucket.org (remotes, ssh config, known_hosts, git config)"
+SCRIPT_SUMMARY="Moves Bitbucket SSH access to ssh.bitbucket.org (remotes, ssh config, known_hosts, git config)"
 
 ############################################ DIR
 dir=''
@@ -63,6 +63,8 @@ esac
 
 help_and_exit() {
     ECHOHEAD "Git fix Bitbucket SSH host (bitbucket.org -> ssh.bitbucket.org)"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
     echonice "Bitbucket Cloud no longer accepts SSH on bitbucket.org. This script:"
     echonice "  1. machine: adds ssh.bitbucket.org to ~/.ssh/known_hosts (fingerprints verified)"
     echonice "  2. machine: adds ssh.bitbucket.org to any 'Host bitbucket.org' block in ~/.ssh/config"
