@@ -71,6 +71,7 @@ help_and_exit() {
     echonice "sake-help -f \"keyword\"          # Find commands matching keyword"
     echonice "sake-help git                  # Detailed help for GIT section only"
     echonice "sake-help composer             # Detailed help for COMPOSER section only"
+    echonice "sake-help -f \"-pm-\"            # All commands that run across more than one website / project"
 
     echofunctions
     exit

@@ -82,7 +82,7 @@ if ! command -v jq &>/dev/null; then
 fi
 
 # Switch PHP to whatever composer.json requires, before any composer work
-sake-php-switch-versions
+sake-php-config-switch-versions
 
 ############################################ SWITCH PHP VERSION (from composer.json)
 
@@ -227,7 +227,7 @@ EOF
     git push
 fi
 
-sake-composer-available-updates
+sake-composer-update-available
 
 #TODO: use env variable for sunnysideup
 composer dump-autoload -o 2>&1 | grep -E 'app/|vendor/sunnysideup'

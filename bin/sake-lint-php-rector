@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Refactors and upgrades PHP code automatically using Rector"
+
+############################################ DIR
+dir='app/src'
+
+############################################ SETTINGS
+also='app/_config.php'
+dryRun=''
+rectorConfig="Lint"
+verbose=''
+useCurrentVersion=''
+help='no'
+while (($#)); do
+    case $1 in
+    -a | --also)
+        also=$2
+        shift
+        ;;
+    -c | --current-version)
+        useCurrentVersion='yes'
+        ;;
+    -d | --dry-run)
+        dryRun='--dry-run'
+        ;;
+    -r | --rector-config)
+        rectorConfig=$2
+        shift
+        ;;
+    -v | --verbose)
+        verbose='--debug'
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+############################################ HELP
+
+help_and_exit() {
+
+    ECHOHEAD "Rector"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+    echonice "Also check (-a):               $WORKING_DIR/$also"
+    echonice "Rector config file (-r):       $rectorConfig"
+
+    ECHOHEAD "Available settings:"
+    echonice "-a, --also                     also lint - e.g. app/_config.php OR myfolder"
+    echonice "-c, --current-version          use the installed silverstripe/framework major version as config (e.g. SS6)"
+    echonice "-d, --dry-run                  dry run"
+    echonice "-r, --rector-config            rector config file location e.g. Lint"
+
+    local rectorDir="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rectors"
+    if [ -d "$rectorDir" ]; then
+        echonice "                               available options:"
+        for file in "$rectorDir"/*.php; do
+            if [ -f "$file" ]; then
+                local basename
+                basename=$(basename "$file")
+                local shorthand="${basename#Rector}"
+                shorthand="${shorthand%.php}"
+                echonice "                               - ${shorthand} (${basename})"
+            fi
+        done
+    fi
+
+    echonice "-v, --verbose                  enable debug (verbose) mode"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-lint-php-rector -a app_more/_config.php   -r SS6   app/src "
+    echonice "sake-lint-php-rector -c   app/src "
+    echoline
+
+    echofunctions
+    exit
+}
+
+get_silverstripe_major_version() {
+    local installedFile="$WORKING_DIR/vendor/composer/installed.php"
+    local version=''
+    if [ -f "$installedFile" ]; then
+        version=$(php -r '
+            $data = require $argv[1];
+            $v = $data["versions"]["silverstripe/framework"]["pretty_version"]
+                ?? $data["versions"]["silverstripe/framework"]["version"]
+                ?? "";
+            $v = ltrim($v, "v");
+            if ($v !== "") { echo (int) explode(".", $v)[0]; }
+        ' "$installedFile" 2>/dev/null)
+    fi
+    if [ -z "$version" ] && command -v composer >/dev/null 2>&1; then
+        version=$(composer show silverstripe/framework --working-dir="$WORKING_DIR" 2>/dev/null |
+            grep -iE '^versions' | grep -oE '[0-9]+' | head -n1)
+    fi
+    echo "$version"
+}
+
+sake_check_help_and_exit
+
+############################################ CODE
+
+cd_or_fail "$WORKING_DIR" help_and_exit
+
+# Resolve -c / --current-version: use installed silverstripe/framework major version
+if [ "$useCurrentVersion" = 'yes' ]; then
+    ssMajor=$(get_silverstripe_major_version)
+    if [ -z "$ssMajor" ]; then
+        echobad "Could not determine installed silverstripe/framework version."
+        help_and_exit
+    fi
+    rectorConfig="SS${ssMajor}"
+    echonice "Using current Silverstripe major version: $ssMajor (config: $rectorConfig)"
+fi
+
+# Resolve shorthand rector config names (e.g. "SS4" -> "RectorSS4.php")
+if [ ! -f "$rectorConfig" ]; then
+    rectorDir="$SCRIPT_DIR/../sunnysideup/easy-coding-standards/rectors"
+
+    # Try as full filename first (e.g. RectorSS4.php)
+    if [ -f "$rectorDir/$rectorConfig" ]; then
+        rectorConfig="$rectorDir/$rectorConfig"
+    # Try as shorthand (e.g. SS4 -> RectorSS4.php)
+    elif [ -f "$rectorDir/Rector${rectorConfig}.php" ]; then
+        rectorConfig="$rectorDir/Rector${rectorConfig}.php"
+    else
+        echobad "Could not find rector config file: $rectorConfig"
+        help_and_exit
+    fi
+fi
+
+if test -f "$WORKING_DIR/$also"; then
+    $SCRIPT_DIR/rector process "$WORKING_DIR/$also" --config $rectorConfig $verbose $dryRun
+fi
+
+$SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig $verbose $dryRun --debug
+
+echo "$SCRIPT_DIR/rector process $WORKING_DIR/$dir --config $rectorConfig $verbose $dryRun --debug"
+
+echoend

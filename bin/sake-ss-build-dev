@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Runs SilverStripe dev/build with proper permissions and folder setup"
+
+############################################ DIR
+dir='./'
+
+############################################ SETTINGS
+skipComposer="no"
+ss6="no"
+help='no'
+while (($#)); do
+    case $1 in
+    -s | --skip-composer)
+        skipComposer=$2
+        shift
+        ;;
+    -x | --ss6)
+        ss6='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        dir=$1
+        ;;
+    esac
+    shift
+done
+
+help_and_exit() {
+
+    ECHOHEAD "Dev/Build"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Directory to analyse:          $WORKING_DIR/$dir"
+
+    ECHOHEAD "Current settings:"
+    echonice "-s, --skip-composer            $skipComposer"
+    echonice "-x, --ss6                      $ss6"
+
+    ECHOHEAD "Available settings:"
+    echonice "-s, --skip-composer            skip composer install, default: no !!!"
+    echonice "-x, --ss6                      run as silverstripe 6 project"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-ss-build-dev ."
+    echonice "sake-ss-build-dev . --skip-composer yes"
+    echonice "sake-ss-build-dev . -x"
+
+    echofunctions
+    exit
+}
+
+
+sake_check_help_and_exit
+
+############################################ CODE
+
+cd_or_fail "$WORKING_DIR" help_and_exit
+
+if [[ "$skipComposer" == "yes" ]]; then
+    echo "skipping composer"
+else
+    composer install
+fi
+
+# composer install
+
+# remove obsolete folders
+sudo rm .graphql/ -rf
+
+# create necessary folders
+sudo mkdir -p ./public
+sudo mkdir -p ./public/assets
+sudo mkdir -p ./.graphql-generated
+sudo mkdir -p ./public/_graphql
+
+# root folder is accessible
+sudo chmod 0755 .
+sudo chmod 0755 themes
+sudo chmod 0755 public
+
+# we keep all the sudos together...
+# cleanup ownership
+sudo chown $(whoami):www-data . -R
+sudo chown www-data public/assets -R
+sudo chown www-data .graphql-generated/ -R
+sudo chown www-data public/_graphql -R
+# files ...
+if [ -f public/admin.types.graphql ]; then
+    sudo chown www-data public/admin.types.graphql
+fi
+
+# dev-build
+if [[ "$ss6" == "yes" ]]; then
+    sudo -u www-data vendor/bin/sake db:build --flush
+else
+    sudo -u www-data vendor/bin/sake dev/build flush=all
+fi
+
+echoend

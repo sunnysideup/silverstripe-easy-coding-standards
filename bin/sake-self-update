@@ -56,9 +56,9 @@ composer update || {
     echo " !! composer update failed (continuing)"
 }
 
-echo " -> sake-composer-available-updates"
-sake-composer-available-updates || {
-    echo " !! sake-composer-available-updates failed (continuing)"
+echo " -> sake-composer-update-available"
+sake-composer-update-available || {
+    echo " !! sake-composer-update-available failed (continuing)"
 }
 
 # Commit the upgrader repo

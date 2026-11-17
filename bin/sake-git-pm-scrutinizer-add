@@ -41,7 +41,7 @@ help_and_exit() {
     echonice "-a, --add                      $add"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-scrutinize-add -a yes "
+    echonice "sake-git-pm-scrutinizer-add -a yes "
 
     echofunctions
     exit

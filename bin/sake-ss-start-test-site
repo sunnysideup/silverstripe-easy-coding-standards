@@ -114,7 +114,7 @@ mysql -h 127.0.0.1 -u root -px -e "DROP DATABASE IF EXISTS test; CREATE DATABASE
 
 ############################################ DEV BUILD
 
-sake-ss-dev-build
+sake-ss-build-dev
 
 ############################################ ADD MOCK DATAB
 
