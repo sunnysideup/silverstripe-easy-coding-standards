@@ -88,6 +88,7 @@ Install as global composer package and then try to access the commands, starting
  - sake-ss-db-import
  - sake-ss-db-open
  - sake-ss-dev-build
+ - sake-ss-build-dev (shortcut for sake-ss-dev-build)
  - sake-ss-flush
  - sake-ss-install-upgrader
  - sake-ss-ready

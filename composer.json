@@ -102,6 +102,7 @@
     "bin/sake-self-methods",
     "bin/sake-self-update",
     "bin/sake-ss-align-versions",
+    "bin/sake-ss-build-dev",
     "bin/sake-ss-contribute-step-1",
     "bin/sake-ss-contribute-step-2",
     "bin/sake-ss-create-env-file",

@@ -123,9 +123,9 @@ if ([[ "$force" == "yes" ]]); then
 fi
 
 if ([[ "$minimalChangesOnly" == "yes" ]]); then
-    composer update --minimal-changes --prefer-source
+    composer update --minimal-changes --prefer-source --no-audit
 else
-    composer update --with-all-dependencies --prefer-source
+    composer update --with-all-dependencies --prefer-source --no-audit
 fi
 
 # Capture the new package info after the update
@@ -232,6 +232,6 @@ sake-composer-available-updates
 #TODO: use env variable for sunnysideup
 composer dump-autoload -o 2>&1 | grep -E 'app/|vendor/sunnysideup'
 
-composer audit
+# composer audit is already run by sake-composer-available-updates above
 
 echoend
