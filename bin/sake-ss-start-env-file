@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
+# Improved interactive sake-ss-start-env-file
+# Asks for all values with defaults, generates .env.yml, then builds .env
 
-############################################ BASICS
+############################################ PARSE ARGUMENTS
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
 SCRIPT_SUMMARY="Generates a SilverStripe .env file from YAML configuration data"
 
-############################################ DIR
-dir='./'
-
-############################################ SETTINGS
-YMLFILECREATE='no'
+# Default yml file location
 YMLFILELOCATION='.env.yml'
-help='no'
+YMLFILECREATE='no'
+
+# Parse command line arguments
 while (($#)); do
     case $1 in
     -c | --createymlfile)
@@ -22,9 +22,12 @@ while (($#)); do
         YMLFILELOCATION=$2
         shift
         ;;
+    -h | --help)
+        help_and_exit
+        ;;
     *)
         if ! sake_handle_help_flag "$1"; then
-            dir=$1
+            :
         fi
         ;;
     esac
@@ -40,7 +43,7 @@ help_and_exit() {
     echonice "Once the yml file exists, running again builds the .env file from it."
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
-    echonice "Directory to use:              $WORKING_DIR/$dir"
+    echonice "Directory to use:              $WORKING_DIR"
 
     ECHOHEAD "Available settings:"
     echonice "-c, --createymlfile            (re)create the yml file to enter data"
@@ -58,13 +61,13 @@ help_and_exit() {
     exit
 }
 
-sake_check_help_and_exit
+sake_check_help_and_exit() {
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        help_and_exit
+    fi
+}
 
-############################################ CODE
-
-cd_or_fail "$WORKING_DIR" help_and_exit
-
-# Resolve the yml location to an absolute path (the file may not exist yet, so use realpath -m).
+############################################ RESOLVE DIRECTORY AND YML PATH
 case "$YMLFILELOCATION" in
     /*) : ;;
     *) YMLFILELOCATION="$WORKING_DIR/$YMLFILELOCATION" ;;
@@ -72,35 +75,153 @@ esac
 YMLFILELOCATION=$(realpath -m "$YMLFILELOCATION")
 ENVFILELOCATION=$(realpath -m "$WORKING_DIR/.env")
 
-echonice "YML file location: $YMLFILELOCATION"
+############################################ INTERACTIVE PROMPTS
+# Get current directory information for educated defaults
+CURRENT_DIR=$(pwd)
+CURRENT_DIR_NAME=$(basename "$CURRENT_DIR")
+CURRENT_DIR_BASENAME=$(basename "$CURRENT_DIR" | tr '.' '_')
+
+echo "=== Basics ==="
+# Default includes http:// protocol, user can override
+SS_BASE_URL_DEFAULT="http://${CURRENT_DIR_NAME}.ss4"
+read -p "SS_BASE_URL [$SS_BASE_URL_DEFAULT]: " SS_BASE_URL
+SS_BASE_URL=${SS_BASE_URL:-$SS_BASE_URL_DEFAULT}
+
+read -p "SS_ENVIRONMENT_TYPE [dev]: " SS_ENVIRONMENT_TYPE
+SS_ENVIRONMENT_TYPE=${SS_ENVIRONMENT_TYPE:-dev}
+
+read -p "SS_ALLOWED_HOSTS [${CURRENT_DIR_NAME}.ss4]: " SS_ALLOWED_HOSTS
+SS_ALLOWED_HOSTS=${SS_ALLOWED_HOSTS:-${CURRENT_DIR_NAME}.ss4}
+# SS_ALLOWED_HOSTS="add your domain here, e.g. www.mydomain.com"
+
+read -p "SS_HOSTED_WITH_SITEHOST [false]: " SS_HOSTED_WITH_SITEHOST
+SS_HOSTED_WITH_SITEHOST=${SS_HOSTED_WITH_SITEHOST:-false}
+
+echo ""
+echo "=== Paths ==="
+# Full path for TEMP default (not relative)
+TEMP_PATH_DEFAULT="$CURRENT_DIR/tmp"
+read -p "TEMP_PATH [$TEMP_PATH_DEFAULT]: " TEMP_PATH
+TEMP_PATH=${TEMP_PATH:-$TEMP_PATH_DEFAULT}
+
+echo ""
+echo "=== DB ==="
+# Replace dots with underscores for valid database name
+SS_DATABASE_NAME_DEFAULT="${CURRENT_DIR_BASENAME}"
+read -p "SS_DATABASE_SERVER [localhost]: " SS_DATABASE_SERVER
+SS_DATABASE_SERVER=${SS_DATABASE_SERVER:-localhost}
+
+read -p "SS_DATABASE_NAME [$SS_DATABASE_NAME_DEFAULT]: " SS_DATABASE_NAME
+SS_DATABASE_NAME=${SS_DATABASE_NAME:-$SS_DATABASE_NAME_DEFAULT}
+
+read -p "SS_DATABASE_USERNAME [root]: " SS_DATABASE_USERNAME
+SS_DATABASE_USERNAME=${SS_DATABASE_USERNAME:-root}
+
+read -p "SS_DATABASE_PASSWORD [x]: " SS_DATABASE_PASSWORD
+SS_DATABASE_PASSWORD=${SS_DATABASE_PASSWORD:-x}
+
+read -p "SS_DATABASE_CLASS [MySQLDatabase]: " SS_DATABASE_CLASS
+SS_DATABASE_CLASS=${SS_DATABASE_CLASS:-MySQLDatabase}
+
+echo ""
+echo "=== Logins ==="
+read -p "SS_BASIC_AUTH_USER [x]: " SS_BASIC_AUTH_USER
+SS_BASIC_AUTH_USER=${SS_BASIC_AUTH_USER:-x}
+
+read -p "SS_BASIC_AUTH_PASSWORD [x]: " SS_BASIC_AUTH_PASSWORD
+SS_BASIC_AUTH_PASSWORD=${SS_BASIC_AUTH_PASSWORD:-x}
+
+read -p "SS_USE_BASIC_AUTH [false]: " SS_USE_BASIC_AUTH
+SS_USE_BASIC_AUTH=${SS_USE_BASIC_AUTH:-false}
+
+read -p "SS_DEFAULT_ADMIN_USERNAME [x]: " SS_DEFAULT_ADMIN_USERNAME
+SS_DEFAULT_ADMIN_USERNAME=${SS_DEFAULT_ADMIN_USERNAME:-x}
+
+read -p "SS_DEFAULT_ADMIN_PASSWORD [x]: " SS_DEFAULT_ADMIN_PASSWORD
+SS_DEFAULT_ADMIN_PASSWORD=${SS_DEFAULT_ADMIN_PASSWORD:-x}
+
+read -p "BYPASS_MFA [true]: " BYPASS_MFA
+BYPASS_MFA=${BYPASS_MFA:-true}
+
+echo ""
+echo "=== Debug and Development ==="
+read -p "SS_ERROR_LOG (optional, press enter to skip): " SS_ERROR_LOG
+
+read -p "SS_SERVER_FOR_EXAMPLE_DATA (optional, press enter to skip): " SS_SERVER_FOR_EXAMPLE_DATA
+
+# SS_ALLOW_SMOKE_TEST defaults to true for dev environments
+read -p "SS_ALLOW_SMOKE_TEST [true]: " SS_ALLOW_SMOKE_TEST
+SS_ALLOW_SMOKE_TEST=${SS_ALLOW_SMOKE_TEST:-true}
+
+echo ""
+echo "=== Release ==="
+read -p "SS_RELEASE_BRANCH [develop]: " SS_RELEASE_BRANCH
+SS_RELEASE_BRANCH=${SS_RELEASE_BRANCH:-develop}
+
+read -p "FIA_RELEASE_PING_URL [tbc]: " FIA_RELEASE_PING_URL
+FIA_RELEASE_PING_URL=${FIA_RELEASE_PING_URL:-tbc}
+
+echo ""
+echo "=== Secrets ==="
+# Generate real random strings for MFA and session keys
+SS_MFA_SECRET_KEY_DEFAULT=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+SS_SESSION_KEY_DEFAULT=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+
+read -p "SS_MFA_SECRET_KEY [$SS_MFA_SECRET_KEY_DEFAULT]: " SS_MFA_SECRET_KEY
+SS_MFA_SECRET_KEY=${SS_MFA_SECRET_KEY:-$SS_MFA_SECRET_KEY_DEFAULT}
+
+read -p "SS_SESSION_KEY [$SS_SESSION_KEY_DEFAULT]: " SS_SESSION_KEY
+SS_SESSION_KEY=${SS_SESSION_KEY:-$SS_SESSION_KEY_DEFAULT}
+
+echo ""
+echo "=== Email ==="
+read -p "SS_SEND_ALL_EMAILS_TO [support.team@sunnysideup.co.nz]: " SS_SEND_ALL_EMAILS_TO
+SS_SEND_ALL_EMAILS_TO=${SS_SEND_ALL_EMAILS_TO:-support.team@sunnysideup.co.nz}
+
+echo ""
+echo "=== Branding ==="
+read -p "SS_WHITE_LABEL_ONLY [false]: " SS_WHITE_LABEL_ONLY
+SS_WHITE_LABEL_ONLY=${SS_WHITE_LABEL_ONLY:-false}
+
+############################################ GENERATE YML FILE
+echo ""
+echo "=== Generating .env.yml file ==="
+
+# Build the YAML content piece by piece to avoid heredoc issues
+YML_CONTENT="# Basics\n"
+YML_CONTENT+="WebsiteURL: \"$SS_BASE_URL\"\n"
+YML_CONTENT+="Branch: \"$SS_RELEASE_BRANCH\"\n"
+YML_CONTENT+="DBServer: \"$SS_DATABASE_SERVER\"\n"
+YML_CONTENT+="DBName: \"$SS_DATABASE_NAME\"\n"
+YML_CONTENT+="DBUser: \"$SS_DATABASE_USERNAME\"\n"
+YML_CONTENT+="DBPassword: \"$SS_DATABASE_PASSWORD\"\n"
+YML_CONTENT+="BasicAuthUser: \"$SS_BASIC_AUTH_USER\"\n"
+YML_CONTENT+="BasicAuthPassword: \"$SS_BASIC_AUTH_PASSWORD\"\n"
+YML_CONTENT+="EnvironmentType: \"$SS_ENVIRONMENT_TYPE\"\n"
+YML_CONTENT+="DomainName: \"$SS_ALLOWED_HOSTS\"\n"
+YML_CONTENT+="FIAPingURL: \"$FIA_RELEASE_PING_URL\"\n"
+YML_CONTENT+="SessionKey: \"$SS_SESSION_KEY\"\n"
+YML_CONTENT+="MFASecretKey: \"$SS_MFA_SECRET_KEY\"\n"
+YML_CONTENT+="SendAllEmailsTo: \"$SS_SEND_ALL_EMAILS_TO\"\n"
+YML_CONTENT+="BYPASS_MFA: \"$BYPASS_MFA\"\n"
+YML_CONTENT+="SSAllowSmokeTest: \"$SS_ALLOW_SMOKE_TEST\"\n"
+YML_CONTENT+="AdminUser: \"$SS_DEFAULT_ADMIN_USERNAME\"\n"
+YML_CONTENT+="AdminPassword: \"$SS_DEFAULT_ADMIN_PASSWORD\"\n"
+YML_CONTENT+="\n# Paths\n"
+YML_CONTENT+="TEMP_PATH: \"$TEMP_PATH\"\n"
+YML_CONTENT+="\n# DB\n"
+YML_CONTENT+="# Note: dots in database name have been replaced with underscores\n"
+
+# Write the YAML file
+printf "$YML_CONTENT" > "$YMLFILELOCATION"
+
+echo "Created: $YMLFILELOCATION"
+echo ""
+
+############################################ BUILD ENV FILE
+echo "Building env file: $ENVFILELOCATION"
 
 PHP_CLASS_FILE="${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php"
-
-############################################ CREATE YML (when asked, or when it does not exist)
-
-if [[ "$YMLFILECREATE" == "yes" || ! -f "$YMLFILELOCATION" ]]; then
-
-    if [[ ! -f "$YMLFILELOCATION" ]]; then
-        echonice "No yml file found - creating one for you to complete."
-    else
-        echonice "Recreating the yml file."
-    fi
-
-    phpCode="require '${PHP_CLASS_FILE}';
-\\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::outputExampleFile('${YMLFILELOCATION}');"
-
-    echo "Running: php -r \"$phpCode\""
-    php -r "$phpCode"
-
-    echonice "Created: $YMLFILELOCATION"
-    echonice "Please edit it with your values, then run this command again to build the .env file."
-    echoend
-    exit 0
-fi
-
-############################################ BUILD ENV (yml exists)
-
-echonice "Building env file: $ENVFILELOCATION"
 
 phpCode="require '${PHP_CLASS_FILE}';
 \\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::buildEnvFile('${YMLFILELOCATION}', '${ENVFILELOCATION}', '${ENVFILELOCATION}');"
@@ -108,5 +229,8 @@ phpCode="require '${PHP_CLASS_FILE}';
 echo "Running: php -r \"$phpCode\""
 php -r "$phpCode"
 
+echo ""
 echonice "Built: $ENVFILELOCATION"
 echoend
+
+exit 0
