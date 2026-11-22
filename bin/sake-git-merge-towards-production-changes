@@ -304,10 +304,10 @@ fi
 
 # The review starts at the "until" hash of the NEWEST CHANGELOG entry. Entries are
 # written by this script as a level-2 heading:
-#   ## [Unreleased] — from <fromHash> to <untilHash> (<date>)
+#   ## [Unreleased] — from <fromHash|start> to <untilHash> (<date>)
 # Anchoring on '^## ' and the exact 'from X to Y (' shape means hashes mentioned
 # in the entry body (or in older prose) can never be mistaken for a range.
-CHANGELOG_HEADING_RE='^## .*from [0-9a-f]{7,40} to [0-9a-f]{7,40} \('
+CHANGELOG_HEADING_RE='^## .*from (start|[0-9a-f]{7,40}) to [0-9a-f]{7,40} \('
 changelogUntil=''
 if [[ -f CHANGELOG.md ]]; then
     # Newest entry is at the top, so the first match wins.

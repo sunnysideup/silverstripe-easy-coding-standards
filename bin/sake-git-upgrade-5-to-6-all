@@ -1,0 +1,557 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="For every repo of an owner: if branch 5 is ahead of main, merge 5 into main, drop SS5-only changes, clean up conflicts and make sure it works with SS6"
+
+############################################ SETTINGS
+owner='sunnysideup'
+limit=1000
+sourceBranch='5'       # branch holding SS5 work
+baseBranch=''          # branch that receives the merge (default: repo default branch, i.e. main)
+workDir="${TMPDIR:-/tmp}/sake-upgrade-5-to-6"
+rectorConfig='SS62'
+only=''                # comma separated repo names (without owner)
+skip=''                # comma separated repo names to skip
+assumeYes='no'         # don't ask per repo
+runChangelog='yes'     # run sake-git-merge-towards-production-changes on the source branch first
+dryRun='no'
+push='no'
+useLlm='yes'
+provider=''
+model=''
+verbose='no'
+
+while (($#)); do
+    case $1 in
+    -o | --owner)
+        owner="${2:-}"
+        shift
+        ;;
+    -l | --limit)
+        limit="${2:-1000}"
+        shift
+        ;;
+    -s | --source)
+        sourceBranch="${2:-}"
+        shift
+        ;;
+    -b | --base)
+        baseBranch="${2:-}"
+        shift
+        ;;
+    -w | --work-dir)
+        workDir="${2:-}"
+        shift
+        ;;
+    -r | --rector-config)
+        rectorConfig="${2:-}"
+        shift
+        ;;
+    --only)
+        only="${2:-}"
+        shift
+        ;;
+    --skip)
+        skip="${2:-}"
+        shift
+        ;;
+    -y | --yes)
+        assumeYes='yes'
+        ;;
+    --no-changelog)
+        runChangelog='no'
+        ;;
+    -d | --dry-run)
+        dryRun='yes'
+        ;;
+    -p | --push)
+        push='yes'
+        ;;
+    --no-llm)
+        useLlm='no'
+        ;;
+    --provider)
+        provider="${2:-}"
+        shift
+        ;;
+    -m | --model)
+        model="${2:-}"
+        shift
+        ;;
+    -v | --verbose)
+        verbose='yes'
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        echobad "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+    shift
+done
+
+############################################ HELP
+
+help_and_exit() {
+    ECHOHEAD "Merge SS5 branches into main and upgrade to SS6 across all repos"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "directory of script:           $SCRIPT_DIR"
+
+    ECHOHEAD "Current settings:"
+    echonice "owner:                         $owner"
+    echonice "source branch (-s):            $sourceBranch"
+    echonice "base branch (-b):              ${baseBranch:-(repo default branch)}"
+    echonice "work dir (-w):                 $workDir"
+    echonice "rector config (-r):            $rectorConfig"
+    echonice "skip repos (--skip):           ${skip:-(none)}"
+    echonice "ask per repo:                  $([[ "$assumeYes" == 'yes' ]] && echo no || echo 'yes (when interactive)')"
+    echonice "changelog first:               $runChangelog"
+    echonice "use LLM:                       $useLlm"
+    echonice "push:                          $push"
+    echonice "dry run:                       $dryRun"
+
+    ECHOHEAD "What it does per repo:"
+    echonice "0. skips repos without a '$sourceBranch' branch, or where it is not ahead of the base branch"
+    echonice "   asks [p]roceed / [s]kip / [q]uit (not with --yes, --dry-run or without a terminal)"
+    echonice "1. runs sake-git-merge-towards-production-changes on '$sourceBranch' (CHANGELOG.md)"
+    echonice "2. (a) merges '$sourceBranch' into the base branch (no commit yet)"
+    echonice "   (c) conflicts are cleaned up per file with sake-llm-opencode (composer.json keeps the base version)"
+    echonice "   (b) an LLM reviews the whole incoming diff and reverts changes that are not needed / wrong for SS6"
+    echonice "   then commits the merge"
+    echonice "3. (d) runs sake-lint-php-rector -r $rectorConfig, an LLM SS6 clean-up, then checks:"
+    echonice "   composer validate + php -l on all PHP files (one LLM repair attempt if it fails)"
+    echonice "4. commits the clean-up (and pushes with --push) using sake-git-commit-and-push"
+    echonice "   a failing repo is reset to where it started and reported, never left half-merged"
+
+    ECHOHEAD "Available settings:"
+    echonice "-o, --owner OWNER              GitHub user or org (default: sunnysideup)"
+    echonice "-l, --limit NUMBER             max repos to scan (default: 1000)"
+    echonice "-s, --source BRANCH            branch to merge FROM (default: 5)"
+    echonice "-b, --base BRANCH              branch to merge INTO (default: repo default branch)"
+    echonice "-w, --work-dir DIR             where repos are cloned (default: $workDir)"
+    echonice "-r, --rector-config NAME       rector config (default: SS62)"
+    echonice "    --only a,b,c               only these repo names"
+    echonice "    --skip a,b,c               never touch these repo names"
+    echonice "-y, --yes                      do not ask per repo (automation)"
+    echonice "    --no-changelog             do not run sake-git-merge-towards-production-changes first"
+    echonice "-d, --dry-run                  only report which repos would be upgraded"
+    echonice "-p, --push                     push the result (commit goes through sake-git-commit-and-push)"
+    echonice "    --no-llm                   skip all LLM steps (conflicts then fail the repo)"
+    echonice "    --provider PROVIDER        LLM provider (passed to sake-llm-opencode)"
+    echonice "-m, --model MODEL              LLM model (passed to sake-llm-opencode)"
+    echonice "-v, --verbose                  show skipped repos too"
+    echonice "-h, --help                     show help information"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-git-upgrade-5-to-6-all --dry-run"
+    echonice "sake-git-upgrade-5-to-6-all --only silverstripe-seo --skip silverstripe-email-helpers -m github-copilot/claude-sonnet-4.5"
+    echonice "sake-git-upgrade-5-to-6-all --push"
+
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ PROMPTS
+
+write_prompts() {
+    local dir=$1
+    mkdir -p "$dir/.agents"
+
+    cat >"$dir/.agents/prompt-conflicts.txt" <<TXT
+You are resolving a git merge conflict in a Silverstripe module.
+Branch '$sourceBranch' (Silverstripe CMS 5) is being merged into '$base' (Silverstripe CMS 6, PHP 8.3+).
+In the attached file(s), resolve every conflict marker (<<<<<<<, =======, >>>>>>>).
+- Keep shared feature and bug-fix content from both sides.
+- Prefer the Silverstripe 6 compatible form; drop SS5-only plumbing.
+- Never leave conflict markers behind. Do not run git commands. Do not commit.
+- Only edit the attached file(s).
+TXT
+
+    cat >"$dir/.agents/prompt-review.txt" <<TXT
+Branch '$sourceBranch' (Silverstripe CMS 5) has just been merged (uncommitted) into '$base' (Silverstripe CMS 6, PHP 8.3+)
+in this Silverstripe module. The attached file merge.diff is the complete incoming change set relative to '$base'
+(git diff --cached HEAD). Review ALL of it, including changes that merged silently:
+- Keep feature work and bug fixes that are valid for SS6.
+- Revert anything that is not required or is wrong on '$base': SS5-only class names/APIs, PHP 8.1/8.2-only plumbing,
+  SS5 dependency constraints, SS5-only workarounds, downgrades of code that '$base' already has in newer form.
+  To revert a file or hunk, edit it back to its '$base' content (you may run: git show HEAD:<path>).
+- composer.json must keep the '$base' version.
+- You may run read-only git commands (git diff, git show, git status). Do NOT run git add, commit, checkout, reset or merge.
+- No conflict markers may remain.
+TXT
+
+    cat >"$dir/.agents/prompt-cleanup.txt" <<TXT
+This Silverstripe module has just had its Silverstripe CMS 5 branch merged into the Silverstripe CMS 6 branch ('$base'),
+and Rector ($rectorConfig) has already run. Make sure the module works with Silverstripe CMS 6 / PHP 8.3:
+- composer.json: require silverstripe/framework (and other silverstripe/* and sunnysideup/* modules) in their SS6 compatible
+  constraints (^6 or the SS6 version of that package), PHP ^8.3, and remove SS5-only constraints.
+- Replace any remaining SS5 class names, removed or deprecated APIs and SS5-only syntax with the SS6 equivalents.
+- Check src/, tests/, templates/, _config/ (yml) and client/ for SS5 leftovers.
+- No conflict markers (<<<<<<<, =======, >>>>>>>) may remain anywhere.
+- Keep changes minimal and do not change behaviour. Do not run git commands. Do not commit.
+TXT
+}
+
+# run_llm PROMPT_FILE FILES_GLOB
+run_llm() {
+    local promptFile=$1 files=$2
+    local args=("." --files "$files" --prompt "$promptFile")
+    [[ -n "$provider" ]] && args+=(--provider "$provider")
+    [[ -n "$model" ]] && args+=(--model "$model")
+    sake-llm-opencode "${args[@]}"
+}
+
+############################################ PER REPO
+
+QUIT='no'
+START_SHA=''
+
+merge_in_progress() { git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; }
+unmerged_paths() { git diff --name-only --diff-filter=U; }
+
+markers_remaining() {
+    git grep -lEI '^(<{7} |={7}$|>{7} )' -- . ':!*.md' 2>/dev/null
+}
+
+# Put the clone back exactly where this repo's run started.
+bail() {
+    merge_in_progress && git merge --abort >/dev/null 2>&1
+    [[ -n "$START_SHA" ]] && git reset --hard "$START_SHA" >/dev/null 2>&1
+    git clean -fd -e .agents >/dev/null 2>&1
+    return 1
+}
+
+php_dirs() {
+    local d
+    for d in src code app/src tests; do [[ -d "$d" ]] && echo "$d"; done
+}
+
+run_rector() {
+    local d any='no'
+    for d in $(php_dirs); do
+        any='yes'
+        sake-lint-php-rector -r "$rectorConfig" -a _config.php "$d" || return 1
+    done
+    [[ "$any" == 'yes' ]] || echowarn "no src/code/tests dir found, rector skipped"
+    return 0
+}
+
+# Cheap "does it still hang together" checks. Writes problems to .agents/verify.txt.
+verify_module() {
+    local out=.agents/verify.txt f rc=0
+    : >"$out"
+
+    if command -v composer >/dev/null 2>&1 && [[ -f composer.json ]]; then
+        composer validate --no-check-publish --no-check-all >>"$out" 2>&1 || {
+            echo "composer validate FAILED" >>"$out"
+            rc=1
+        }
+    fi
+    if command -v php >/dev/null 2>&1; then
+        while IFS= read -r f; do
+            php -l "$f" >/dev/null 2>>"$out" || {
+                echo "php -l FAILED: $f" >>"$out"
+                rc=1
+            }
+        done < <(git ls-files '*.php')
+    fi
+    if [[ -n "$(markers_remaining)" ]]; then
+        echo "conflict markers remain in: $(markers_remaining | tr '\n' ' ')" >>"$out"
+        rc=1
+    fi
+    return $rc
+}
+
+ask_repo() {
+    local name=$1 ans
+    [[ "$assumeYes" == 'yes' || "$dryRun" == 'yes' || ! -t 0 ]] && return 0
+    while true; do
+        read -r -p "   upgrade $name? [p]roceed / [s]kip / [q]uit: " ans </dev/tty
+        case "${ans,,}" in
+        p | proceed | y | yes | '') return 0 ;;
+        s | skip | n | no) return 1 ;;
+        q | quit)
+            echowarn "quitting."
+            QUIT='yes'
+            return 1
+            ;;
+        esac
+    done
+}
+
+# Update CHANGELOG.md on the source branch (commits there) before it is merged.
+changelog_on_source() {
+    local repo=$1
+    git checkout -q -B "$sourceBranch" "origin/$sourceBranch" || return 1
+    [[ "$runChangelog" == 'yes' && "$useLlm" == 'yes' ]] || return 0
+
+    ECHOHEAD "$repo: CHANGELOG.md on $sourceBranch"
+    local args=(. -b "$sourceBranch" --no-fetch)
+    [[ -n "$provider" ]] && args+=(--provider "$provider")
+    [[ -n "$model" ]] && args+=(--model "$model")
+    if ! sake-git-merge-towards-production-changes "${args[@]}"; then
+        echowarn "$repo: changelog step failed; continuing without it"
+        git reset -q --hard "origin/$sourceBranch" 2>/dev/null
+        git clean -fdq -e .agents
+    fi
+    return 0
+}
+
+# Work inside the cloned repo (cwd already set). Returns 0 = upgraded, 1 = failed.
+upgrade_repo() {
+    local repo=$1 f
+
+    changelog_on_source "$repo" || return 1
+
+    git checkout -q -B "$base" "origin/$base" || return 1
+    START_SHA=$(git rev-parse HEAD)
+
+    write_prompts "$PWD"
+    printf '.agents/\n' >>"$(git rev-parse --git-path info/exclude)"
+
+    ############ (a) merge
+    ECHOHEAD "$repo: merging $sourceBranch into $base"
+    git merge --no-ff --no-commit "$sourceBranch" >/dev/null 2>&1
+
+    if ! merge_in_progress; then
+        echonice "$repo: nothing to merge"
+        return 0
+    fi
+
+    # composer.json is version specific: always keep the base branch version
+    if unmerged_paths | grep -qx 'composer.json'; then
+        git checkout --ours composer.json 2>/dev/null && git add composer.json
+    fi
+
+    ############ (c) conflicts
+    if [[ -n "$(unmerged_paths)" ]]; then
+        if [[ "$useLlm" != 'yes' ]]; then
+            echobad "conflicts in: $(unmerged_paths | tr '\n' ' ') (and --no-llm given)"
+            bail
+            return 1
+        fi
+        while IFS= read -r f; do
+            echonice "cleaning up conflict with LLM: $f"
+            run_llm "$PWD/.agents/prompt-conflicts.txt" "$f" || echowarn "LLM exited non-zero for $f"
+        done < <(unmerged_paths)
+        if [[ -n "$(markers_remaining)" ]]; then
+            echobad "conflict markers remain in: $(markers_remaining | tr '\n' ' ')"
+            bail
+            return 1
+        fi
+    fi
+    git add -A
+
+    ############ (b) review the whole incoming change set
+    if [[ "$useLlm" == 'yes' ]]; then
+        ECHOHEAD "$repo: LLM review of incoming changes"
+        git diff --cached HEAD >.agents/merge.diff
+        run_llm "$PWD/.agents/prompt-review.txt" '.agents/merge.diff' || echowarn "LLM review exited non-zero"
+        if [[ -n "$(markers_remaining)" ]]; then
+            echobad "conflict markers remain in: $(markers_remaining | tr '\n' ' ')"
+            bail
+            return 1
+        fi
+        git add -A
+    fi
+
+    git commit -q --no-edit -m "Merge branch '$sourceBranch' into $base" || {
+        bail
+        return 1
+    }
+    echogood "$repo: merge committed"
+
+    ############ (d) works with SS6
+    ECHOHEAD "$repo: rector $rectorConfig"
+    if ! run_rector; then
+        echobad "rector failed"
+        bail
+        return 1
+    fi
+
+    if [[ "$useLlm" == 'yes' ]]; then
+        ECHOHEAD "$repo: LLM SS6 clean-up"
+        run_llm "$PWD/.agents/prompt-cleanup.txt" 'composer.json' || echowarn "LLM clean-up exited non-zero"
+    fi
+
+    ECHOHEAD "$repo: verifying"
+    if ! verify_module; then
+        cat .agents/verify.txt
+        if [[ "$useLlm" == 'yes' ]]; then
+            echowarn "verification failed; one LLM repair attempt"
+            printf 'Fix the problems listed in the attached verify.txt for this Silverstripe 6 module. Only edit what is needed. Do not run git commands.\n' >.agents/prompt-repair.txt
+            run_llm "$PWD/.agents/prompt-repair.txt" '.agents/verify.txt' || echowarn "LLM repair exited non-zero"
+        fi
+        if ! verify_module; then
+            cat .agents/verify.txt
+            echobad "$repo: verification failed"
+            bail
+            return 1
+        fi
+    fi
+    echogood "$repo: verification passed"
+
+    ############ commit (and push) the clean-up
+    local msg="API: upgrade to Silverstripe 6 (merged $sourceBranch into $base)"
+    if [[ -n "$(git status --porcelain)" ]]; then
+        if [[ "$push" == 'yes' ]]; then
+            sake-git-commit-and-push -m "$msg" -v no -r no . || {
+                echobad "$repo: sake-git-commit-and-push failed"
+                return 1
+            }
+        else
+            git add -A && git commit -q -m "$msg" || {
+                bail
+                return 1
+            }
+        fi
+    fi
+    echogood "$repo: committed on $base"
+
+    if [[ "$push" == 'yes' ]]; then
+        # make sure everything lands, even if there was nothing left to commit for the tool above
+        if [[ "$(git rev-parse "$sourceBranch")" != "$(git rev-parse "origin/$sourceBranch")" ]]; then
+            git push origin "$sourceBranch" && echogood "$repo: pushed changelog commit on $sourceBranch" ||
+                echowarn "$repo: could not push $sourceBranch"
+        fi
+        git fetch -q origin "$base"
+        if [[ "$(git rev-parse "$base")" != "$(git rev-parse "origin/$base")" ]]; then
+            git push origin "$base" || {
+                echobad "$repo: push failed"
+                return 1
+            }
+        fi
+        echogood "$repo: pushed"
+    fi
+    return 0
+}
+
+############################################ RUN
+
+for tool in gh git sake-llm-opencode sake-lint-php-rector sake-git-merge-towards-production-changes sake-git-commit-and-push; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echobad "Required tool not found: $tool"
+        exit 1
+    fi
+done
+
+ECHOHEAD "Scanning $owner repos for '$sourceBranch' branches ahead of base"
+mkdir -p "$workDir" || exit 1
+
+mapfile -t repos < <(gh repo list "$owner" --limit "$limit" --no-archived --source \
+    --json name,defaultBranchRef --jq '.[] | "\(.name) \(.defaultBranchRef.name // "main")"')
+
+if [[ -n "$only" ]]; then
+    filtered=()
+    for line in "${repos[@]}"; do
+        name=${line%% *}
+        [[ ",$only," == *",$name,"* ]] && filtered+=("$line")
+    done
+    repos=("${filtered[@]}")
+fi
+
+if [[ -n "$skip" ]]; then
+    filtered=()
+    for line in "${repos[@]}"; do
+        name=${line%% *}
+        [[ ",$skip," == *",$name,"* ]] || filtered+=("$line")
+    done
+    repos=("${filtered[@]}")
+fi
+
+echonice "repos to check: ${#repos[@]}"
+
+upgraded=() failed=() skipped=() candidates=()
+
+for line in "${repos[@]}"; do
+    [[ -n "$line" ]] || continue
+    name=${line%% *}
+    defaultBranch=${line##* }
+    base=${baseBranch:-$defaultBranch}
+    repoDir="$workDir/$name"
+
+    if [[ -d "$repoDir/.git" ]]; then
+        git -C "$repoDir" fetch -q origin --prune 2>/dev/null || {
+            skipped+=("$name (fetch failed)")
+            continue
+        }
+    else
+        # cheap existence check before cloning
+        if ! git ls-remote --exit-code --heads "https://github.com/$owner/$name.git" "$sourceBranch" >/dev/null 2>&1; then
+            [[ "$verbose" == 'yes' ]] && echonice "- $name: no '$sourceBranch' branch"
+            continue
+        fi
+        gh repo clone "$owner/$name" "$repoDir" -- -q >/dev/null 2>&1 || {
+            skipped+=("$name (clone failed)")
+            continue
+        }
+    fi
+
+    cd "$repoDir" || continue
+    if ! git rev-parse -q --verify "origin/$sourceBranch" >/dev/null; then
+        [[ "$verbose" == 'yes' ]] && echonice "- $name: no '$sourceBranch' branch"
+        continue
+    fi
+    if ! git rev-parse -q --verify "origin/$base" >/dev/null; then
+        skipped+=("$name (no base branch '$base')")
+        continue
+    fi
+
+    aheadOfBase=$(git rev-list --count "origin/$base..origin/$sourceBranch")
+    if ((aheadOfBase == 0)); then
+        [[ "$verbose" == 'yes' ]] && echonice "- $name: '$sourceBranch' not ahead of '$base'"
+        continue
+    fi
+
+    echowarn "$name: '$sourceBranch' is $aheadOfBase commit(s) ahead of '$base'"
+    candidates+=("$name")
+
+    [[ "$dryRun" == 'yes' ]] && continue
+
+    if ! ask_repo "$name"; then
+        [[ "$QUIT" == 'yes' ]] && break
+        skipped+=("$name (skipped by user)")
+        continue
+    fi
+
+    git reset -q --hard
+    git clean -fdq
+    if upgrade_repo "$name"; then
+        upgraded+=("$name")
+    else
+        failed+=("$name")
+    fi
+done
+
+cd "$WORKING_DIR" || exit 1
+
+############################################ SUMMARY
+
+ECHOHEAD "Summary"
+echonice "ahead of base:   ${#candidates[@]}"
+if [[ "$dryRun" == 'yes' ]]; then
+    for n in "${candidates[@]}"; do echonice "  would upgrade: $n"; done
+else
+    echogood "upgraded:        ${#upgraded[@]}"
+    for n in "${upgraded[@]}"; do echonice "  $n  ($workDir/$n)"; done
+    if ((${#failed[@]} > 0)); then
+        echobad "failed:          ${#failed[@]}"
+        for n in "${failed[@]}"; do echonice "  $n"; done
+    fi
+fi
+if ((${#skipped[@]} > 0)); then
+    echowarn "skipped:         ${#skipped[@]}"
+    for n in "${skipped[@]}"; do echonice "  $n"; done
+fi
+[[ "$push" == 'yes' || "$dryRun" == 'yes' || ${#upgraded[@]} -eq 0 ]] || echonice "Nothing pushed. Review in $workDir, or re-run with --push."
+
+echoend

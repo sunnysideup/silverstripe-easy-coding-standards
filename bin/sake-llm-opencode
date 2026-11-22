@@ -208,6 +208,12 @@ sake_check_help_and_exit
 add_to_git_ignore() {
     set +e
 
+    # never commit while a merge is in progress: that would finalise the merge
+    if git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+        grep -Fqx '.agents/' .gitignore 2>/dev/null || printf '.agents/\n' >> "$(git rev-parse --git-path info/exclude)"
+        return 0
+    fi
+
     local ignoreLine='.agents/'
 
     touch .gitignore
