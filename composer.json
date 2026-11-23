@@ -73,6 +73,7 @@
     "bin/sake-git-squash-and-pr",
     "bin/sake-git-squash-commits",
     "bin/sake-git-squash-stale-branches",
+    "bin/sake-git-upgrade-5-to-6-all",
     "bin/sake-help",
     "bin/sake-lint-class-namespacing",
     "bin/sake-lint-class-psr-4-checker",

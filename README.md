@@ -69,6 +69,7 @@ lives in the `pm` group: `sake-<category>-pm-<task>` (see `sake-help -f -pm-`).
  - sake-git-squash-and-pr - Squashes all commits in current branch and creates a pull request
  - sake-git-squash-commits - Squashes multiple commits into one with various filtering options
  - sake-git-squash-stale-branches - Removes local branches that have been merged, excluding protected branches like master and develop
+ - sake-git-upgrade-5-to-6-all - For every repo of an owner: if branch 5 is ahead of main, merge 5 into main, drop SS5-only changes, clean up conflicts, Rector (SS62) and verify SS6 with LLM help
 
 # lint
 ## class
