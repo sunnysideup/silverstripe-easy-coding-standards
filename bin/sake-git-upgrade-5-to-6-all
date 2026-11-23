@@ -27,6 +27,8 @@ useLlm='yes'
 provider=''
 model=''
 verbose='no'
+maxCost=''           # stop everything once total LLM spend (USD) reaches this
+thinking='no'
 verifyInstall='no'   # composer install + phpunit against SS6 in a scratch copy
 verifySoft='no'      # install/test failures are reported in the PR instead of failing the repo
 VERIFY_TIMEOUT=1800
@@ -102,6 +104,13 @@ while (($#)); do
         model="${2:-}"
         shift
         ;;
+    --max-cost)
+        maxCost="${2:-}"
+        shift
+        ;;
+    --thinking)
+        thinking='yes'
+        ;;
     --verify-install)
         verifyInstall='yes'
         ;;
@@ -142,6 +151,8 @@ help_and_exit() {
     echonice "changelog first:               $runChangelog"
     echonice "verify install + tests:        $verifyInstall (soft: $verifySoft)"
     echonice "use LLM:                       $useLlm"
+    echonice "LLM provider/model:            ${provider:-(env LLM_PROVIDER / runner default)} / ${model:-(env LLM_MODEL / runner default)}"
+    echonice "max LLM spend (--max-cost):    ${maxCost:-(no limit)}"
     echonice "push to base:                  $push"
     echonice "pull request mode (--pr):       $prMode (branch: $prBranch, draft: $prDraft)"
     echonice "dry run:                       $dryRun"
@@ -186,7 +197,13 @@ help_and_exit() {
     echonice "-m, --model MODEL              LLM model (passed to sake-llm-opencode)"
     echonice "    --verify-install           composer install + PHPUnit in a scratch copy (SS6 deps resolved for real); failure = repo fails"
     echonice "    --verify-soft              with --verify-install: do not fail the repo, record the result in the PR/summary instead"
+    echonice "    --max-cost USD             stop (after the current step) once total LLM spend reaches USD"
+    echonice "    --thinking                 show the model's thinking while it works"
     echonice "-v, --verbose                  show skipped repos too"
+    echonice ""
+    echonice "While the LLM works its output streams live. Ctrl-C stops the LLM step only, then asks:"
+    echonice "[s]kip this repo (reset, nothing pushed) / [c]ontinue with what it did so far / [q]uit"
+    echonice "Cost per LLM call, per repo and in total is printed (needs jq)."
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
@@ -242,13 +259,73 @@ and Rector ($rectorConfig) has already run. Make sure the module works with Silv
 TXT
 }
 
-# run_llm PROMPT_FILE FILES_GLOB
+# Cost tracking: sake-llm-opencode appends "cost tokensIn tokensOut" per call to this file.
+export SAKE_LLM_COST_FILE="$(mktemp "${TMPDIR:-/tmp}/sake-llm-cost.XXXXXX")"
+trap 'rm -f "$SAKE_LLM_COST_FILE"' EXIT
+
+total_cost() { awk '{c+=$1} END {printf "%.4f", c+0}' "$SAKE_LLM_COST_FILE"; }
+total_tokens() { awk '{i+=$2; o+=$3} END {printf "%d in / %d out", i, o}' "$SAKE_LLM_COST_FILE"; }
+over_budget() { [[ -n "$maxCost" ]] && awk -v t="$(total_cost)" -v m="$maxCost" 'BEGIN {exit !(t+0 >= m+0)}'; }
+
+ABORT_REPO='no'
+IN_LLM='no'
+
+# Ctrl-C: during an LLM call only the LLM is stopped (we then ask what to do); otherwise abort cleanly.
+on_int() {
+    [[ "$IN_LLM" == 'yes' ]] && return 0
+    echo
+    echowarn "interrupted: restoring the current repo and stopping"
+    cd "${CURRENT_DIR:-.}" 2>/dev/null && bail
+    echonice "LLM spend so far: \$$(total_cost) ($(total_tokens))"
+    exit 130
+}
+trap on_int INT
+
+# run_llm PROMPT_FILE FILES_GLOB   (output streams live; sets ABORT_REPO if the user stops the repo)
 run_llm() {
-    local promptFile=$1 files=$2
-    local args=("." --files "$files" --prompt "$promptFile")
+    local promptFile=$1 files=$2 rc ans
+    if over_budget; then
+        echobad "LLM budget reached (\$$(total_cost) >= \$$maxCost): stopping"
+        ABORT_REPO='yes'
+        QUIT='yes'
+        return 1
+    fi
+    local args=(".")
+    args+=(--files "$files" --prompt "$promptFile")
     [[ -n "$provider" ]] && args+=(--provider "$provider")
     [[ -n "$model" ]] && args+=(--model "$model")
+    [[ "$thinking" == 'yes' ]] && args+=(--thinking)
+
+    IN_LLM='yes'
     sake-llm-opencode "${args[@]}"
+    rc=$?
+    IN_LLM='no'
+
+    echonice "LLM spend so far: \$$(total_cost) ($(total_tokens))${maxCost:+ of max \$$maxCost}"
+    if ((rc == 130)); then
+        echo
+        if [[ -t 0 ]]; then
+            while true; do
+                read -r -p "   LLM stopped. [s]kip this repo / [c]ontinue with what it did / [q]uit: " ans </dev/tty
+                case "${ans,,}" in
+                s | skip) ABORT_REPO='yes'; break ;;
+                c | continue) break ;;
+                q | quit) ABORT_REPO='yes'; QUIT='yes'; break ;;
+                esac
+            done
+        else
+            ABORT_REPO='yes'
+        fi
+    fi
+    return $rc
+}
+
+# after an LLM step: if the user stopped the repo, restore it
+aborted() {
+    [[ "$ABORT_REPO" == 'yes' ]] || return 1
+    echowarn "stopped by user: restoring repo"
+    bail
+    return 0
 }
 
 ############################################ PER REPO
@@ -510,6 +587,7 @@ upgrade_repo() {
         while IFS= read -r f; do
             echonice "cleaning up conflict with LLM: $f"
             run_llm "$PWD/.agents/prompt-conflicts.txt" "$f" || echowarn "LLM exited non-zero for $f"
+            aborted && return 1
         done < <(unmerged_paths)
         if [[ -n "$(markers_remaining)" ]]; then
             echobad "conflict markers remain in: $(markers_remaining | tr '\n' ' ')"
@@ -524,6 +602,7 @@ upgrade_repo() {
         ECHOHEAD "$repo: LLM review of incoming changes"
         git diff --cached HEAD >.agents/merge.diff
         run_llm "$PWD/.agents/prompt-review.txt" '.agents/merge.diff' || echowarn "LLM review exited non-zero"
+        aborted && return 1
         if [[ -n "$(markers_remaining)" ]]; then
             echobad "conflict markers remain in: $(markers_remaining | tr '\n' ' ')"
             bail
@@ -549,6 +628,7 @@ upgrade_repo() {
     if [[ "$useLlm" == 'yes' ]]; then
         ECHOHEAD "$repo: LLM SS6 clean-up"
         run_llm "$PWD/.agents/prompt-cleanup.txt" 'composer.json' || echowarn "LLM clean-up exited non-zero"
+        aborted && return 1
     fi
 
     ECHOHEAD "$repo: verifying"
@@ -558,6 +638,7 @@ upgrade_repo() {
             echowarn "verification failed; one LLM repair attempt"
             printf 'Fix the problems listed in the attached verify.txt for this Silverstripe 6 module. Only edit what is needed. Do not change tests just to make them pass unless they test removed SS5 behaviour. Do not run git commands.\n' >.agents/prompt-repair.txt
             run_llm "$PWD/.agents/prompt-repair.txt" '.agents/verify.txt' || echowarn "LLM repair exited non-zero"
+            aborted && return 1
         fi
         if ! verify_all; then
             cat .agents/verify.txt
@@ -711,6 +792,9 @@ for line in "${repos[@]}"; do
 
     git reset -q --hard
     git clean -fdq
+    CURRENT_DIR="$repoDir"
+    ABORT_REPO='no'
+    costBefore=$(total_cost)
     VERIFY_DETAIL=''
     VERIFY_SUMMARY='static checks only (composer validate, php -l); dependencies were NOT installed and PHPUnit was NOT run'
     if upgrade_repo "$name"; then
@@ -718,6 +802,8 @@ for line in "${repos[@]}"; do
     else
         failed+=("$name")
     fi
+    echonice "$name: LLM cost for this repo \$$(awk -v a="$(total_cost)" -v b="$costBefore" 'BEGIN {printf "%.4f", a-b}')"
+    [[ "$QUIT" == 'yes' ]] && break
 done
 
 cd "$WORKING_DIR" || exit 1
@@ -725,6 +811,7 @@ cd "$WORKING_DIR" || exit 1
 ############################################ SUMMARY
 
 ECHOHEAD "Summary"
+echonice "LLM total:       \$$(total_cost)  ($(total_tokens))"
 echonice "ahead of base:   ${#candidates[@]}"
 if [[ "$dryRun" == 'yes' ]]; then
     for n in "${candidates[@]}"; do echonice "  would upgrade: $n"; done

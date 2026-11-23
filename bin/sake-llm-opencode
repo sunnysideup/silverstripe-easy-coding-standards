@@ -501,11 +501,22 @@ report_cost() {
           "cache write:   \($m | map(.tokens.cache.write // 0) | add // 0)",
           "COST (USD):    $\($m | map(.cost // 0) | add // 0 | . * 10000 | round / 10000)"
     ' 2>/dev/null | while IFS= read -r line; do echonice "$line"; done
+    # machine readable line for callers (e.g. sake-git-upgrade-5-to-6-all) that sum up spend
+    if [[ -n "${SAKE_LLM_COST_FILE:-}" ]]; then
+        printf '%s' "$json" | jq -r '
+            [.messages[] | (.info // .) | select(type == "object" and has("cost"))] as $m
+            | "\($m | map(.cost // 0) | add // 0) \($m | map(.tokens.input // 0) | add // 0) \($m | map(.tokens.output // 0) | add // 0)"
+        ' >>"$SAKE_LLM_COST_FILE" 2>/dev/null || true
+    fi
 }
 
 echo ""
+echonice "Output streams below. Ctrl-C stops the model; usage so far is still reported (exit status 130)."
+# Let Ctrl-C stop opencode only; this script survives to report the cost.
+trap ':' INT
 runStatus=0
 "${cmd[@]}" || runStatus=$?
+trap - INT
 
 report_cost || true
 
