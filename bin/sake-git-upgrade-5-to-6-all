@@ -19,10 +19,18 @@ assumeYes='no'         # don't ask per repo
 runChangelog='yes'     # run sake-git-merge-towards-production-changes on the source branch first
 dryRun='no'
 push='no'
+prMode='no'          # open a pull request instead of merging into base
+prBranch='upgrade/ss6-merge-5'
+prDraft='yes'
+forcePr='no'        # rebuild an existing PR branch (force-with-lease)
 useLlm='yes'
 provider=''
 model=''
 verbose='no'
+verifyInstall='no'   # composer install + phpunit against SS6 in a scratch copy
+verifySoft='no'      # install/test failures are reported in the PR instead of failing the repo
+VERIFY_TIMEOUT=1800
+VERIFY_SUMMARY='static checks only (composer validate, php -l); dependencies were NOT installed and PHPUnit was NOT run'
 
 while (($#)); do
     case $1 in
@@ -70,6 +78,19 @@ while (($#)); do
     -p | --push)
         push='yes'
         ;;
+    --pr)
+        prMode='yes'
+        ;;
+    --pr-branch)
+        prBranch="${2:-}"
+        shift
+        ;;
+    --no-draft)
+        prDraft='no'
+        ;;
+    --force-pr)
+        forcePr='yes'
+        ;;
     --no-llm)
         useLlm='no'
         ;;
@@ -80,6 +101,12 @@ while (($#)); do
     -m | --model)
         model="${2:-}"
         shift
+        ;;
+    --verify-install)
+        verifyInstall='yes'
+        ;;
+    --verify-soft)
+        verifySoft='yes'
         ;;
     -v | --verbose)
         verbose='yes'
@@ -113,8 +140,10 @@ help_and_exit() {
     echonice "skip repos (--skip):           ${skip:-(none)}"
     echonice "ask per repo:                  $([[ "$assumeYes" == 'yes' ]] && echo no || echo 'yes (when interactive)')"
     echonice "changelog first:               $runChangelog"
+    echonice "verify install + tests:        $verifyInstall (soft: $verifySoft)"
     echonice "use LLM:                       $useLlm"
-    echonice "push:                          $push"
+    echonice "push to base:                  $push"
+    echonice "pull request mode (--pr):       $prMode (branch: $prBranch, draft: $prDraft)"
     echonice "dry run:                       $dryRun"
 
     ECHOHEAD "What it does per repo:"
@@ -127,6 +156,11 @@ help_and_exit() {
     echonice "   then commits the merge"
     echonice "3. (d) runs sake-lint-php-rector -r $rectorConfig, an LLM SS6 clean-up, then checks:"
     echonice "   composer validate + php -l on all PHP files (one LLM repair attempt if it fails)"
+    echonice "   with --verify-install also: composer install/update + vendor/bin/phpunit in a scratch copy (repo itself stays clean)"
+    echonice "   tests need the DB env your Silverstripe tests normally use (SS_DATABASE_* ...) in your shell"
+    echonice "PR mode (--pr): all work happens on branch '$prBranch' created from the base branch; that branch is pushed and a"
+    echonice "   pull request into the base branch is opened. The base branch and '$sourceBranch' are NEVER pushed."
+    echonice "   Repos that already have that branch on origin are skipped (safe to re-run); --force-pr rebuilds it."
     echonice "4. commits the clean-up (and pushes with --push) using sake-git-commit-and-push"
     echonice "   a failing repo is reset to where it started and reported, never left half-merged"
 
@@ -142,16 +176,23 @@ help_and_exit() {
     echonice "-y, --yes                      do not ask per repo (automation)"
     echonice "    --no-changelog             do not run sake-git-merge-towards-production-changes first"
     echonice "-d, --dry-run                  only report which repos would be upgraded"
+    echonice "    --pr                       open a pull request per repo instead of merging into the base branch"
+    echonice "    --pr-branch NAME           PR branch name (default: upgrade/ss6-merge-5)"
+    echonice "    --no-draft                 open PRs as ready for review (default: draft)"
+    echonice "    --force-pr                 rebuild a PR branch that already exists (force-with-lease)"
     echonice "-p, --push                     push the result (commit goes through sake-git-commit-and-push)"
     echonice "    --no-llm                   skip all LLM steps (conflicts then fail the repo)"
     echonice "    --provider PROVIDER        LLM provider (passed to sake-llm-opencode)"
     echonice "-m, --model MODEL              LLM model (passed to sake-llm-opencode)"
+    echonice "    --verify-install           composer install + PHPUnit in a scratch copy (SS6 deps resolved for real); failure = repo fails"
+    echonice "    --verify-soft              with --verify-install: do not fail the repo, record the result in the PR/summary instead"
     echonice "-v, --verbose                  show skipped repos too"
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
     echonice "sake-git-upgrade-5-to-6-all --dry-run"
     echonice "sake-git-upgrade-5-to-6-all --only silverstripe-seo --skip silverstripe-email-helpers -m github-copilot/claude-sonnet-4.5"
+    echonice "sake-git-upgrade-5-to-6-all --pr --yes                 # a draft PR per repo to review on GitHub"
     echonice "sake-git-upgrade-5-to-6-all --push"
 
     echofunctions
@@ -214,6 +255,8 @@ run_llm() {
 
 QUIT='no'
 START_SHA=''
+PR_URLS=()
+VERIFY_DETAIL=''
 
 merge_in_progress() { git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; }
 unmerged_paths() { git diff --name-only --diff-filter=U; }
@@ -271,6 +314,67 @@ verify_module() {
     return $rc
 }
 
+# composer install + phpunit in a scratch copy so vendor/ and composer.lock never end up in the repo.
+# Appends to .agents/verify.txt. rc 0 = passed (or no tests to run), 1 = failed.
+verify_install() {
+    local out="$PWD/.agents/verify.txt" tmp rc=0 f
+    local installLog testLog
+    command -v composer >/dev/null 2>&1 || {
+        echo "composer not installed; cannot verify install" >>"$out"
+        return 1
+    }
+
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/ss6-verify.XXXXXX") || return 1
+    git ls-files -co --exclude-standard -z | xargs -0 -r cp --parents -t "$tmp" 2>/dev/null
+
+    installLog="$tmp/.composer.log"
+    testLog="$tmp/.phpunit.log"
+
+    echonice "composer install in scratch copy (this resolves SS6 dependencies)..."
+    if [[ -f "$tmp/composer.lock" ]]; then
+        (cd "$tmp" && timeout "$VERIFY_TIMEOUT" composer install --no-interaction --no-progress --prefer-dist) >"$installLog" 2>&1 || rc=1
+    else
+        (cd "$tmp" && timeout "$VERIFY_TIMEOUT" composer update --no-interaction --no-progress --prefer-dist) >"$installLog" 2>&1 || rc=1
+    fi
+    if ((rc != 0)); then
+        {
+            echo "composer install FAILED (last 60 lines):"
+            tail -n 60 "$installLog"
+        } >>"$out"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    if [[ -x "$tmp/vendor/bin/phpunit" ]] && ls "$tmp"/phpunit.xml* >/dev/null 2>&1; then
+        echonice "running phpunit in scratch copy..."
+        (cd "$tmp" && SS_ENVIRONMENT_TYPE="${SS_ENVIRONMENT_TYPE:-dev}" timeout "$VERIFY_TIMEOUT" vendor/bin/phpunit) >"$testLog" 2>&1 || rc=1
+        if ((rc != 0)); then
+            {
+                echo "phpunit FAILED (last 80 lines):"
+                tail -n 80 "$testLog"
+            } >>"$out"
+        else
+            echonice "$(tail -n 3 "$testLog" | tr '\n' ' ')"
+        fi
+    else
+        echonice "no phpunit binary/config: install verified, no tests to run"
+        VERIFY_SUMMARY='composer install resolved SS6 dependencies; no PHPUnit config, so no tests were run'
+        rm -rf "$tmp"
+        return 0
+    fi
+
+    rm -rf "$tmp"
+    ((rc == 0)) && VERIFY_SUMMARY='composer install resolved SS6 dependencies and PHPUnit passed (in a scratch copy)'
+    return $rc
+}
+
+# static checks, then (optionally) the heavier install + tests
+verify_all() {
+    verify_module || return 1
+    [[ "$verifyInstall" == 'yes' ]] || return 0
+    verify_install
+}
+
 ask_repo() {
     local name=$1 ans
     [[ "$assumeYes" == 'yes' || "$dryRun" == 'yes' || ! -t 0 ]] && return 0
@@ -306,13 +410,77 @@ changelog_on_source() {
     return 0
 }
 
+# Push the PR branch and open a pull request into base. Never touches base or the source branch on origin.
+open_pull_request() {
+    local repo=$1 body=.agents/pr-body.md pushArgs=(-u)
+    [[ "$forcePr" == 'yes' ]] && pushArgs+=(--force-with-lease)
+
+    {
+        echo "## Upgrade to Silverstripe 6"
+        echo
+        echo "Automated by \`sake-git-upgrade-5-to-6-all\`: merges \`$sourceBranch\` (SS5) into \`$base\` (SS6)."
+        echo
+        echo "### What was done"
+        echo "1. CHANGELOG.md updated on \`$sourceBranch\` (included in this PR)"
+        echo "2. \`$sourceBranch\` merged into \`$base\`; conflicts cleaned up"
+        echo "3. LLM review of the whole incoming diff, reverting changes not needed on SS6"
+        echo "4. Rector (\`$rectorConfig\`) and an LLM SS6 clean-up"
+        echo "5. Verification: static checks passed (\`composer validate\`, \`php -l\`, no conflict markers). $VERIFY_SUMMARY"
+        if [[ -n "$VERIFY_DETAIL" ]]; then
+            echo
+            echo '<details><summary>Failure output</summary>'
+            echo
+            echo '```'
+            echo "$VERIFY_DETAIL"
+            echo '```'
+            echo '</details>'
+        fi
+        echo
+        echo "### Commits"
+        git log --no-merges --oneline "origin/$base..HEAD" | sed 's/^/- /'
+        echo
+        echo "### Files changed"
+        echo '```'
+        git diff --stat "origin/$base"...HEAD | tail -n 40
+        echo '```'
+        echo
+        echo "### Please review"
+        echo "- [ ] No SS5-only code, class names or constraints came across"
+        echo "- [ ] \`composer.json\` constraints are right for SS6"
+        echo "- [ ] Tests pass in CI / a real SS6 project (see the verification line above for what the script actually ran)"
+        echo "- [ ] LLM edits (conflict resolution, clean-up) look sensible"
+    } >"$body"
+
+    git push "${pushArgs[@]}" origin "$prBranch" || {
+        echobad "$repo: could not push $prBranch"
+        return 1
+    }
+
+    local prArgs=(pr create --repo "$owner/$repo" --base "$base" --head "$prBranch"
+        --title "Upgrade to Silverstripe 6 (merge $sourceBranch into $base)" --body-file "$body")
+    [[ "$prDraft" == 'yes' ]] && prArgs+=(--draft)
+    local url
+    if url=$(gh "${prArgs[@]}" 2>&1 | tail -n1); then
+        echogood "$repo: pull request: $url"
+        PR_URLS+=("$repo $url")
+        return 0
+    fi
+    echobad "$repo: branch pushed but PR creation failed: $url"
+    echonice "  create it by hand: gh pr create --repo $owner/$repo --base $base --head $prBranch"
+    return 1
+}
+
 # Work inside the cloned repo (cwd already set). Returns 0 = upgraded, 1 = failed.
 upgrade_repo() {
     local repo=$1 f
 
     changelog_on_source "$repo" || return 1
 
-    git checkout -q -B "$base" "origin/$base" || return 1
+    if [[ "$prMode" == 'yes' ]]; then
+        git checkout -q -B "$prBranch" "origin/$base" || return 1
+    else
+        git checkout -q -B "$base" "origin/$base" || return 1
+    fi
     START_SHA=$(git rev-parse HEAD)
 
     write_prompts "$PWD"
@@ -384,18 +552,24 @@ upgrade_repo() {
     fi
 
     ECHOHEAD "$repo: verifying"
-    if ! verify_module; then
+    if ! verify_all; then
         cat .agents/verify.txt
         if [[ "$useLlm" == 'yes' ]]; then
             echowarn "verification failed; one LLM repair attempt"
-            printf 'Fix the problems listed in the attached verify.txt for this Silverstripe 6 module. Only edit what is needed. Do not run git commands.\n' >.agents/prompt-repair.txt
+            printf 'Fix the problems listed in the attached verify.txt for this Silverstripe 6 module. Only edit what is needed. Do not change tests just to make them pass unless they test removed SS5 behaviour. Do not run git commands.\n' >.agents/prompt-repair.txt
             run_llm "$PWD/.agents/prompt-repair.txt" '.agents/verify.txt' || echowarn "LLM repair exited non-zero"
         fi
-        if ! verify_module; then
+        if ! verify_all; then
             cat .agents/verify.txt
-            echobad "$repo: verification failed"
-            bail
-            return 1
+            if [[ "$verifySoft" == 'yes' && "$verifyInstall" == 'yes' ]] && verify_module; then
+                VERIFY_SUMMARY="**FAILED**: composer install / PHPUnit did not pass. Static checks passed. Details:"
+                VERIFY_DETAIL=$(grep -A80 -E 'composer install FAILED|phpunit FAILED' .agents/verify.txt | head -n 100)
+                echowarn "$repo: install/test verification failed (--verify-soft): continuing, recorded in the PR"
+            else
+                echobad "$repo: verification failed"
+                bail
+                return 1
+            fi
         fi
     fi
     echogood "$repo: verification passed"
@@ -403,7 +577,7 @@ upgrade_repo() {
     ############ commit (and push) the clean-up
     local msg="API: upgrade to Silverstripe 6 (merged $sourceBranch into $base)"
     if [[ -n "$(git status --porcelain)" ]]; then
-        if [[ "$push" == 'yes' ]]; then
+        if [[ "$push" == 'yes' && "$prMode" != 'yes' ]]; then
             sake-git-commit-and-push -m "$msg" -v no -r no . || {
                 echobad "$repo: sake-git-commit-and-push failed"
                 return 1
@@ -415,7 +589,12 @@ upgrade_repo() {
             }
         fi
     fi
-    echogood "$repo: committed on $base"
+    echogood "$repo: committed on $(git rev-parse --abbrev-ref HEAD)"
+
+    if [[ "$prMode" == 'yes' ]]; then
+        open_pull_request "$repo" || return 1
+        return 0
+    fi
 
     if [[ "$push" == 'yes' ]]; then
         # make sure everything lands, even if there was nothing left to commit for the tool above
@@ -512,6 +691,13 @@ for line in "${repos[@]}"; do
         continue
     fi
 
+    if [[ "$prMode" == 'yes' && "$forcePr" != 'yes' ]] &&
+        git ls-remote --exit-code --heads origin "$prBranch" >/dev/null 2>&1; then
+        existing=$(gh pr list --repo "$owner/$name" --head "$prBranch" --state open --json url --jq '.[0].url' 2>/dev/null)
+        skipped+=("$name ('$prBranch' already on origin; ${existing:-no open PR - create one or use --force-pr})")
+        continue
+    fi
+
     echowarn "$name: '$sourceBranch' is $aheadOfBase commit(s) ahead of '$base'"
     candidates+=("$name")
 
@@ -525,6 +711,8 @@ for line in "${repos[@]}"; do
 
     git reset -q --hard
     git clean -fdq
+    VERIFY_DETAIL=''
+    VERIFY_SUMMARY='static checks only (composer validate, php -l); dependencies were NOT installed and PHPUnit was NOT run'
     if upgrade_repo "$name"; then
         upgraded+=("$name")
     else
@@ -552,6 +740,10 @@ if ((${#skipped[@]} > 0)); then
     echowarn "skipped:         ${#skipped[@]}"
     for n in "${skipped[@]}"; do echonice "  $n"; done
 fi
-[[ "$push" == 'yes' || "$dryRun" == 'yes' || ${#upgraded[@]} -eq 0 ]] || echonice "Nothing pushed. Review in $workDir, or re-run with --push."
+if ((${#PR_URLS[@]} > 0)); then
+    ECHOHEAD "Pull requests to review"
+    for n in "${PR_URLS[@]}"; do echonice "  $n"; done
+fi
+[[ "$push" == 'yes' || "$prMode" == 'yes' || "$dryRun" == 'yes' || ${#upgraded[@]} -eq 0 ]] || echonice "Nothing pushed. Review in $workDir, or re-run with --push."
 
 echoend

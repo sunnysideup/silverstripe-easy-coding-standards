@@ -10,8 +10,9 @@ SCRIPT_SUMMARY="Runs OpenCode LLM agent to process files based on custom prompts
 
 
 ############################################ DEFAULTS
-DEFAULT_PROVIDER='google'
-DEFAULT_MODEL='gemini-1.5-pro'
+DEFAULT_PROVIDER='github-copilot'
+DEFAULT_MODEL='claude-sonnet-5.5'
+DEFAULT_VARIANT='medium'
 OPEN_CODE_INSTALL_CMD='curl -fsSL https://opencode.ai/install | bash'
 
 ############################################ SETTINGS
@@ -28,6 +29,8 @@ apiKeyEnvName='LLM_API_KEY' # --api-key-env NAME (source env var to read key fro
 # optional overrides
 providerOverride='' # --provider PROVIDER
 modelOverride=''    # --model model-id
+variantOverride=''  # --variant medium
+showThinking='no'   # --thinking
 apiEnvOverride=''   # --api-env OPENAI_API_KEY
 apiKeyOverride=''   # --api-key ... (avoid; prefer env)
 
@@ -57,6 +60,7 @@ help_and_exit() {
     echonice "dry run:                         $dryRun"
     echonice "provider (override/env/default): ${providerOverride:-${LLM_PROVIDER:-$DEFAULT_PROVIDER}}"
     echonice "model (override/env/default):    ${modelOverride:-${LLM_MODEL:-$DEFAULT_MODEL}}"
+    echonice "variant (override/env/default):  ${variantOverride:-${LLM_VARIANT:-$DEFAULT_VARIANT}}"
     echonice "api env override:                ${apiEnvOverride:-'(not set)'}"
     echonice "api key source env:              $apiKeyEnvName"
     echonice "key value:                       $(mask_api_key "${apiKeyEnvValue-}")"
@@ -69,6 +73,8 @@ help_and_exit() {
     echonice "-o, --opencode-path PATH              opencode binary/path (default: opencode)"
     echonice "    --provider PROVIDER               provider to use (default: $DEFAULT_PROVIDER)"
     echonice "-m, --model MODEL                     model to use (default: $DEFAULT_MODEL)"
+    echonice "    --variant VARIANT                 model variant / reasoning effort (default: $DEFAULT_VARIANT)"
+    echonice "    --thinking                        show the model's thinking blocks"
     echonice "    --api-env ENVVAR                  force which env var to pass the key into"
     echonice "    --api-key VALUE                   pass key value directly (avoid; prefer env)"
     echonice "    --api-key-env ENVVAR              which env var to read the key from (default: LLM_API_KEY)"
@@ -153,6 +159,18 @@ while (($#)); do
         ;;
     --model=*)
         modelOverride="${1#*=}"
+        ;;
+
+    --variant)
+        variantOverride=$2
+        shift
+        ;;
+    --variant=*)
+        variantOverride="${1#*=}"
+        ;;
+
+    --thinking)
+        showThinking='yes'
         ;;
 
     --api-env)
@@ -357,6 +375,14 @@ if [[ "$model" != */* ]]; then
 fi
 provider="${model%%/*}"
 
+# Variant (e.g. medium) is appended as provider/model#variant unless already present
+variant="${variantOverride:-${LLM_VARIANT:-$DEFAULT_VARIANT}}"
+if [[ "$model" == *"#"* ]]; then
+    variant="${model#*#}"
+elif [[ -n "$variant" ]]; then
+    model="$model#$variant"
+fi
+
 # Determine which env var to populate (optional)
 apiEnv="${apiEnvOverride:-$(provider_to_api_env "$provider")}"
 
@@ -383,7 +409,11 @@ cmd=( env )
 if [[ -n "$apiKey" ]]; then
     cmd+=( "$apiEnv=$apiKey" )
 fi
-cmd+=( "$opencodeResolved" run --agent build -m "$model" )
+runTitle="sake-llm-opencode $(date +%Y-%m-%d_%H:%M:%S)-$$"
+cmd+=( "$opencodeResolved" run --agent build -m "$model" --title "$runTitle" )
+if [[ "$showThinking" == "yes" ]]; then
+    cmd+=( --thinking )
+fi
 
 # Add files
 for f in "${selectedFiles[@]}"; do
@@ -428,6 +458,12 @@ if [[ "$dryRun" == "yes" ]]; then
     exit 0
 fi
 
+ECHOHEAD "Model:"
+echonice "provider:  $provider"
+echonice "model:     ${model%%#*}"
+echonice "variant:   ${variant:-'(none)'}"
+echonice "full id:   $model"
+
 ECHOHEAD "Command:"
 print_cmd_masked
 
@@ -442,6 +478,39 @@ done
 ECHOHEAD "Prompt content"
 echonice "$promptText"
 
+report_cost() {
+    command -v jq >/dev/null 2>&1 || { echonice "(install jq to see cost)"; return 0; }
+    local sid json
+    sid="$("$opencodeResolved" session list -n 20 --format json 2>/dev/null \
+        | jq -r --arg t "$runTitle" '[.[] | select(.title == $t)][0].id // empty' 2>/dev/null || true)"
+    if [[ -z "$sid" ]]; then
+        echonice "(could not find session '$runTitle' to compute cost)"
+        return 0
+    fi
+    json="$("$opencodeResolved" session export "$sid" 2>/dev/null || true)"
+    [[ -n "$json" ]] || return 0
+    ECHOHEAD "Usage for this run:"
+    echonice "session:       $sid"
+    printf '%s' "$json" | jq -r '
+        [.messages[] | (.info // .) | select(type == "object" and has("cost"))] as $m
+        | "steps:         \($m | length)",
+          "input tokens:  \($m | map(.tokens.input // 0) | add // 0)",
+          "output tokens: \($m | map(.tokens.output // 0) | add // 0)",
+          "reasoning:     \($m | map(.tokens.reasoning // 0) | add // 0)",
+          "cache read:    \($m | map(.tokens.cache.read // 0) | add // 0)",
+          "cache write:   \($m | map(.tokens.cache.write // 0) | add // 0)",
+          "COST (USD):    $\($m | map(.cost // 0) | add // 0 | . * 10000 | round / 10000)"
+    ' 2>/dev/null | while IFS= read -r line; do echonice "$line"; done
+}
+
 echo ""
-"${cmd[@]}"
+runStatus=0
+"${cmd[@]}" || runStatus=$?
+
+report_cost || true
+
+if (( runStatus != 0 )); then
+    echobad "opencode exited with status $runStatus"
+    exit "$runStatus"
+fi
 echoend
