@@ -49,7 +49,7 @@ server="$(normalize_server "$server")"
 
 help_and_exit() {
     ECHOHEAD "Sync Database from Server"
-    echonice "Syncs database and assets from remote server using sspak format"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Remote server web root dir:    $server"

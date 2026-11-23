@@ -47,7 +47,7 @@ done
 ############################################ HELP
 help_and_exit() {
     ECHOHEAD "Composer Update"
-    echonice "Updates composer packages with optional force, minimal changes, and auto-commit"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:         $SCRIPT_DIR"
     echonice "Directory to analyse:        $WORKING_DIR/$dir"
@@ -82,7 +82,7 @@ if ! command -v jq &>/dev/null; then
 fi
 
 # Switch PHP to whatever composer.json requires, before any composer work
-sake-php-switch-versions
+sake-php-config-switch-versions
 
 ############################################ SWITCH PHP VERSION (from composer.json)
 
@@ -227,11 +227,11 @@ EOF
     git push
 fi
 
-sake-composer-available-updates
+sake-composer-update-available
 
 #TODO: use env variable for sunnysideup
 composer dump-autoload -o 2>&1 | grep -E 'app/|vendor/sunnysideup'
 
-# composer audit is already run by sake-composer-available-updates above
+# composer audit is already run by sake-composer-update-available above
 
 echoend

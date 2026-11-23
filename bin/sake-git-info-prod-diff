@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Diffs remote uncommitted changes and untracked files against your local codebase"
+
+############################################ SETTINGS
+server=''
+help='no'
+envServerKey='SS_SERVER_FOR_EXAMPLE_DATA'
+
+############################################ ARGUMENTS
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        shift
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        server=$1
+        ;;
+    esac
+    shift
+done
+
+############################################ DEFAULT SERVER FROM .env
+if [[ -z "$server" ]]; then
+    serverFromEnv="$(read_local_dotenv_value "$envServerKey" || true)"
+    [[ -n "$serverFromEnv" ]] && server="$serverFromEnv"
+fi
+
+if [[ -z "${server:-}" ]]; then
+    echobad 'No server specified.'
+    help_and_exit
+fi
+server="$(normalize_server "$server")"
+
+############################################ HELPERS
+
+help_and_exit() {
+    ECHOHEAD "Diff Remote Uncommitted vs Local Code"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Working Directory:             $WORKING_DIR"
+    echonice "Server to check:               ${server:-"(not set)"}"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+    echofunctions
+    exit
+}
+sake_check_help_and_exit
+
+############################################ RUN COMMANDS
+
+REMOTE_HOST="${server%%:*}"
+if [[ "$server" == *":"* ]]; then
+    REMOTE_PATH="${server#*:}"
+else
+    REMOTE_PATH="$DEFAULT_SERVER_DIR"
+fi
+
+ECHOHEAD "Analyzing remote changes on: $REMOTE_HOST"
+
+# 1. Identify modified, deleted, and untracked files on remote
+REMOTE_FILES=$(ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && git diff --name-only --diff-filter=ACMR" 2>/dev/null)
+REMOTE_DELETED=$(ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && git diff --name-only --diff-filter=D" 2>/dev/null)
+REMOTE_UNTRACKED=$(ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && git ls-files --others --exclude-standard" 2>/dev/null)
+
+if [[ -z "$REMOTE_FILES" && -z "$REMOTE_DELETED" && -z "$REMOTE_UNTRACKED" ]]; then
+    echonice "Result: No uncommitted changes or untracked files found on the remote server."
+    echoend
+    exit 0
+fi
+
+# 2. Output Untracked Files List (if any)
+if [[ -n "$REMOTE_UNTRACKED" ]]; then
+    ECHOHEAD "Untracked Files on Server (Not in Git Repo)"
+    echo "$REMOTE_UNTRACKED" | sed 's/^/  + /'
+    echonice ""
+fi
+
+# Check if we need to proceed to diffing tracked files
+if [[ -z "$REMOTE_FILES" && -z "$REMOTE_DELETED" ]]; then
+    echonice "No tracked files were modified. Skipping diff process."
+    echoend
+    exit 0
+fi
+
+# 3. Setup temporary directory to hold remote state for diffing
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+# 4. Stream modified files securely over SSH using tar
+if [[ -n "$REMOTE_FILES" ]]; then
+    echonice "Fetching remote modified files for comparison..."
+    ssh -q "$REMOTE_HOST" "cd '$REMOTE_PATH' && echo \"$REMOTE_FILES\" | tar -czf - -T -" | tar -xzf - -C "$TMP_DIR" 2>/dev/null
+fi
+
+ECHOHEAD "Diff Report: Remote Uncommitted vs Local Files"
+DIFF_FOUND="no"
+
+# 5. Compare Added/Modified Files
+if [[ -n "$REMOTE_FILES" ]]; then
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        OUTPUT=$(git diff --color=always --no-index "$file" "$TMP_DIR/$file" 2>/dev/null)
+
+        if [[ -n "$OUTPUT" ]]; then
+            DIFF_FOUND="yes"
+            echonice "--------------------------------------------------------"
+            echonice " File: $file"
+            echonice "--------------------------------------------------------"
+            echo "$OUTPUT" | sed "s|$TMP_DIR/||g"
+            echo ""
+        fi
+    done <<<"$REMOTE_FILES"
+fi
+
+# 6. Compare Deleted Files
+if [[ -n "$REMOTE_DELETED" ]]; then
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        if [[ -f "$file" ]]; then
+            DIFF_FOUND="yes"
+            echonice "--------------------------------------------------------"
+            echonice " File: $file (Deleted on remote)"
+            echonice "--------------------------------------------------------"
+            git diff --color=always --no-index "$file" /dev/null
+            echo ""
+        fi
+    done <<<"$REMOTE_DELETED"
+fi
+
+# 7. Conclusion
+if [[ "$DIFF_FOUND" == "no" ]]; then
+    echonice "Result: All remote tracked uncommitted changes perfectly match your local files!"
+fi
+
+echoend

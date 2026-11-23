@@ -172,6 +172,45 @@ echofunctions() {
 
 ############################################ HELP
 
+# Reads SCRIPT_SUMMARY from a script file without executing it.
+# Works for bash (SCRIPT_SUMMARY="...") and for php/other scripts
+# via a comment line (// SCRIPT_SUMMARY="..." or # SCRIPT_SUMMARY="...").
+sake_get_script_summary() {
+    local path="$1"
+    [[ -f "$path" ]] || return 0
+    grep -m 1 -E '^(//|#)?[[:space:]]*SCRIPT_SUMMARY=' "$path" 2>/dev/null \
+        | sed -E 's/^(\/\/|#)?[[:space:]]*SCRIPT_SUMMARY=//' \
+        | tr -d '"' | tr -d "'" || true
+}
+
+# Lists sake commands whose name or summary contains the keyword (case-insensitive).
+echosearchresults() {
+    local keyword="${1:-}"
+    local ACTUAL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local matches=() entry script summary
+
+    ECHOHEAD "Commands matching \"$keyword\""
+
+    for entry in "$ACTUAL_SCRIPT_DIR"/sake-*; do
+        [[ -f "$entry" && -x "$entry" ]] || continue
+        script="$(basename "$entry")"
+        [[ "$script" == "sake-self-methods" || "$script" == "sake-self-update" ]] && continue
+
+        summary="$(sake_get_script_summary "$entry")"
+        if [[ "${script,,}" == *"${keyword,,}"* || "${summary,,}" == *"${keyword,,}"* ]]; then
+            matches+=("$(printf ' %-37s %s' "$script:" "${summary:-(No summary - run $script -h for details)}")")
+        fi
+    done
+
+    if ((${#matches[@]} == 0)); then
+        echowarn "No commands found matching \"$keyword\""
+    else
+        echo "" >&2
+        printf '%s\n' "${matches[@]}" >&2
+    fi
+    echo "" >&2
+}
+
 echolistoffunctions() {
     ECHOHEAD 'List of Available Functions'
 
@@ -209,7 +248,7 @@ echolistoffunctions() {
         local sorted_scripts=()
         while IFS= read -r line; do
             sorted_scripts+=("$line")
-        done < <(printf "%s\n" "${categorized_scripts[@]}" | sort)
+        done < <(printf "%s\n" "${categorized_scripts[@]}" | LC_ALL=C sort -t: -k1,1 -k3,3)
 
         local current_category=""
 
@@ -285,34 +324,33 @@ echodetailedhelp() {
         local sorted_scripts=()
         while IFS= read -r line; do
             sorted_scripts+=("$line")
-        done < <(printf "%s\n" "${categorized_scripts[@]}" | sort)
+        done < <(printf "%s\n" "${categorized_scripts[@]}" | LC_ALL=C sort -t: -k1,1 -k3,3)
 
-        # First pass: count subcategories per category
+        # Grouping rules (derived from the command name: sake-<category>-<group>-<name>):
+        #  - <group> is the first word after the category (or the whole label if it has no dash)
+        #  - a group is shown on its own when 2+ commands share it
+        #  - the "pm" group (tasks that run across more than one website / project)
+        #    is always shown on its own, even with a single command
+        #  - everything else ends up in MISC
+        local always_group="PM"
+
+        # First pass: count commands per category:group
         declare -A subcategory_counts
         for item in "${sorted_scripts[@]}"; do
             local category="${item%%:*}"
             local rest="${item#*:}"
             local label="${rest%%:*}"
-
-            # Extract second word (subcategory) from label
-            local subcategory=""
-            if [[ "$label" == *-* ]]; then
-                subcategory="${label%%-*}"
-                subcategory="${subcategory^^}"
-            fi
-
-            if [[ -n "$subcategory" ]]; then
-                local key="${category}:${subcategory}"
-                subcategory_counts[$key]=$((${subcategory_counts[$key]:-0} + 1))
-            fi
+            local subcategory="${label%%-*}"
+            subcategory="${subcategory^^}"
+            local key="${category}:${subcategory}"
+            subcategory_counts[$key]=$((${subcategory_counts[$key]:-0} + 1))
         done
 
-        # Organize scripts by category and subcategory
-        declare -A category_grouped_items
-        declare -A category_misc_items
-        local current_category=""
-
-        # Collect and organize items
+        # Second pass: format each line and bucket it by category + group
+        declare -A grouped_items   # "CATEGORY::GROUP" => lines
+        declare -A misc_items      # "CATEGORY"        => lines
+        local -a category_order=()
+        declare -A group_order     # "CATEGORY"        => space separated groups
         for item in "${sorted_scripts[@]}"; do
             local category="${item%%:*}"
             local rest="${item#*:}"
@@ -321,126 +359,55 @@ echodetailedhelp() {
             local script="${rest%%:*}"
             local path="${rest#*:}"
 
-            # Extract subcategory (second word)
-            local subcategory=""
-            if [[ "$label" == *-* ]]; then
-                subcategory="${label%%-*}"
-                subcategory="${subcategory^^}"
-            fi
-
-            # Determine if this item belongs to a subcategory group (2+ items)
+            local subcategory="${label%%-*}"
+            subcategory="${subcategory^^}"
+            local key="${category}:${subcategory}"
             local in_group="no"
-            if [[ -n "$subcategory" ]]; then
-                local key="${category}:${subcategory}"
-                local count=${subcategory_counts[$key]:-0}
-                if [[ $count -gt 1 ]]; then
-                    in_group="yes"
-                fi
+            if [[ ${subcategory_counts[$key]:-0} -gt 1 || "$subcategory" == "$always_group" ]]; then
+                in_group="yes"
             fi
 
-            # Extract compact summary
-            local summary=""
-            if [[ -f "$path" ]]; then
-                summary=$(grep -m 1 '^SCRIPT_SUMMARY=' "$path" 2>/dev/null | sed 's/^SCRIPT_SUMMARY=//' | tr -d '"' | tr -d "'")
-            fi
-
-            if [[ -z "$summary" ]] && output=$("$path" -h 2>&1); then
-                local clean_output=$(echo "$output" | sed 's/\x1b\[[0-9;]*m//g')
-                summary=$(echo "$clean_output" | awk '
-                    /^.*# / { if (found_title) next; found_title=1; next }
-                    found_title && /^.*# / { exit }
-                    found_title && /^[-]+$/ { next }
-                    found_title && /Directory of script:/ { next }
-                    found_title && /Directory to [a-z]+:/ { next }
-                    found_title && /directory of script:/ { next }
-                    found_title && /directory to [a-z]+:/ { next }
-                    found_title && /^[[:space:]]*$/ { next }
-                    found_title && NF > 0 {
-                        gsub(/^[[:space:]]+/, "");
-                        if (length($0) > 5 && $0 !~ /^[-]+$/) {
-                            print;
-                            if (++count >= 1) exit
-                        }
-                    }
-                ' | head -1 | sed 's/^[[:space:]]*//')
-            fi
-
-            # Format the output line
-            local output_line
+            # Extract compact summary (never executes the script)
+            local summary output_line
+            summary="$(sake_get_script_summary "$path")"
             if [[ -n "$summary" && ${#summary} -gt 5 ]]; then
                 output_line=$(printf ' %-37s %s' "$script:" "$summary")
             else
                 output_line=$(printf ' %-37s %s' "$script:" "(No summary - run $script -h for details)")
             fi
 
-            # Store items by category
+            if [[ " ${category_order[*]} " != *" $category "* ]]; then
+                category_order+=("$category")
+            fi
+
             if [[ "$in_group" == "yes" ]]; then
-                local key="${category}::${subcategory}"
-                category_grouped_items[$key]="${category_grouped_items[$key]}${output_line}"$'\n'
+                local grp_key="${category}::${subcategory}"
+                if [[ -z "${grouped_items[$grp_key]:-}" ]]; then
+                    group_order[$category]="${group_order[$category]:-} ${subcategory}"
+                fi
+                grouped_items[$grp_key]="${grouped_items[$grp_key]:-}${output_line}"$'\n'
             else
-                category_misc_items[$category]="${category_misc_items[$category]}${output_line}"$'\n'
+                misc_items[$category]="${misc_items[$category]:-}${output_line}"$'\n'
             fi
         done
 
-        # Now output everything organized
-        current_category=""
-        for item in "${sorted_scripts[@]}"; do
-            local category="${item%%:*}"
+        # Output: one block per category, then its groups, then MISC
+        local category subcategory
+        for category in "${category_order[@]}"; do
+            [[ -n "$filter_section" && "$category" != "$filter_section" ]] && continue
 
-            # Skip this category if filtering and it doesn't match
-            if [[ -n "$filter_section" && "$category" != "$filter_section" ]]; then
-                continue
-            fi
+            echo "" >&2
+            _print_col_stderr "$_COL_HEAD" "# $category"
 
-            if [[ "$category" != "$current_category" ]]; then
-                echo "" >&2
-                _print_col_stderr "$_COL_HEAD" "# $category"
-                current_category="$category"
+            for subcategory in ${group_order[$category]:-}; do
+                _print_col_stderr "$_COL_NICE" "## $subcategory"
+                echo -n "${grouped_items[${category}::${subcategory}]}" >&2
+            done
 
-                # Output grouped subcategories
-                local rest="${item#*:}"
-                local label="${rest%%:*}"
-
-                # Get all unique subcategories for this category (from sorted list)
-                local -a shown_subcats=()
-                for subitem in "${sorted_scripts[@]}"; do
-                    local subcat="${subitem%%:*}"
-                    # Skip if filtering and doesn't match
-                    [[ -n "$filter_section" && "$subcat" != "$filter_section" ]] && continue
-                    [[ "$subcat" != "$category" ]] && continue
-
-                    local subrest="${subitem#*:}"
-                    local sublabel="${subrest%%:*}"
-                    local subsubcategory=""
-                    if [[ "$sublabel" == *-* ]]; then
-                        subsubcategory="${sublabel%%-*}"
-                        subsubcategory="${subsubcategory^^}"
-                    fi
-
-                    [[ -z "$subsubcategory" ]] && continue
-
-                    local key="${category}:${subsubcategory}"
-                    local count=${subcategory_counts[$key]:-0}
-                    [[ $count -le 1 ]] && continue
-
-                    # Check if already shown
-                    local already_shown="no"
-                    for shown in "${shown_subcats[@]}"; do
-                        [[ "$shown" == "$subsubcategory" ]] && already_shown="yes" && break
-                    done
-                    [[ "$already_shown" == "yes" ]] && continue
-
-                    shown_subcats+=("$subsubcategory")
-                    _print_col_stderr "$_COL_NICE" "## $subsubcategory"
-                    local grp_key="${category}::${subsubcategory}"
-                    echo -n "${category_grouped_items[$grp_key]}" >&2
-                done
-
-                # Output MISC items for this category
-                if [[ -n "${category_misc_items[$category]}" ]]; then
-                    _print_col_stderr "$_COL_NICE" "## MISC"
-                    echo -n "${category_misc_items[$category]}" >&2
-                fi
+            if [[ -n "${misc_items[$category]:-}" ]]; then
+                # No point in a MISC heading when the category has no groups
+                [[ -n "${group_order[$category]:-}" ]] && _print_col_stderr "$_COL_NICE" "## MISC"
+                echo -n "${misc_items[$category]}" >&2
             fi
         done
     fi

@@ -30,7 +30,7 @@ done
 ############################################ HELP FUNCTION
 help_and_exit() {
     ECHOHEAD "Import Local Database File"
-    echonice "Imports a MySQL database dump file into local SilverStripe database"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Local .env file:               $localEnvFile"
@@ -41,7 +41,7 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-ss-import-db ./tmp/db_dump.sql"
+    echonice "sake-ss-db-import ./tmp/db_dump.sql"
 
     exit
 }

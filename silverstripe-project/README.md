@@ -48,9 +48,9 @@ cd [REPO]
 composer install
 echo "/vendor/" >> .gitignore
 echo "/resources/" >> .gitignore
-sake-lint-ecs src/ > TMP_LINTING_NOTES_ECS
-sake-lint-rector src/ > TMP_LINTING_NOTES_RECTOR
-sake-lint-stan -l 2 src/ > TMP_LINTING_NOTES_STAN
+sake-lint-php-ecs src/ > TMP_LINTING_NOTES_ECS
+sake-lint-php-rector src/ > TMP_LINTING_NOTES_RECTOR
+sake-lint-php-stan -l 2 src/ > TMP_LINTING_NOTES_STAN
 git add .  -A
 git commit . -m "MY TEST"
 ```

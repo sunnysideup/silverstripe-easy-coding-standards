@@ -68,7 +68,7 @@ done
 
 help_and_exit() {
     ECHOHEAD "Merge previous commits"
-    echonice "Squashes multiple commits into one with options for specific count, today's commits, or all branch commits"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:                 $SCRIPT_DIR"
 

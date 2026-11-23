@@ -39,7 +39,7 @@ done
 
 help_and_exit() {
     ECHOHEAD "Squash commits of current branch and make a pull request to develop"
-    echonice "Squashes all commits in current branch and creates a pull request to the target branch"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $dir (relative to $WORKING_DIR)"

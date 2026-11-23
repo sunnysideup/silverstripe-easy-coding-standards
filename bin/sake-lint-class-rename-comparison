@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+// SCRIPT_SUMMARY="Compares classes between two git branches to find renamed classes (optionally fixes references)"
 
 declare(strict_types=1);
 

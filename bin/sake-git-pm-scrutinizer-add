@@ -32,7 +32,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "Add all github packages to scrutinizer"
-    echonice "Identifies GitHub repositories not yet added to Scrutinizer CI"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
@@ -41,7 +41,7 @@ help_and_exit() {
     echonice "-a, --add                      $add"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-scrutinize-add -a yes "
+    echonice "sake-git-pm-scrutinizer-add -a yes "
 
     echofunctions
     exit

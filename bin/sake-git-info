@@ -34,7 +34,7 @@ done
 
 help_and_exit() {
     ECHOHEAD "Git info"
-    echonice "Displays comprehensive git repository information including branch status, commits, and sync state"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $WORKING_DIR/$dir"

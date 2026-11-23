@@ -39,7 +39,7 @@ done
 
 help_and_exit() {
     ECHOHEAD 'Forks Ahead of My Repos'
-    echonice "Scans your repositories and their forks to find branches with commits ahead of your originals"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "working directory:             $WORKING_DIR"

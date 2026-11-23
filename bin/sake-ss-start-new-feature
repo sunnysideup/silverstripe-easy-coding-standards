@@ -49,7 +49,7 @@ done
 
 help_and_exit() {
     ECHOHEAD "Git commit and push"
-    echonice "Creates new feature branch and syncs database from server to start development"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
     echonice "directory to commit:           $dir (relative to $WORKING_DIR)"
@@ -128,8 +128,8 @@ fi
 
 ############################################ RUN DEV/BUILD
 
-echonice "Running sake-ss-dev-build..."
-sake-ss-dev-build || exit 1
+echonice "Running sake-ss-build-dev..."
+sake-ss-build-dev || exit 1
 
 ############################################ DONE
 

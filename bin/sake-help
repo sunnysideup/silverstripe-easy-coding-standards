@@ -12,16 +12,29 @@ dir='./'
 ############################################ SETTINGS
 more="no"
 section=""
+find=""
 help='no'
 while (($#)); do
     case $1 in
     -m | --more)
         more="yes"
         ;;
+    -f | --find)
+        if [[ -z "${2:-}" ]]; then
+            echobad "-f|--find requires a keyword"
+            exit 1
+        fi
+        find="$2"
+        shift
+        ;;
     *)
         if sake_handle_help_flag "$1"; then
             shift
             continue
+        fi
+        if [[ "$1" == -* ]]; then
+            echobad "Unknown option: $1"
+            exit 1
         fi
         # Treat any other argument as a section name
         section="${1^^}"  # Convert to uppercase
@@ -37,7 +50,7 @@ done
 help_and_exit() {
 
     ECHOHEAD "self help"
-    echonice "Displays a list of all available sake commands and their descriptions"
+    echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "Directory of script:           $SCRIPT_DIR"
     echonice "Directory to analyse:          $WORKING_DIR/$dir"
@@ -45,16 +58,20 @@ help_and_exit() {
     ECHOHEAD "Current settings:"
     echonice "More (-m|--more):              $more"
     echonice "Section:                       ${section:-all}"
+    echonice "Find (-f|--find):              ${find:-none}"
 
     ECHOHEAD "Available settings:"
     echonice "-m, --more                     show detailed help for all sections"
+    echonice "-f, --find <keyword>           list commands with keyword in name or description"
     echonice "[section]                      show detailed help for specific section"
 
     ECHOHEAD "Example usage:"
     echonice "sake-help                      # Basic list of all commands"
     echonice "sake-help --more               # Detailed help for all sections"
+    echonice "sake-help -f \"keyword\"          # Find commands matching keyword"
     echonice "sake-help git                  # Detailed help for GIT section only"
     echonice "sake-help composer             # Detailed help for COMPOSER section only"
+    echonice "sake-help -f \"-pm-\"            # All commands that run across more than one website / project"
 
     echofunctions
     exit
@@ -67,7 +84,9 @@ sake_check_help_and_exit
 
 cd_or_fail "$WORKING_DIR" help_and_exit
 
-if [[ "$more" == "yes" ]]; then
+if [[ -n "$find" ]]; then
+    echosearchresults "$find"
+elif [[ "$more" == "yes" ]]; then
     echodetailedhelp "$section"
 else
     echolistoffunctions
