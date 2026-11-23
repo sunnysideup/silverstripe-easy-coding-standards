@@ -134,6 +134,15 @@ done
 
 ############################################ HELP
 
+# What sake-llm-opencode will really use (its own default / LLM_* env / our -m and --provider).
+effective_model() {
+    local args=(--help) out
+    [[ -n "$provider" ]] && args+=(--provider "$provider")
+    [[ -n "$model" ]] && args+=(--model "$model")
+    out=$(sake-llm-opencode "${args[@]}" 2>&1 | sed 's/\x1b\[[0-9;]*m//g')
+    printf '%s\n' "$out" | grep -E '^ *(provider|model|variant) \(override/env/default\):' | sed 's/ (override\/env\/default)//; s/^ */   /'
+}
+
 help_and_exit() {
     ECHOHEAD "Merge SS5 branches into main and upgrade to SS6 across all repos"
     echonice "$SCRIPT_SUMMARY"
@@ -151,7 +160,8 @@ help_and_exit() {
     echonice "changelog first:               $runChangelog"
     echonice "verify install + tests:        $verifyInstall (soft: $verifySoft)"
     echonice "use LLM:                       $useLlm"
-    echonice "LLM provider/model:            ${provider:-(env LLM_PROVIDER / runner default)} / ${model:-(env LLM_MODEL / runner default)}"
+    echonice "LLM that WILL be used (no -m needed; override with -m/--provider or LLM_MODEL/LLM_PROVIDER):"
+    while IFS= read -r l; do echonice "$l"; done < <(effective_model)
     echonice "max LLM spend (--max-cost):    ${maxCost:-(no limit)}"
     echonice "push to base:                  $push"
     echonice "pull request mode (--pr):       $prMode (branch: $prBranch, draft: $prDraft)"
@@ -704,6 +714,8 @@ for tool in gh git sake-llm-opencode sake-lint-php-rector sake-git-merge-towards
     fi
 done
 
+ECHOHEAD "LLM that will be used"
+while IFS= read -r l; do echonice "$l"; done < <(effective_model)
 ECHOHEAD "Scanning $owner repos for '$sourceBranch' branches ahead of base"
 mkdir -p "$workDir" || exit 1
 
