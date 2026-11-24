@@ -508,30 +508,37 @@ normalize_server() {
 #
 # Usage: get_server_ssh_logins [file]
 #
-# Source precedence:
+# Resolution (first match wins):
 #   1. the file argument
-#   2. SAKE_SERVERS_FILE (environment, global .env, or project .env)
+#   2. SAKE_SERVERS_FILE in the project .env
 #   3. <working directory>/servers.txt
-#   4. ~/.config/composer/servers.txt
-#   5. SAKE_SERVERS (comma or whitespace separated list)
+#   4. SAKE_SERVERS_FILE in the environment / global .env
+#   5. ~/.config/composer/servers.txt
+#   6. SAKE_SERVERS (comma or whitespace separated inline list)
 get_server_ssh_logins() {
     local file="${1:-}"
+    local projectEnvFile=''
+    local globalEnvFile="${SAKE_SERVERS_FILE:-}"
     local inlineList="${SAKE_SERVERS:-}"
     local -a servers=()
 
-    [[ -n "$file" ]] || file="${SAKE_SERVERS_FILE:-}"
-    [[ -n "$file" ]] || file="$(read_local_dotenv_value 'SAKE_SERVERS_FILE' 2>/dev/null || true)"
+    projectEnvFile="$(read_local_dotenv_value 'SAKE_SERVERS_FILE' 2>/dev/null || true)"
     [[ -n "$inlineList" ]] || inlineList="$(read_local_dotenv_value 'SAKE_SERVERS' 2>/dev/null || true)"
 
-    if [[ -z "$file" ]]; then
-        local candidate
-        for candidate in "${WORKING_DIR:-.}/servers.txt" "$HOME/.config/composer/servers.txt"; do
-            if [[ -f "$candidate" ]]; then
-                file="$candidate"
-                break
-            fi
-        done
+    [[ -n "$file" ]] || file="$projectEnvFile"
+    if [[ -z "$file" && -f "${WORKING_DIR:-.}/servers.txt" ]]; then
+        file="${WORKING_DIR:-.}/servers.txt"
     fi
+    [[ -n "$file" ]] || file="$globalEnvFile"
+    if [[ -z "$file" && -f "$HOME/.config/composer/servers.txt" ]]; then
+        file="$HOME/.config/composer/servers.txt"
+    fi
+
+    # Expand a leading ~ (read_local_dotenv_value does not go through the shell).
+    case "$file" in
+        '~')   file="$HOME" ;;
+        '~/'*) file="$HOME/${file#\~/}" ;;
+    esac
 
     if [[ -n "$file" ]]; then
         if [[ ! -r "$file" ]]; then
@@ -552,9 +559,9 @@ get_server_ssh_logins() {
 
     if ((${#servers[@]} == 0)); then
         echobad "No servers found."
-        echonice "Add one SSH login per line (user@host, host, or an ~/.ssh/config alias) to:"
-        echonice "  ${file:-${SAKE_SERVERS_FILE:-${WORKING_DIR:-.}/servers.txt}}"
-        echonice "or set SAKE_SERVERS in the environment / .env."
+        echonice "Create ./servers.txt in the directory where you run the command,"
+        echonice "or set SAKE_SERVERS_FILE in ~/.config/composer/.env to a server list file."
+        echonice "List one SSH login per line: user@host, host, or an ~/.ssh/config alias."
         return 1
     fi
 

@@ -165,6 +165,46 @@ lives in the `pm` group: `sake-<category>-pm-<task>` (see `sake-help -f -pm-`).
 
 ```
 
+## server lists
+
+Commands in the `sake-server-management-*` group read one SSH login per line.
+The default is `./servers.txt` in the directory where the command is run.
+Otherwise `SAKE_SERVERS_FILE` from `~/.config/composer/.env` (or a project
+`.env`) is used.
+
+Resolution order (first match wins):
+
+1. `--servers-file FILE` or the positional file argument
+2. `SAKE_SERVERS_FILE` in the project `.env`
+3. `./servers.txt` in the current working directory
+4. `SAKE_SERVERS_FILE` in `~/.config/composer/.env`
+5. `~/.config/composer/servers.txt`
+6. `SAKE_SERVERS` (optional inline fallback)
+
+Each line is an SSH login: `user@host`, `host`, or an `~/.ssh/config` alias.
+Blank lines and lines starting with `#` are ignored.
+
+Example `servers.txt`:
+
+```text
+# production
+user@111.222.333.444
+myserver-alias
+
+# test
+testuser@111.222.333.555
+```
+
+Set a global default in `~/.config/composer/.env`:
+
+```shell
+SAKE_SERVERS_FILE=/home/me/servers.txt
+SAKE_SERVERS_PAUSE_SECONDS=20
+```
+
+`SAKE_SERVERS_FILE` may point at a shared list or a project-local file. You can
+also symlink `~/.config/composer/servers.txt` to a list instead.
+
 ## How to install for one project (not recommended - as it may not work)
 
 1. open your terminal
