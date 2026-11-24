@@ -784,7 +784,10 @@ for line in "${repos[@]}"; do
             [[ "$verbose" == 'yes' ]] && echonice "- $name: no '$sourceBranch' branch"
             continue
         fi
-        gh repo clone "$owner/$name" "$repoDir" -- -q >/dev/null 2>&1 || {
+        # plain git (not 'gh repo clone'): snap-packaged gh cannot exec ssh
+        cloneErr=$(git clone -q "https://github.com/$owner/$name.git" "$repoDir" 2>&1) || {
+            echobad "$name: clone failed: $cloneErr"
+            rm -rf "$repoDir"
             skipped+=("$name (clone failed)")
             continue
         }
