@@ -28,6 +28,8 @@ provider=''
 model=''
 verbose='no'
 maxCost=''           # stop everything once total LLM spend (USD) reaches this
+conflictBatch=8      # max conflicted files per LLM call; files are grouped per folder (each call has a fixed overhead)
+conflictBytes=160000 # ...and a call is also capped at about this many bytes of conflicted files
 thinking='no'
 verifyInstall='no'   # composer install + phpunit against SS6 in a scratch copy
 verifySoft='no'      # install/test failures are reported in the PR instead of failing the repo
@@ -106,6 +108,10 @@ while (($#)); do
         ;;
     --max-cost)
         maxCost="${2:-}"
+        shift
+        ;;
+    --conflict-batch)
+        conflictBatch="${2:-8}"
         shift
         ;;
     --thinking)
@@ -208,6 +214,7 @@ help_and_exit() {
     echonice "    --verify-install           composer install + PHPUnit in a scratch copy (SS6 deps resolved for real); failure = repo fails"
     echonice "    --verify-soft              with --verify-install: do not fail the repo, record the result in the PR/summary instead"
     echonice "    --max-cost USD             stop (after the current step) once total LLM spend reaches USD"
+    echonice "    --conflict-batch N         max conflicted files per LLM call (default $conflictBatch; files are grouped per folder; 1 = one call per file)"
     echonice "    --thinking                 show the model's thinking while it works"
     echonice "-v, --verbose                  show skipped repos too"
     echonice ""
@@ -594,11 +601,81 @@ upgrade_repo() {
             bail
             return 1
         fi
-        while IFS= read -r f; do
-            echonice "cleaning up conflict with LLM: $f"
-            run_llm "$PWD/.agents/prompt-conflicts.txt" "$f" || echowarn "LLM exited non-zero for $f"
+        local salvageDir salvageKey n_total=0 n_done=0 n_reused=0
+        salvageDir="$(realpath -m "$workDir")/.salvage/$repo"
+        salvageKey="$(git rev-parse "origin/$base") $(git rev-parse "$sourceBranch")"
+        if [[ "$(cat "$salvageDir/.key" 2>/dev/null)" != "$salvageKey" ]]; then
+            rm -rf "$salvageDir"
+        fi
+        mkdir -p "$salvageDir" && printf '%s' "$salvageKey" >"$salvageDir/.key"
+
+        n_total=$(unmerged_paths | wc -l)
+        local pending todo=()
+        mapfile -t pending < <(unmerged_paths)
+
+        for f in "${pending[@]}"; do
+            if [[ -f "$salvageDir/files/$f" ]]; then
+                cp "$salvageDir/files/$f" "$f"
+                echogood "reusing earlier LLM resolution (free): $f"
+                n_reused=$((n_reused + 1))
+            else
+                todo+=("$f")
+            fi
+        done
+
+        # keep every file the LLM resolved, even when this run is later stopped (budget, Ctrl-C, failure)
+        salvage_resolved() {
+            local x
+            for x in "$@"; do
+                if [[ -f "$x" ]] && ! grep -qE '^(<{7} |={7}$|>{7} )' "$x"; then
+                    mkdir -p "$salvageDir/files/$(dirname "$x")" && cp "$x" "$salvageDir/files/$x"
+                    n_done=$((n_done + 1))
+                fi
+            done
+        }
+        stop_message() {
+            [[ "$ABORT_REPO" == 'yes' ]] || return 0
+            echowarn "$repo: stopped. Saved $((n_done + n_reused)) of $n_total resolved conflict file(s) in $salvageDir/files"
+            echonice "   re-run the same command (raise --max-cost if that was the reason): saved files are reused at no LLM cost"
+        }
+
+        # group files per folder (similar conflicts in one folder are resolved consistently in one call), capped by file count and size:
+        # every call has a fixed overhead, but a huge call re-reads its whole context at every step
+        ((conflictBatch >= 1)) || conflictBatch=1
+        local batches=() cur='' curN=0 curBytes=0 curDir='' sz d b batchFiles
+        for f in "${todo[@]}"; do
+            sz=$(stat -c %s "$f" 2>/dev/null || echo 0)
+            d=$(dirname "$f")
+            if ((curN > 0)) && { ((curN >= conflictBatch)) || ((curBytes + sz > conflictBytes)) || { [[ "$d" != "$curDir" ]] && ((curN >= 3)); }; }; then
+                batches+=("$cur")
+                cur='' curN=0 curBytes=0
+            fi
+            cur+="${cur:+$'\n'}$f"
+            curN=$((curN + 1))
+            curBytes=$((curBytes + sz))
+            curDir=$d
+        done
+        ((curN > 0)) && batches+=("$cur")
+        echonice "$repo: ${#todo[@]} file(s) to resolve in ${#batches[@]} LLM call(s)"
+
+        for b in "${batches[@]}"; do
+            mapfile -t batchFiles <<<"$b"
+            echonice "cleaning up conflicts with LLM (${#batchFiles[@]} file(s)): ${batchFiles[*]}"
+            run_llm "$PWD/.agents/prompt-conflicts.txt" "$b" || echowarn "LLM exited non-zero for this batch"
+            salvage_resolved "${batchFiles[@]}"
+            stop_message
             aborted && return 1
-        done < <(unmerged_paths)
+        done
+
+        # whatever a batch left unresolved gets one more try on its own
+        for f in "${todo[@]}"; do
+            [[ -f "$salvageDir/files/$f" ]] && continue
+            echowarn "$f still has conflict markers: retrying on its own"
+            run_llm "$PWD/.agents/prompt-conflicts.txt" "$f" || echowarn "LLM exited non-zero for $f"
+            salvage_resolved "$f"
+            stop_message
+            aborted && return 1
+        done
         if [[ -n "$(markers_remaining)" ]]; then
             echobad "conflict markers remain in: $(markers_remaining | tr '\n' ' ')"
             bail
@@ -716,6 +793,18 @@ done
 
 ECHOHEAD "LLM that will be used"
 while IFS= read -r l; do echonice "$l"; done < <(effective_model)
+if [[ "$useLlm" == 'yes' ]] && command -v opencode >/dev/null 2>&1; then
+    effModel=$(effective_model | sed -n 's/^ *model: *//p' | head -1)
+    effModel=${effModel%%#*}
+    if [[ -n "$effModel" ]] && availableModels=$(opencode models 2>/dev/null) && [[ -n "$availableModels" ]] &&
+        ! grep -Fxq -- "$effModel" <<<"$availableModels"; then
+        echobad "Model not available in opencode: $effModel"
+        echonice "Available models from the same provider (see 'opencode models'):"
+        while IFS= read -r l; do echonice "   $l"; done < <(grep -F -- "${effModel%%/*}/" <<<"$availableModels")
+        exit 1
+    fi
+fi
+
 ECHOHEAD "Scanning $owner repos for '$sourceBranch' branches ahead of base"
 mkdir -p "$workDir" || exit 1
 
@@ -836,6 +925,7 @@ for line in "${repos[@]}"; do
     VERIFY_SUMMARY='static checks only (composer validate, php -l); dependencies were NOT installed and PHPUnit was NOT run'
     if upgrade_repo "$name"; then
         upgraded+=("$name")
+        rm -rf "$(realpath -m "$workDir")/.salvage/$name"
     else
         failed+=("$name")
     fi

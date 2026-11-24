@@ -320,10 +320,17 @@ add_to_git_ignore
 # is independent of IFS, so glob *results* containing spaces stay intact either
 # way and multi-match results still land in separate array elements.
 _oldIFS="$IFS"
-IFS=''
 shopt -s nullglob globstar
-# shellcheck disable=SC2206  # intentional pathname expansion of the pattern
-matches=( $filesPattern )
+matches=()
+# --files may hold several globs, one per line (e.g. a batch of files for one LLM call)
+while IFS= read -r _pat; do
+    [[ -n "$_pat" ]] || continue
+    IFS=''
+    # shellcheck disable=SC2206  # intentional pathname expansion of the pattern
+    _m=( $_pat )
+    IFS="$_oldIFS"
+    (( ${#_m[@]} == 0 )) || matches+=( "${_m[@]}" )
+done <<<"$filesPattern"
 shopt -u nullglob globstar
 IFS="$_oldIFS"
 
