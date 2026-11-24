@@ -192,8 +192,8 @@ help_and_exit() {
     echonice "-b, --base BRANCH              branch to merge INTO (default: repo default branch)"
     echonice "-w, --work-dir DIR             where repos are cloned (default: $workDir)"
     echonice "-r, --rector-config NAME       rector config (default: SS62)"
-    echonice "    --only a,b,c               only these repo names"
-    echonice "    --skip a,b,c               never touch these repo names"
+    echonice "    --only a,b,c               only these repo names (prefixes 'sunnysideup-' and 'silverstripe-' are optional: 'ecommerce' = 'silverstripe-ecommerce')"
+    echonice "    --skip a,b,c               never touch these repo names (same matching as --only)"
     echonice "-y, --yes                      do not ask per repo (automation)"
     echonice "    --no-changelog             do not run sake-git-merge-towards-production-changes first"
     echonice "-d, --dry-run                  only report which repos would be upgraded"
@@ -719,6 +719,28 @@ while IFS= read -r l; do echonice "$l"; done < <(effective_model)
 ECHOHEAD "Scanning $owner repos for '$sourceBranch' branches ahead of base"
 mkdir -p "$workDir" || exit 1
 
+# Strip an optional owner prefix ('sunnysideup-' / 'sunnysideup/') and an optional 'silverstripe-' prefix.
+short_repo_name() {
+    local n=${1// /}
+    n=${n#"$owner"/}
+    n=${n#"$owner"-}
+    n=${n#silverstripe-}
+    printf '%s' "$n"
+}
+
+# repo_in_list NAME "a,b,c": exact match, or match after dropping the optional prefixes on both sides
+# ('ecommerce', 'silverstripe-ecommerce', 'sunnysideup-ecommerce' and 'sunnysideup-silverstripe-ecommerce' are all the same repo)
+repo_in_list() {
+    local name=$1 list=$2 item short
+    short=$(short_repo_name "$name")
+    local IFS=','
+    for item in $list; do
+        [[ -n "${item// /}" ]] || continue
+        [[ "${item// /}" == "$name" || "$(short_repo_name "$item")" == "$short" ]] && return 0
+    done
+    return 1
+}
+
 mapfile -t repos < <(gh repo list "$owner" --limit "$limit" --no-archived --source \
     --json name,defaultBranchRef --jq '.[] | "\(.name) \(.defaultBranchRef.name // "main")"')
 
@@ -726,7 +748,7 @@ if [[ -n "$only" ]]; then
     filtered=()
     for line in "${repos[@]}"; do
         name=${line%% *}
-        [[ ",$only," == *",$name,"* ]] && filtered+=("$line")
+        repo_in_list "$name" "$only" && filtered+=("$line")
     done
     repos=("${filtered[@]}")
 fi
@@ -735,7 +757,7 @@ if [[ -n "$skip" ]]; then
     filtered=()
     for line in "${repos[@]}"; do
         name=${line%% *}
-        [[ ",$skip," == *",$name,"* ]] || filtered+=("$line")
+        repo_in_list "$name" "$skip" || filtered+=("$line")
     done
     repos=("${filtered[@]}")
 fi
