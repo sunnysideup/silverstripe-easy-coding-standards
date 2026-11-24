@@ -113,6 +113,10 @@ lives in the `pm` group: `sake-<category>-pm-<task>` (see `sake-help -f -pm-`).
 ## misc
  - sake-php-line-counter - Counts PHP lines of code and estimates project complexity in hours
 
+# server
+## management
+ - sake-server-management-check-basics - Checks the basics on one or more servers over SSH (backups, git state, composer packages)
+
 # ss
 ## build
  - sake-ss-build-dev - Runs SilverStripe dev/build with proper permissions and folder setup

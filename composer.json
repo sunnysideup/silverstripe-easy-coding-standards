@@ -102,6 +102,7 @@
     "bin/sake-php-line-counter",
     "bin/sake-self-methods",
     "bin/sake-self-update",
+    "bin/sake-server-management-check-basics",
     "bin/sake-ss-build-dev",
     "bin/sake-ss-build-flush",
     "bin/sake-ss-contribute-step-1",

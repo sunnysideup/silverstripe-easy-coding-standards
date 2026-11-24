@@ -23,6 +23,8 @@ declare -A varsToAdd=(
     [LLM_API_KEY]=''
     [LLM_MODEL]=''
     [DEFAULT_SERVER_DIR]='/container/application'
+    [SAKE_SERVERS_FILE]=''
+    [SAKE_SERVERS_PAUSE_SECONDS]='20'
 )
 
 # Loop through vars and add them if missing
@@ -499,6 +501,124 @@ normalize_server() {
 
     # Pure data output
     echo "$raw"
+}
+
+# Outputs one SSH login per line to stdout (user@host, host, or an ~/.ssh/config alias).
+# Blank lines and lines starting with # are ignored.
+#
+# Usage: get_server_ssh_logins [file]
+#
+# Source precedence:
+#   1. the file argument
+#   2. SAKE_SERVERS_FILE (environment, global .env, or project .env)
+#   3. <working directory>/servers.txt
+#   4. ~/.config/composer/servers.txt
+#   5. SAKE_SERVERS (comma or whitespace separated list)
+get_server_ssh_logins() {
+    local file="${1:-}"
+    local inlineList="${SAKE_SERVERS:-}"
+    local -a servers=()
+
+    [[ -n "$file" ]] || file="${SAKE_SERVERS_FILE:-}"
+    [[ -n "$file" ]] || file="$(read_local_dotenv_value 'SAKE_SERVERS_FILE' 2>/dev/null || true)"
+    [[ -n "$inlineList" ]] || inlineList="$(read_local_dotenv_value 'SAKE_SERVERS' 2>/dev/null || true)"
+
+    if [[ -z "$file" ]]; then
+        local candidate
+        for candidate in "${WORKING_DIR:-.}/servers.txt" "$HOME/.config/composer/servers.txt"; do
+            if [[ -f "$candidate" ]]; then
+                file="$candidate"
+                break
+            fi
+        done
+    fi
+
+    if [[ -n "$file" ]]; then
+        if [[ ! -r "$file" ]]; then
+            echobad "Server list file not readable: $file"
+            return 1
+        fi
+        mapfile -t servers < <(
+            sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$file" |
+                grep -Ev '^(#|$)'
+        )
+    elif [[ -n "$inlineList" ]]; then
+        mapfile -t servers < <(
+            printf '%s\n' "${inlineList//,/ }" |
+                tr -s '[:space:]' '\n' |
+                grep -Ev '^(#|$)'
+        )
+    fi
+
+    if ((${#servers[@]} == 0)); then
+        echobad "No servers found."
+        echonice "Add one SSH login per line (user@host, host, or an ~/.ssh/config alias) to:"
+        echonice "  ${file:-${SAKE_SERVERS_FILE:-${WORKING_DIR:-.}/servers.txt}}"
+        echonice "or set SAKE_SERVERS in the environment / .env."
+        return 1
+    fi
+
+    # Pure data output
+    printf '%s\n' "${servers[@]}"
+}
+
+# Calls a callback once for each server, pausing between logins so the servers
+# have time to breathe. Prints a message before each pause.
+#
+# Usage: loop_servers <callback> [--pause SECONDS] [server ...]
+#
+# The callback is called as: <callback> <server> <index> <total>
+#   - <index> is one-based
+#   - return 0 for success, non-zero for failure
+#
+# If no servers are given, get_server_ssh_logins is used.
+# Returns 0 when every callback succeeded, 1 otherwise.
+loop_servers() {
+    local callback="${1:-}"
+    if [[ -z "$callback" ]]; then
+        echobad "loop_servers: no callback function given"
+        return 2
+    fi
+    if ! declare -F "$callback" >/dev/null 2>&1; then
+        echobad "loop_servers: callback function not found: $callback"
+        return 2
+    fi
+    shift
+
+    local pauseSeconds="${SAKE_SERVERS_PAUSE_SECONDS:-20}"
+    if [[ "${1:-}" == "--pause" ]]; then
+        pauseSeconds="${2:-$pauseSeconds}"
+        shift
+        (($#)) && shift
+    fi
+    if [[ ! "$pauseSeconds" =~ ^[0-9]+$ ]]; then
+        echobad "loop_servers: invalid pause (seconds): $pauseSeconds"
+        return 2
+    fi
+
+    local -a servers=("$@")
+    if ((${#servers[@]} == 0)); then
+        mapfile -t servers < <(get_server_ssh_logins)
+        ((${#servers[@]})) || return 1
+    fi
+
+    local total=${#servers[@]}
+    local i host rc
+    local allOk=1
+
+    for i in "${!servers[@]}"; do
+        host="${servers[i]}"
+        "$callback" "$host" "$((i + 1))" "$total"
+        rc=$?
+        ((rc == 0)) || allOk=0
+
+        if ((i < total - 1 && pauseSeconds > 0)); then
+            echonice "Waiting ${pauseSeconds}s before the next server..."
+            sleep "$pauseSeconds"
+        fi
+    done
+
+    ((allOk))
 }
 
 installpackage() {

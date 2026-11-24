@@ -1,0 +1,535 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR=$(pwd)
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Checks the basics on one or more servers over SSH (backups, git state, composer packages)"
+
+############################################ SETTINGS
+serversFile=''
+help='no'
+pauseSeconds="${SAKE_SERVERS_PAUSE_SECONDS:-20}"
+
+BACKUP_DIR="${BACKUP_DIR:-/container/backups/containers/latest/databases}"
+APP_DIR="${APP_DIR:-${DEFAULT_SERVER_DIR:-/container/application}}"
+EXPECTED_BRANCH="${EXPECTED_BRANCH:-production}"
+ALLOWED_CHANGE="${ALLOWED_CHANGE:-public/.htaccess}"
+MAX_AGE_SECONDS="${MAX_AGE_SECONDS:-86400}"     # 1 day
+MIN_SIZE_BYTES="${MIN_SIZE_BYTES:-1048576}"     # 1 MB (1024 * 1024)
+
+# Directories to browse to (cd + ls) right after login, in order, pausing
+# after each one, before any checks run. Colon-separated.
+WARMUP_DIRS="${WARMUP_DIRS:-/container/backups:/container/backups/containers}"
+WARMUP_PAUSE="${WARMUP_PAUSE:-5}"     # seconds to wait after each dir / between retries
+WARMUP_TRIES="${WARMUP_TRIES:-3}"     # attempts per dir before warning and moving on
+
+# Composer command on the servers (can include args, e.g. "php /opt/composer.phar").
+COMPOSER_BIN="${COMPOSER_BIN:-composer}"
+# 1 = also compare every file in vendor/ against a clean install (slower,
+# needs disk space in /tmp and access to packagist / the composer cache).
+COMPOSER_FILE_CHECK="${COMPOSER_FILE_CHECK:-1}"
+# File/dir names inside vendor/ to leave out of that comparison (any depth).
+# Repo housekeeping files: present in a git (source) install but stripped from
+# release zips (dist), so they'd otherwise show up as "added on server".
+VENDOR_IGNORE="${VENDOR_IGNORE:-.git .svn .hg .github .gitattributes .gitignore .scrutinizer.yml .travis.yml .editorconfig .styleci.yml .gitlab-ci.yml}"
+
+SSH_OPTS=(
+    -T                              # no TTY, we're piping a script in
+    -o BatchMode=yes                # never prompt for a password
+    -o ConnectTimeout=15
+    -o ServerAliveInterval=15
+    -o ServerAliveCountMax=3
+)
+
+############################################ ARGUMENTS
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        ;;
+    --servers-file)
+        serversFile="${2:-}"
+        shift
+        ;;
+    --pause)
+        pauseSeconds="${2:-}"
+        shift
+        ;;
+    --backup-dir)
+        BACKUP_DIR="${2:-}"
+        shift
+        ;;
+    --app-dir)
+        APP_DIR="${2:-}"
+        shift
+        ;;
+    --branch)
+        EXPECTED_BRANCH="${2:-}"
+        shift
+        ;;
+    --allowed-change)
+        ALLOWED_CHANGE="${2:-}"
+        shift
+        ;;
+    --no-composer-file-check)
+        COMPOSER_FILE_CHECK=0
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        if [[ "$1" == -* ]]; then
+            echobad "Unknown option: $1"
+            exit 1
+        fi
+        serversFile="$1"
+        ;;
+    esac
+    shift
+done
+
+############################################ HELP
+help_and_exit() {
+    ECHOHEAD "Check Server Basics"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "For every server it logs in once via SSH and checks:"
+    echonice "  0. browses to the backup directories first (warming up the server)"
+    echonice "  1. every backup database file is < 24h old and > 1 MB"
+    echonice "  2. git diff shows no changes except $ALLOWED_CHANGE"
+    echonice "  3. the repo is on the '$EXPECTED_BRANCH' branch"
+    echonice "  4. HEAD matches the latest commit on origin/$EXPECTED_BRANCH"
+    echonice "  5. installed composer packages match composer.lock"
+    echonice "  5b. vendor/ has no locally edited, added or removed files"
+    echonice ""
+    echonice "The only change made on a server: a Bitbucket origin URL of the form"
+    echonice "git@bitbucket.org:... is switched to git@ssh.bitbucket.org:..."
+    echonice "Nothing else in the application directory is modified."
+    echonice ""
+    echonice "Servers file:                  ${serversFile:-<auto>}"
+    echonice "Pause between logins:           ${pauseSeconds}s"
+    echonice "Backup directory:               $BACKUP_DIR"
+    echonice "Application directory:          $APP_DIR"
+    echonice "Expected branch:                $EXPECTED_BRANCH"
+    echonice "Allowed git change:             $ALLOWED_CHANGE"
+    echonice "Maximum backup age:             ${MAX_AGE_SECONDS}s"
+    echonice "Minimum backup size:            ${MIN_SIZE_BYTES} bytes"
+    echonice "Warmup directories:             $WARMUP_DIRS"
+    echonice "Warmup pause / tries:           ${WARMUP_PAUSE}s / $WARMUP_TRIES"
+    echonice "Composer binary:                $COMPOSER_BIN"
+    echonice "Composer file check:            $COMPOSER_FILE_CHECK"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+    echonice "    --servers-file FILE        file with one SSH login per line"
+    echonice "                               (user@host, host, or an ~/.ssh/config alias)"
+    echonice "    --pause SECONDS            wait between server logins (default: $pauseSeconds)"
+    echonice "    --backup-dir DIR           backup databases directory on the server"
+    echonice "    --app-dir DIR              application directory on the server"
+    echonice "    --branch NAME              expected git branch (default: production)"
+    echonice "    --allowed-change FILE      only file allowed to differ in git diff"
+    echonice "    --no-composer-file-check   skip the vendor/ file-by-file comparison"
+    echonice ""
+    echonice "The servers file is read from (in order):"
+    echonice "  1. --servers-file or the positional argument"
+    echonice "  2. SAKE_SERVERS_FILE (environment, global .env, or project .env)"
+    echonice "  3. ./servers.txt in the working directory"
+    echonice "  4. ~/.config/composer/servers.txt"
+    echonice "  5. SAKE_SERVERS (comma or whitespace separated list)"
+    echonice "Blank lines and lines starting with # are ignored."
+    echonice ""
+    echonice "Tunable environment variables:"
+    echonice "BACKUP_DIR, APP_DIR, EXPECTED_BRANCH, ALLOWED_CHANGE, MAX_AGE_SECONDS,"
+    echonice "MIN_SIZE_BYTES, WARMUP_DIRS, WARMUP_PAUSE, WARMUP_TRIES, COMPOSER_BIN,"
+    echonice "COMPOSER_FILE_CHECK, VENDOR_IGNORE, SAKE_SERVERS_FILE, SAKE_SERVERS_PAUSE_SECONDS"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-server-management-check-basics                       # ./servers.txt"
+    echonice "sake-server-management-check-basics my-servers.txt"
+    echonice "sake-server-management-check-basics --pause 30 servers.txt"
+    echonice "sake-server-management-check-basics --no-composer-file-check"
+    echonice "SAKE_SERVERS='user@host1,user@host2' sake-server-management-check-basics"
+
+    echofunctions
+    exit
+}
+
+sake_check_help_and_exit
+
+############################################ SERVER LIST
+mapfile -t SERVERS < <(get_server_ssh_logins "$serversFile")
+
+if ((${#SERVERS[@]} == 0)); then
+    # get_server_ssh_logins has already explained what is missing.
+    exit 2
+fi
+
+############################################ REMOTE SCRIPT
+# Sent over stdin to `bash -s` on each server, so everything happens in the
+# one SSH session. Prints PASS/FAIL/INFO lines; exits 1 if anything failed.
+read -r -d '' REMOTE_SCRIPT <<'REMOTE'
+set -uo pipefail
+
+BACKUP_DIR=$1
+APP_DIR=$2
+EXPECTED_BRANCH=$3
+ALLOWED_CHANGE=$4
+MAX_AGE_SECONDS=$5
+MIN_SIZE_BYTES=$6
+WARMUP_DIRS=$7
+WARMUP_PAUSE=$8
+WARMUP_TRIES=${11}
+COMPOSER_BIN=$9
+COMPOSER_FILE_CHECK=${10}
+VENDOR_IGNORE=${12}
+
+fails=0
+pass() { printf 'PASS  %s\n' "$*"; }
+fail() { printf 'FAIL  %s\n' "$*"; fails=$((fails + 1)); }
+info() { printf 'INFO  %s\n' "$*"; }
+warn() { printf 'WARN  %s\n' "$*"; }     # shown, but doesn't fail the server
+human() { numfmt --to=iec --suffix=B "$1" 2>/dev/null || printf '%sB' "$1"; }
+
+# --- 0. Browse to the backup directories first -------------------------------
+# Retries if a directory isn't ready yet. Never fails the server: the backup
+# check below is what actually matters.
+IFS=: read -r -a warmup <<<"$WARMUP_DIRS"
+for d in "${warmup[@]}"; do
+    [[ -n $d ]] || continue
+    ok=0
+    for (( attempt = 1; attempt <= WARMUP_TRIES; attempt++ )); do
+        if err=$( { cd -- "$d" && ls -A >/dev/null; } 2>&1 ); then
+            ok=1
+            break
+        fi
+        reason=${err##*: }
+        if (( attempt < WARMUP_TRIES )); then
+            info "Not ready: $d ($reason), retry $attempt/$((WARMUP_TRIES - 1)) in ${WARMUP_PAUSE}s"
+            sleep "$WARMUP_PAUSE"
+        fi
+    done
+    if (( ok )); then
+        info "Browsed to $d, waiting ${WARMUP_PAUSE}s"
+        sleep "$WARMUP_PAUSE"
+    else
+        warn "Could not browse to $d after $WARMUP_TRIES tries ($reason); continuing"
+    fi
+done
+cd / || true
+
+# --- 1. Backups --------------------------------------------------------------
+if [[ ! -d $BACKUP_DIR ]]; then
+    fail "Backup directory not found: $BACKUP_DIR"
+else
+    now=$(date +%s)
+    count=0
+    shopt -s nullglob dotglob
+    for f in "$BACKUP_DIR"/*; do
+        [[ -f $f ]] || continue
+        count=$((count + 1))
+        name=${f##*/}
+        read -r size mtime < <(stat -c '%s %Y' -- "$f")
+        age=$((now - mtime))
+        age_h=$(awk -v s="$age" 'BEGIN { printf "%.1f", s / 3600 }')
+        ok=1
+        if (( age > MAX_AGE_SECONDS )); then
+            fail "Backup too old: $name (${age_h}h old)"
+            ok=0
+        fi
+        if (( size <= MIN_SIZE_BYTES )); then
+            fail "Backup too small: $name ($(human "$size"))"
+            ok=0
+        fi
+        (( ok )) && pass "Backup OK: $name ($(human "$size"), ${age_h}h old)"
+    done
+    shopt -u nullglob dotglob
+    if (( count == 0 )); then
+        fail "No backup files found in $BACKUP_DIR"
+    else
+        pass "Found $count backup file(s) in $BACKUP_DIR"
+    fi
+fi
+
+# --- 2-4. Git ----------------------------------------------------------------
+# safe.directory avoids "dubious ownership" errors if the repo belongs to
+# another user. Nothing below modifies the repo.
+g() { git -c safe.directory="$APP_DIR" -C "$APP_DIR" "$@"; }
+export GIT_TERMINAL_PROMPT=0                    # never hang on a credential prompt
+# accept-new: trust a host key the first time (e.g. new ssh.bitbucket.org
+# hostname) but still refuse if a known host's key changes.
+export GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new'
+
+if [[ ! -d $APP_DIR ]]; then
+    fail "Application directory not found: $APP_DIR"
+elif ! g rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    fail "$APP_DIR is not a git repository"
+else
+    # 2. Only the allowed file may differ (staged or unstaged).
+    mapfile -t changed < <(g diff --name-only HEAD)
+    unexpected=()
+    for c in "${changed[@]}"; do
+        [[ $c == "$ALLOWED_CHANGE" ]] || unexpected+=("$c")
+    done
+    if (( ${#unexpected[@]} )); then
+        fail "git diff shows ${#unexpected[@]} unexpected changed file(s):"
+        for c in "${unexpected[@]}"; do info "    $c"; done
+    elif (( ${#changed[@]} )); then
+        pass "git diff: only $ALLOWED_CHANGE changed"
+    else
+        pass "git diff: no changes ($ALLOWED_CHANGE is unmodified)"
+    fi
+
+    # Switch old Bitbucket SSH remotes to the new ssh.bitbucket.org host.
+    old=$(g remote get-url origin 2>/dev/null)
+    if [[ $old =~ git@bitbucket ]]; then
+        new=${old/bitbucket.org/ssh.bitbucket.org}
+        if g remote set-url origin "$new" 2>/dev/null; then
+            info "Updated origin: $old -> $new"
+        else
+            fail "Could not update origin to $new (no write access to .git/config?)"
+        fi
+    fi
+    while IFS= read -r l; do info "remote: $l"; done < <(g remote -v)
+
+    # 3. Branch
+    branch=$(g symbolic-ref --short -q HEAD || echo '(detached HEAD)')
+    if [[ $branch == "$EXPECTED_BRANCH" ]]; then
+        pass "On branch $EXPECTED_BRANCH"
+    else
+        fail "On branch '$branch', expected '$EXPECTED_BRANCH'"
+    fi
+
+    # 4. Latest commit. ls-remote only reads the remote; it doesn't fetch or
+    #    touch the working tree or any local refs.
+    local_sha=$(g rev-parse HEAD)
+    remote_sha=$(timeout 60 git -c safe.directory="$APP_DIR" -C "$APP_DIR" \
+        ls-remote --exit-code origin "refs/heads/$EXPECTED_BRANCH" 2>/dev/null | cut -f1)
+    if [[ -z $remote_sha ]]; then
+        fail "Could not read origin/$EXPECTED_BRANCH (network or credentials problem?)"
+    elif [[ $local_sha == "$remote_sha" ]]; then
+        pass "HEAD is the latest $EXPECTED_BRANCH commit (${local_sha:0:10})"
+    else
+        fail "HEAD ${local_sha:0:10} is not the latest origin/$EXPECTED_BRANCH (${remote_sha:0:10})"
+        if g cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+            behind=$(g rev-list --count "HEAD..$remote_sha")
+            info "    $behind commit(s) behind"
+        else
+            info "    remote commit not fetched locally yet; can't count how far behind"
+        fi
+    fi
+fi
+
+# --- 5. Composer packages ----------------------------------------------------
+# Print at most N lines of a list as INFO, then "... and X more".
+info_list() {
+    local max=$1; shift
+    local -a items=("$@")
+    local i
+    for (( i = 0; i < ${#items[@]} && i < max; i++ )); do info "    ${items[i]}"; done
+    (( ${#items[@]} > max )) && info "    ... and $(( ${#items[@]} - max )) more"
+}
+
+read -r -a composer <<<"$COMPOSER_BIN"
+export COMPOSER_NO_INTERACTION=1 COMPOSER_ALLOW_SUPERUSER=1
+installed_json=$APP_DIR/vendor/composer/installed.json
+
+if [[ ! -d $APP_DIR ]]; then
+    :   # already reported above
+elif [[ ! -f $APP_DIR/composer.lock ]]; then
+    fail "No composer.lock in $APP_DIR"
+elif [[ ! -f $installed_json ]]; then
+    fail "No vendor/composer/installed.json; composer packages not installed?"
+elif ! command -v "${composer[0]}" >/dev/null 2>&1; then
+    fail "Composer not found on server ('${composer[0]}'); set COMPOSER_BIN"
+else
+    # Were the packages installed with or without require-dev?
+    dev_flag=(--no-dev)
+    if php -r '$j = json_decode(file_get_contents($argv[1]), true); exit(empty($j["dev"]) ? 1 : 0);' \
+        "$installed_json" 2>/dev/null; then
+        dev_flag=()
+    fi
+    common=(--no-scripts --no-progress --no-ansi --no-interaction "${dev_flag[@]}")
+
+    # 5a. Installed versions vs composer.lock. --dry-run changes nothing.
+    dry=$(cd / && timeout 300 "${composer[@]}" install --dry-run --no-plugins \
+        "${common[@]}" --working-dir="$APP_DIR" 2>&1)
+    rc=$?
+    mapfile -t ops < <(grep -E '^[[:space:]]*- (Installing|Updating|Upgrading|Downgrading|Removing) ' <<<"$dry" \
+        | sed 's/^[[:space:]]*- //')
+    if (( rc != 0 )); then
+        fail "composer install --dry-run failed (exit $rc):"
+        mapfile -t tail_lines < <(tail -n 5 <<<"$dry")
+        info_list 5 "${tail_lines[@]}"
+    elif (( ${#ops[@]} )); then
+        fail "Installed composer packages don't match composer.lock (${#ops[@]} difference(s)):"
+        info_list 20 "${ops[@]}"
+    else
+        pass "Composer packages match composer.lock${dev_flag:+ (no-dev)}"
+    fi
+    if grep -qi 'lock file is not up to date' <<<"$dry"; then
+        fail "composer.lock is out of date with composer.json"
+    fi
+
+    # 5b. File-level comparison against a clean install in a temp dir.
+    if [[ $COMPOSER_FILE_CHECK == 1 ]]; then
+        tmp=$(mktemp -d /tmp/composer-check.XXXXXX)
+        trap 'rm -rf "$tmp"' EXIT
+
+        # Copy only what composer needs: composer.json/.lock, auth.json, the
+        # patches/ dir, plus any local patch files or path repositories that
+        # composer.json refers to. Nothing else from the project is read.
+        # Plugins stay enabled so things like composer-patches apply as they
+        # did on the real install; scripts are skipped.
+        mapfile -t needed < <(cd "$APP_DIR" && php -r '
+            $j = json_decode(file_get_contents("composer.json"), true) ?: [];
+            $p = ["composer.json", "composer.lock", "auth.json", "patches"];
+            foreach ($j["repositories"] ?? [] as $r) {
+                if (in_array($r["type"] ?? "", ["path", "artifact"], true)) { $p[] = $r["url"]; }
+            }
+            $x = $j["extra"] ?? [];
+            if (isset($x["patches-file"])) { $p[] = $x["patches-file"]; }
+            foreach ($x["patches"] ?? [] as $list) {
+                foreach ((array) $list as $patch) {
+                    $u = is_array($patch) ? ($patch["url"] ?? "") : $patch;
+                    if ($u !== "" && !preg_match("#^[a-z]+://#i", $u)) { $p[] = $u; }
+                }
+            }
+            echo implode("\n", array_unique($p)), "\n";' 2>/dev/null)
+        (( ${#needed[@]} )) || needed=(composer.json composer.lock auth.json patches)
+        for p in "${needed[@]}"; do
+            [[ -z $p || $p == /* || $p == ../* ]] && continue   # absolute/outside paths work as-is
+            base=${p%%[*?[]*}                                    # "modules/*" -> "modules"
+            [[ $base != "$p" ]] && base=${base%/}
+            [[ -n $base && -e $APP_DIR/$base ]] || continue
+            (cd "$APP_DIR" && cp -a --parents -- "$base" "$tmp"/) 2>/dev/null
+        done
+
+        out=$(cd "$tmp" && timeout 900 "${composer[@]}" install --no-autoloader \
+            "${common[@]}" 2>&1)
+        rc=$?
+        if (( rc != 0 )); then
+            fail "Clean composer install for comparison failed (exit $rc):"
+            mapfile -t tail_lines < <(tail -n 5 <<<"$out")
+            info_list 5 "${tail_lines[@]}"
+        else
+            ignore_args=()
+            read -r -a ignore_names <<<"$VENDOR_IGNORE"
+            for n in "${ignore_names[@]}"; do ignore_args+=(-x "$n"); done
+            changes=()
+            while IFS= read -r line; do
+                case $line in
+                    "Files $APP_DIR/"*)
+                        x=${line#"Files $APP_DIR/"}
+                        rel=${x%" and $tmp/"*}; kind="modified" ;;
+                    "Only in $APP_DIR/"*)
+                        x=${line#"Only in $APP_DIR/"}
+                        rel="${x%%: *}/${x#*: }"; kind="added on server" ;;
+                    "Only in $tmp/"*)
+                        x=${line#"Only in $tmp/"}
+                        rel="${x%%: *}/${x#*: }"; kind="missing on server" ;;
+                    *)  rel=$line; kind="error" ;;
+                esac
+                # Skip files composer generates itself (autoloader, metadata).
+                [[ $rel == vendor/autoload.php ]] && continue
+                [[ $rel == vendor/composer/* && ${rel#vendor/composer/} != */* ]] && continue
+                changes+=("$kind: $rel")
+            done < <(diff -rq "${ignore_args[@]}" "$APP_DIR/vendor" "$tmp/vendor" 2>&1)
+
+            if (( ${#changes[@]} )); then
+                fail "Composer packages have ${#changes[@]} local change(s) vs a clean install:"
+                info_list 25 "${changes[@]}"
+            else
+                pass "No local changes to any composer package files"
+            fi
+        fi
+        rm -rf "$tmp"
+        trap - EXIT
+    fi
+fi
+
+exit $(( fails > 0 ))
+REMOTE
+
+############################################ OUTPUT
+if [[ -t 2 ]]; then
+    RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' BOLD=$'\e[1m' DIM=$'\e[2m' RESET=$'\e[0m'
+else
+    RED='' GREEN='' YELLOW='' BOLD='' DIM='' RESET=''
+fi
+
+colourise() {
+    local line
+    while IFS= read -r line; do
+        case $line in
+            PASS*) printf '  %s%s%s\n' "$GREEN" "$line" "$RESET" >&2 ;;
+            FAIL*) printf '  %s%s%s\n' "$RED" "$line" "$RESET" >&2 ;;
+            WARN*) printf '  %s%s%s\n' "$YELLOW" "$line" "$RESET" >&2 ;;
+            INFO*) printf '  %s%s%s\n' "$DIM" "$line" "$RESET" >&2 ;;
+            *)     printf '  %s\n' "$line" >&2 ;;
+        esac
+    done
+}
+
+############################################ SERVER CHECK
+declare -A RESULT
+
+check_one_server() {
+    local host="$1"
+    local index="$2"
+    local total="$3"
+    local rc=''
+
+    printf '\n%s[%d/%d] %s%s  %s(%s)%s\n' "$BOLD" "$index" "$total" "$host" "$RESET" \
+        "$DIM" "$(date '+%F %T')" "$RESET" >&2
+
+    ssh "${SSH_OPTS[@]}" "$host" "bash -s -- $REMOTE_ARGS" <<<"$REMOTE_SCRIPT" 2>&1 | colourise
+    rc=${PIPESTATUS[0]}
+
+    case $rc in
+        0)   RESULT[$host]="${GREEN}OK${RESET}"
+             return 0
+             ;;
+        1)   RESULT[$host]="${RED}FAILED${RESET}"
+             return 1
+             ;;
+        255) RESULT[$host]="${YELLOW}SSH ERROR${RESET}"
+             printf '  %sFAIL  Could not connect / SSH error%s\n' "$RED" "$RESET" >&2
+             return 1
+             ;;
+        *)   RESULT[$host]="${YELLOW}ERROR (exit $rc)${RESET}"
+             return 1
+             ;;
+    esac
+}
+
+REMOTE_ARGS=$(printf '%q ' "$BACKUP_DIR" "$APP_DIR" "$EXPECTED_BRANCH" \
+    "$ALLOWED_CHANGE" "$MAX_AGE_SECONDS" "$MIN_SIZE_BYTES" \
+    "$WARMUP_DIRS" "$WARMUP_PAUSE" "$COMPOSER_BIN" "$COMPOSER_FILE_CHECK" \
+    "$WARMUP_TRIES" "$VENDOR_IGNORE")
+
+ECHOHEAD "Check server basics"
+echonice "Servers to check:              ${#SERVERS[@]}"
+echonice "Pause between logins:          ${pauseSeconds}s"
+echonice "Backup directory:              $BACKUP_DIR"
+echonice "Application directory:         $APP_DIR"
+echonice "Expected branch:               $EXPECTED_BRANCH"
+
+loop_servers check_one_server --pause "$pauseSeconds" "${SERVERS[@]}"
+all_ok=$?
+
+############################################ SUMMARY
+ECHOHEAD "Summary"
+for host in "${SERVERS[@]}"; do
+    printf '  %-40s %s\n' "$host" "${RESULT[$host]:-NOT CHECKED}" >&2
+done
+
+if ((all_ok == 0)); then
+    echogood "All servers passed the basics check."
+else
+    echobad "One or more servers failed the basics check."
+fi
+
+echoend
+exit "$all_ok"
