@@ -79,7 +79,7 @@ ENVFILELOCATION=$(realpath -m "$WORKING_DIR/.env")
 # Get current directory information for educated defaults
 CURRENT_DIR=$(pwd)
 CURRENT_DIR_NAME=$(basename "$CURRENT_DIR")
-CURRENT_DIR_BASENAME=$(basename "$CURRENT_DIR" | tr '.' '_')
+CURRENT_DIR_BASENAME=$(basename "$CURRENT_DIR" | sed 's/\..*//' | tr -c 'a-zA-Z0-9_\n' '_')
 
 echo "=== Basics ==="
 # Default includes http:// protocol, user can override
@@ -100,13 +100,13 @@ SS_HOSTED_WITH_SITEHOST=${SS_HOSTED_WITH_SITEHOST:-false}
 echo ""
 echo "=== Paths ==="
 # Full path for TEMP default (not relative)
-TEMP_PATH_DEFAULT="$CURRENT_DIR/tmp"
+TEMP_PATH_DEFAULT="/tmp"
 read -p "TEMP_PATH [$TEMP_PATH_DEFAULT]: " TEMP_PATH
 TEMP_PATH=${TEMP_PATH:-$TEMP_PATH_DEFAULT}
 
 echo ""
 echo "=== DB ==="
-# Replace dots with underscores for valid database name
+# Use only the first part of the domain (before the first dot) as database name
 SS_DATABASE_NAME_DEFAULT="${CURRENT_DIR_BASENAME}"
 read -p "SS_DATABASE_SERVER [localhost]: " SS_DATABASE_SERVER
 SS_DATABASE_SERVER=${SS_DATABASE_SERVER:-localhost}
@@ -205,12 +205,14 @@ YML_CONTENT+="MFASecretKey: \"$SS_MFA_SECRET_KEY\"\n"
 YML_CONTENT+="SendAllEmailsTo: \"$SS_SEND_ALL_EMAILS_TO\"\n"
 YML_CONTENT+="BYPASS_MFA: \"$BYPASS_MFA\"\n"
 YML_CONTENT+="SSAllowSmokeTest: \"$SS_ALLOW_SMOKE_TEST\"\n"
+YML_CONTENT+="ErrorLog: \"$SS_ERROR_LOG\"\n"
+YML_CONTENT+="ServerForExampleData: \"$SS_SERVER_FOR_EXAMPLE_DATA\"\n"
 YML_CONTENT+="AdminUser: \"$SS_DEFAULT_ADMIN_USERNAME\"\n"
 YML_CONTENT+="AdminPassword: \"$SS_DEFAULT_ADMIN_PASSWORD\"\n"
 YML_CONTENT+="\n# Paths\n"
-YML_CONTENT+="TEMP_PATH: \"$TEMP_PATH\"\n"
+YML_CONTENT+="TempPath: \"$TEMP_PATH\"\n"
 YML_CONTENT+="\n# DB\n"
-YML_CONTENT+="# Note: dots in database name have been replaced with underscores\n"
+YML_CONTENT+="# Note: the database name defaults to the first part of the domain name\n"
 
 # Write the YAML file
 printf "$YML_CONTENT" > "$YMLFILELOCATION"
@@ -224,7 +226,7 @@ echo "Building env file: $ENVFILELOCATION"
 PHP_CLASS_FILE="${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGenerator.php"
 
 phpCode="require '${PHP_CLASS_FILE}';
-\\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::buildEnvFile('${YMLFILELOCATION}', '${ENVFILELOCATION}', '${ENVFILELOCATION}');"
+\\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::buildEnvFile('${YMLFILELOCATION}', '${ENVFILELOCATION}', '${ENVFILELOCATION}', true);"
 
 # The global composer dependencies require a recent PHP, so pick one that is new enough
 # (the default `php` may be an older version).
