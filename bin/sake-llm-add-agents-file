@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Adds an AGENTS.md file (instructions for LLM coding agents) to a project (default) or globally for your user"
+
+############################################ SETTINGS
+help='no'
+dir='./'
+dirGiven='no'
+fileName='AGENTS.md'
+force='no'
+assumeYes='no'
+global='no'
+globalDir="$HOME/.config/opencode"
+
+while (($#)); do
+    case $1 in
+    -f | --force)
+        force='yes'
+        ;;
+    -y | --yes)
+        assumeYes='yes'
+        ;;
+    -g | --global)
+        global='yes'
+        ;;
+    *)
+        if sake_handle_help_flag "$1"; then
+            shift
+            continue
+        fi
+        if [[ "$1" == -* ]]; then
+            echobad "Unknown option: $1"
+            exit 1
+        fi
+        dir=$1
+        dirGiven='yes'
+        ;;
+    esac
+    shift
+done
+
+############################################ HELP
+help_and_exit() {
+    ECHOHEAD "Add AGENTS.md"
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "Default: one AGENTS.md for the project in the current directory (or the directory you pass as first argument)."
+    echonice "          An existing project file is replaced, unless git cannot restore it (uncommitted changes, untracked, or no git)."
+    echonice "With --global: one AGENTS.md for all your projects, in $globalDir."
+    echonice "          An existing global file is only replaced with --force, after an 'Are you sure?' question."
+
+    ECHOHEAD "Current settings:"
+    if [[ "$global" == 'yes' ]]; then
+        echonice "Type:                          global"
+        echonice "Directory:                     $globalDir"
+    else
+        echonice "Type:                          project"
+        echonice "Directory:                     $dir"
+    fi
+    echonice "File:                          $fileName"
+    echonice "Overwrite existing:            $force"
+
+    ECHOHEAD "Available settings:"
+    echonice "-h, --help                     show help information"
+    echonice "-g, --global                   create the global file for your user instead of a project file"
+    echonice "-f, --force                    project: overwrite even with uncommitted changes. global: required to replace the file"
+    echonice "-y, --yes                      skip the 'Are you sure?' question for the global file"
+
+    ECHOHEAD "Example usage:"
+    echonice "sake-llm-add-agents-file                              # project file, current directory"
+    echonice "sake-llm-add-agents-file /var/www/my-site            # project file, other directory"
+    echonice "sake-llm-add-agents-file vendor/my-vendor/my-module --force"
+    echonice "sake-llm-add-agents-file --global                    # global file for all projects"
+
+    echofunctions
+    exit
+}
+sake_check_help_and_exit
+
+############################################ FUNCTIONS
+# Returns 0 and prints the reason when overwriting the file would lose work that git cannot restore.
+# Returns 1 (prints nothing) when the file is tracked by git and has no uncommitted changes.
+project_file_unsafe_reason() {
+    local file="$1"
+    local fileDir fileBase
+    fileDir="$(dirname "$file")"
+    fileBase="$(basename "$file")"
+
+    if ! git -C "$fileDir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "not in a git repository, so the old version could not be restored"
+        return 0
+    fi
+    if ! git -C "$fileDir" ls-files --error-unmatch -- "$fileBase" >/dev/null 2>&1; then
+        echo "it is not tracked by git (or is ignored), so the old version could not be restored"
+        return 0
+    fi
+    if [[ -n "$(git -C "$fileDir" status --porcelain -- "$fileBase" 2>/dev/null)" ]]; then
+        echo "it has uncommitted changes in git"
+        return 0
+    fi
+    return 1
+}
+
+print_global_agents_template() {
+    cat <<'EOF'
+# AGENTS.md (global)
+
+Personal instructions for LLM coding agents, applied to every project on this machine.
+Project-specific rules belong in the AGENTS.md of that project, which takes precedence.
+
+## About me
+
+- Role and main technologies: TODO
+- Preferred language for replies and commit messages: TODO
+
+## How to work
+
+- Keep answers short and to the point.
+- Read the relevant code before changing it.
+- Prefer small, focused changes over large refactors.
+- Follow the conventions of the project you are in.
+- If a request is ambiguous, ask instead of guessing.
+
+## Safety
+
+- Never commit secrets, `.env` files, or credentials.
+- Do not delete or overwrite files you did not create without asking.
+- Do not force-push, and do not rewrite shared history.
+- Do not commit or push unless asked to.
+
+## Git
+
+- Commit messages start with a prefix: `API`, `NEW`, `ENH`, `FIX`, `DOC`, `DEP`, `TLN` or `MNT`, e.g. `FIX: null check in search form`.
+
+## Notes
+
+- Anything else that applies to all your projects: TODO
+EOF
+}
+
+print_agents_template() {
+    cat <<'EOF'
+# AGENTS.md
+
+Instructions for LLM coding agents (OpenCode, Claude Code, Copilot, Codex, etc.) working in this repository.
+Keep this file short and accurate. If something here is wrong or out of date, fix it.
+
+## Project overview
+
+- What this project is and who it is for: TODO
+- Main technologies (language, framework, versions): TODO
+- Where the important code lives: TODO
+
+## Setup and commands
+
+- Install dependencies: TODO (e.g. `composer install`, `npm install`)
+- Build: TODO
+- Run tests: TODO
+- Lint / static analysis: TODO
+
+## Code style
+
+- Follow the conventions already used in the surrounding code.
+- Follow PSR-12 for PHP unless the project says otherwise.
+- Prefer small, focused changes over large refactors.
+- Do not add comments that only repeat what the code does.
+
+## Rules for agents
+
+- Read the relevant code before changing it.
+- Do not edit generated files or anything in `vendor/` or `node_modules/`.
+- Do not commit secrets, `.env` files, or credentials.
+- Do not change unrelated files.
+- Run the tests and linters listed above before saying a task is done.
+- If a request is ambiguous, ask instead of guessing.
+
+## Git
+
+- Commit messages start with a prefix: `API`, `NEW`, `ENH`, `FIX`, `DOC`, `DEP`, `TLN` or `MNT`, e.g. `FIX: null check in search form`.
+- Do not force-push, and do not rewrite shared history.
+- Do not commit or push unless asked to.
+
+## Notes
+
+- Anything else an agent should know (gotchas, deployment, external services): TODO
+EOF
+}
+
+############################################ CODE
+if [[ "$global" == 'yes' ]]; then
+    if [[ "$dirGiven" == 'yes' ]]; then
+        echobad "--global cannot be combined with a directory ($dir)."
+        exit 1
+    fi
+    mkdir -p "$globalDir" || { echobad "Could not create $globalDir"; exit 1; }
+    cd_or_fail "$globalDir" || exit 1
+elif [[ "$dir" == /* ]]; then
+    cd_or_fail "$dir" || exit 1
+else
+    cd_or_fail "$WORKING_DIR/$dir" || exit 1
+fi
+
+targetDir="$(pwd)"
+targetFile="$targetDir/$fileName"
+
+# also catch other spellings (Agents.md, agents.md) as they would clash on some file systems
+existing="$(find "$targetDir" -maxdepth 1 -type f -iname "$fileName" -print -quit 2>/dev/null)"
+
+if [[ -n "$existing" && "$force" != 'yes' ]]; then
+    if [[ "$global" == 'yes' ]]; then
+        echowarn "$existing already exists. Use --force to overwrite it."
+        exit 1
+    fi
+
+    # project file: overwriting is fine when git can bring the old version back
+    if unsafeReason="$(project_file_unsafe_reason "$existing")"; then
+        echowarn "$existing was NOT overwritten: $unsafeReason"
+        echonice "Commit or stash it first, or use --force to overwrite it anyway."
+        exit 1
+    fi
+    echonice "Replacing $existing (committed in git, so the old version can be restored)."
+fi
+
+if [[ -n "$existing" ]]; then
+    targetFile="$existing"
+
+    # the global file applies to all projects, so make sure the user really wants to replace it
+    if [[ "$global" == 'yes' && "$assumeYes" != 'yes' ]]; then
+        echowarn "This will REPLACE your existing global file: $targetFile"
+        if [[ ! -r /dev/tty ]]; then
+            echobad "Cannot ask for confirmation (no terminal). Use --yes to skip the question."
+            exit 1
+        fi
+        read -r -p " Are you sure? [y/N] " answer </dev/tty
+        if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+            echonice "Cancelled. Nothing was changed."
+            exit 1
+        fi
+    fi
+fi
+
+if [[ "$global" == 'yes' ]]; then
+    writeOk='no'
+    print_global_agents_template >"$targetFile" && writeOk='yes'
+else
+    writeOk='no'
+    print_agents_template >"$targetFile" && writeOk='yes'
+fi
+
+if [[ "$writeOk" != 'yes' ]]; then
+    echobad "Could not write $targetFile"
+    exit 1
+fi
+
+echogood "Created $targetFile"
+if [[ "$global" == 'yes' ]]; then
+    echonice "Next: fill in the TODO items. This applies to all your projects (project AGENTS.md files take precedence)."
+else
+    echonice "Next: fill in the TODO items so agents know how to build, test and lint this project."
+fi
+
+echoend
