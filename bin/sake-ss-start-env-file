@@ -226,8 +226,25 @@ PHP_CLASS_FILE="${SCRIPT_DIR}/../sunnysideup/env-file-generator/src/EnvFileGener
 phpCode="require '${PHP_CLASS_FILE}';
 \\Sunnysideup\\EnvFileGenerator\\EnvFileGenerator::buildEnvFile('${YMLFILELOCATION}', '${ENVFILELOCATION}', '${ENVFILELOCATION}');"
 
-echo "Running: php -r \"$phpCode\""
-php -r "$phpCode"
+# The global composer dependencies require a recent PHP, so pick one that is new enough
+# (the default `php` may be an older version).
+MIN_PHP_VERSION_ID=80401
+PHP_BIN=""
+for candidate in php php8.5 php8.4; do
+    if command -v "$candidate" >/dev/null 2>&1 \
+        && "$candidate" -r "exit(PHP_VERSION_ID >= ${MIN_PHP_VERSION_ID} ? 0 : 1);" 2>/dev/null; then
+        PHP_BIN="$candidate"
+        break
+    fi
+done
+
+if [ -z "$PHP_BIN" ]; then
+    echo "ERROR: PHP 8.4.1 or newer is required (found $(php -r 'echo PHP_VERSION;'))." >&2
+    exit 1
+fi
+
+echo "Running: $PHP_BIN -r \"$phpCode\""
+"$PHP_BIN" -r "$phpCode" || exit 1
 
 echo ""
 echonice "Built: $ENVFILELOCATION"
