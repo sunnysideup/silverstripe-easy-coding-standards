@@ -101,6 +101,7 @@
     "bin/sake-php-config-switch-versions",
     "bin/sake-php-config-timezone",
     "bin/sake-php-line-counter",
+    "bin/sake-self-edit",
     "bin/sake-self-methods",
     "bin/sake-self-update",
     "bin/sake-server-management-check-basics",

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+############################################ BASICS
+SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
+WORKING_DIR="$(pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/sake-self-methods"
+SCRIPT_SUMMARY="Opens the code of this module (easy-coding-standards) in OpenCode for editing"
+
+# Resolve symlinks (composer bin links) to find the real module directory
+REAL_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+MODULE_DIR="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
+
+############################################ SETTINGS
+help='no'
+opencodeArgs=()
+
+while (($#)); do
+    case $1 in
+    -h | --help)
+        help='yes'
+        ;;
+    *)
+        opencodeArgs+=("$1")
+        ;;
+    esac
+    shift
+done
+
+############################################ HELP
+
+help_and_exit() {
+
+    ECHOHEAD 'Self Edit'
+    echonice "$SCRIPT_SUMMARY"
+    echonice ""
+    echonice "Directory of script:           $SCRIPT_DIR"
+    echonice "Module directory:              $MODULE_DIR"
+
+    ECHOHEAD 'Available settings:'
+    echonice '-h, --help                     show help information'
+    echonice 'any other arguments are passed on to opencode'
+
+    ECHOHEAD 'Example usage:'
+    echonice 'sake-self-edit'
+
+    echofunctions
+    exit
+}
+
+if [[ "$help" == "yes" ]]; then
+    help_and_exit
+fi
+sake_check_help_and_exit
+
+############################################ RUN
+
+if ! test -f "$MODULE_DIR/composer.json"; then
+    echobad "ERROR: could not find module composer.json in: $MODULE_DIR"
+    exit 1
+fi
+
+if ! command -v opencode >/dev/null 2>&1; then
+    echobad "ERROR: opencode not found. Install it with: curl -fsSL https://opencode.ai/install | bash"
+    exit 1
+fi
+
+echonice "Opening OpenCode in: $MODULE_DIR"
+cd "$MODULE_DIR"
+exec opencode ${opencodeArgs[@]+"${opencodeArgs[@]}"}

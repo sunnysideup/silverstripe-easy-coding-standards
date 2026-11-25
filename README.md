@@ -162,6 +162,7 @@ lives in the `pm` group: `sake-<category>-pm-<task>` (see `sake-help -f -pm-`).
  - sake-update-runtime-npm - Updates NVM, Node.js, and npm to their latest stable versions
 
 # self
+ - sake-self-edit - Opens the code of this module in OpenCode for editing
  - sake-self-update
 
 ```
