@@ -4,13 +4,13 @@
 SCRIPT_DIR="${COMPOSER_RUNTIME_BIN_DIR:?COMPOSER_RUNTIME_BIN_DIR not set}"
 WORKING_DIR=$(pwd)
 source "$SCRIPT_DIR/sake-self-methods"
-SCRIPT_SUMMARY="For every repo of an owner: if branch 5 is ahead of main, merge 5 into main, drop SS5-only changes, clean up conflicts and make sure it works with SS6"
+SCRIPT_SUMMARY="For every repo of an owner where branch 5 (SS5) is ahead of main (SS6): bring the SS5 work into main, either by merging 5 (after a Rector pass on a copy of 5) or, when that conflicts too much, by rebuilding main from an SS6 upgrade of 5. Branch 5 stays SS5."
 
 ############################################ SETTINGS
 owner='sunnysideup'
 limit=1000
-sourceBranch='5'       # branch holding SS5 work
-baseBranch=''          # branch that receives the merge (default: repo default branch, i.e. main)
+sourceBranch='5'       # branch holding SS5 work (stays SS5: only the CHANGELOG.md commit is ever added to it)
+baseBranch=''          # branch that receives the work (default: repo default branch, i.e. main)
 workDir="${TMPDIR:-/tmp}/sake-upgrade-5-to-6"
 rectorConfig='SS62'
 only=''                # comma separated repo names (without owner)
@@ -19,22 +19,30 @@ assumeYes='no'         # don't ask per repo
 runChangelog='yes'     # run sake-git-merge-towards-production-changes on the source branch first
 dryRun='no'
 push='no'
-prMode='no'          # open a pull request instead of merging into base
+prMode='no'            # open a pull request instead of changing base directly
 prBranch='upgrade/ss6-merge-5'
 prDraft='yes'
-forcePr='no'        # rebuild an existing PR branch (force-with-lease)
+forcePr='no'           # rebuild an existing PR branch (force-with-lease)
 useLlm='yes'
 provider=''
 model=''
 verbose='no'
-maxCost=''           # stop everything once total LLM spend (USD) reaches this
-conflictBatch=8      # max conflicted files per LLM call; files are grouped per folder (each call has a fixed overhead)
-conflictBytes=160000 # ...and a call is also capped at about this many bytes of conflicted files
+maxCost=''             # stop everything once total LLM spend (USD) reaches this
+conflictBatch=8        # max conflicted files per LLM call; files are grouped per folder (each call has a fixed overhead)
+conflictBytes=160000   # ...and a call is also capped at about this many bytes of conflicted files
 thinking='no'
-verifyInstall='no'   # composer install + phpunit against SS6 in a scratch copy
-verifySoft='no'      # install/test failures are reported in the PR instead of failing the repo
+verifyInstall='no'     # composer install + phpunit against SS6 in a scratch copy
+verifySoft='no'        # install/test failures are reported in the PR instead of failing the repo
 VERIFY_TIMEOUT=1800
 VERIFY_SUMMARY='static checks only (composer validate, php -l); dependencies were NOT installed and PHPUnit was NOT run'
+
+strategy='auto'        # auto | merge | rebuild
+prep='yes'             # merge path: run Rector on a scratch copy of the source branch first (turns most mechanical conflicts into clean merges)
+conflictLimit=10       # auto: more conflicted files than this (after the Rector prep) = too many to merge
+mainWorkLimit=5        # auto: rebuild only when base has at most this many own (non-upgrade) commits since 5 and main split
+upgradeCmd=''          # rebuild path: optional command that upgrades the code to SS6 (runs inside the repo, after Rector)
+# commit subjects matching this are "upgrade / maintenance" work on base, not features (they are not copied across on rebuild)
+upgradeRegex='rector|upgrad|ss ?6|silverstripe ?6|cms ?6|php ?8|lint|php-?cs|cs-?fix|phpstan|composer|changelog|^(MNT|DEP|DOC)\b'
 
 while (($#)); do
     case $1 in
@@ -123,6 +131,29 @@ while (($#)); do
     --verify-soft)
         verifySoft='yes'
         ;;
+    --strategy)
+        strategy="${2:-auto}"
+        shift
+        ;;
+    --no-prep)
+        prep='no'
+        ;;
+    --conflict-limit)
+        conflictLimit="${2:-10}"
+        shift
+        ;;
+    --main-work-limit)
+        mainWorkLimit="${2:-5}"
+        shift
+        ;;
+    --upgrade-cmd)
+        upgradeCmd="${2:-}"
+        shift
+        ;;
+    --upgrade-regex)
+        upgradeRegex="${2:-$upgradeRegex}"
+        shift
+        ;;
     -v | --verbose)
         verbose='yes'
         ;;
@@ -138,6 +169,14 @@ while (($#)); do
     shift
 done
 
+case $strategy in
+auto | merge | rebuild) ;;
+*)
+    echobad "--strategy must be auto, merge or rebuild (got: $strategy)"
+    exit 1
+    ;;
+esac
+
 ############################################ HELP
 
 # What sake-llm-opencode will really use (its own default / LLM_* env / our -m and --provider).
@@ -150,15 +189,18 @@ effective_model() {
 }
 
 help_and_exit() {
-    ECHOHEAD "Merge SS5 branches into main and upgrade to SS6 across all repos"
+    ECHOHEAD "Bring SS5 work (branch $sourceBranch) into the SS6 branch (main) across all repos"
     echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
 
     ECHOHEAD "Current settings:"
     echonice "owner:                         $owner"
-    echonice "source branch (-s):            $sourceBranch"
-    echonice "base branch (-b):              ${baseBranch:-(repo default branch)}"
+    echonice "source branch (-s):            $sourceBranch  (stays SS5)"
+    echonice "base branch (-b):              ${baseBranch:-(repo default branch)}  (SS6)"
+    echonice "strategy (--strategy):         $strategy  (conflict limit: $conflictLimit, main work limit: $mainWorkLimit)"
+    echonice "rector prep before merge:      $prep"
+    echonice "upgrade command (rebuild):     ${upgradeCmd:-(none: Rector + LLM do the upgrade)}"
     echonice "work dir (-w):                 $workDir"
     echonice "rector config (-r):            $rectorConfig"
     echonice "skip repos (--skip):           ${skip:-(none)}"
@@ -170,40 +212,58 @@ help_and_exit() {
     while IFS= read -r l; do echonice "$l"; done < <(effective_model)
     echonice "max LLM spend (--max-cost):    ${maxCost:-(no limit)}"
     echonice "push to base:                  $push"
-    echonice "pull request mode (--pr):       $prMode (branch: $prBranch, draft: $prDraft)"
+    echonice "pull request mode (--pr):      $prMode (branch: $prBranch, draft: $prDraft)"
     echonice "dry run:                       $dryRun"
 
+    ECHOHEAD "The idea in one go:"
+    echonice "1. MEASURE   how many files would conflict, and how much real (non-upgrade) work main has since 5 and main split."
+    echonice "2. MERGE     (most repos) run Rector on scratch copies of 5 and of the point where 5 and main split, then merge"
+    echonice "             against that. The mechanical SS6 changes then match everywhere, so only real conflicts are left for the LLM."
+    echonice "3. REBUILD   (repos where 2 still conflicts a lot and main has little own work) start main again from 5:"
+    echonice "             upgrade that copy to SS6, copy main's own commits across, and record the old main with 'merge -s ours'"
+    echonice "             (old main stays in the history, no force push, no renamed branches). An LLM then checks nothing"
+    echonice "             from the old main was lost."
+    echonice "4. HUMAN     (lots of conflicts AND lots of own work on main) reported, not touched."
+    echonice "Branch $sourceBranch itself only ever gets the CHANGELOG.md commit; all SS6 work lands on main (or the PR branch)."
+
     ECHOHEAD "What it does per repo:"
-    echonice "0. skips repos without a '$sourceBranch' branch, or where it is not ahead of the base branch"
+    echonice "0. skips repos without a '$sourceBranch' branch, or where it is not ahead of the base branch; prints the measurements"
     echonice "   asks [p]roceed / [s]kip / [q]uit (not with --yes, --dry-run or without a terminal)"
     echonice "1. runs sake-git-merge-towards-production-changes on '$sourceBranch' (CHANGELOG.md)"
-    echonice "2. (a) merges '$sourceBranch' into the base branch (no commit yet)"
-    echonice "   (c) conflicts are cleaned up per file with sake-llm-opencode (composer.json keeps the base version)"
-    echonice "   (b) an LLM reviews the whole incoming diff and reverts changes that are not needed / wrong for SS6"
-    echonice "   then commits the merge"
-    echonice "3. (d) runs sake-lint-php-rector -r $rectorConfig, an LLM SS6 clean-up, then checks:"
+    echonice "2. merge path: (a) Rector on scratch copies of '$sourceBranch' and the merge base (b) merge (c) LLM resolves conflicts"
+    echonice "   (composer.json keeps the base version) (d) LLM reviews the whole incoming diff, then the merge is committed"
+    echonice "   rebuild path: (a) copy of '$sourceBranch' + base composer.json + Rector (+ --upgrade-cmd) (b) cherry-pick base's own"
+    echonice "   commits (c) 'git merge -s ours origin/<base>' (d) LLM compares with the old base and brings back what is missing"
+    echonice "3. sake-lint-php-rector -r $rectorConfig, an LLM SS6 clean-up, then checks:"
     echonice "   composer validate + php -l on all PHP files (one LLM repair attempt if it fails)"
     echonice "   with --verify-install also: composer install/update + vendor/bin/phpunit in a scratch copy (repo itself stays clean)"
     echonice "   tests need the DB env your Silverstripe tests normally use (SS_DATABASE_* ...) in your shell"
-    echonice "PR mode (--pr): all work happens on branch '$prBranch' created from the base branch; that branch is pushed and a"
-    echonice "   pull request into the base branch is opened. The base branch and '$sourceBranch' are NEVER pushed."
-    echonice "   Repos that already have that branch on origin are skipped (safe to re-run); --force-pr rebuilds it."
+    echonice "PR mode (--pr): all work happens on branch '$prBranch' and a pull request into the base branch is opened."
+    echonice "   The base branch and '$sourceBranch' are NEVER pushed. Repos that already have that branch on origin are skipped"
+    echonice "   (safe to re-run); --force-pr rebuilds it."
     echonice "4. commits the clean-up (and pushes with --push) using sake-git-commit-and-push"
     echonice "   a failing repo is reset to where it started and reported, never left half-merged"
 
     ECHOHEAD "Available settings:"
     echonice "-o, --owner OWNER              GitHub user or org (default: sunnysideup)"
     echonice "-l, --limit NUMBER             max repos to scan (default: 1000)"
-    echonice "-s, --source BRANCH            branch to merge FROM (default: 5)"
-    echonice "-b, --base BRANCH              branch to merge INTO (default: repo default branch)"
+    echonice "-s, --source BRANCH            branch to take work FROM (default: 5)"
+    echonice "-b, --base BRANCH              branch to bring work INTO (default: repo default branch)"
+    echonice "    --strategy auto|merge|rebuild   auto (default) measures and picks; merge / rebuild force one path"
+    echonice "    --no-prep                  merge path: do not run Rector on copies of the source branch / merge base before merging"
+    echonice "    --conflict-limit N         auto: more conflicted files than this after the prep = do not merge (default $conflictLimit)"
+    echonice "    --main-work-limit N        auto: rebuild only if base has at most N own commits since the split (default $mainWorkLimit)"
+    echonice "    --upgrade-cmd 'CMD'        rebuild path: your own SS6 upgrade command, run in the repo after Rector"
+    echonice "                               (env: SAKE_REPO, SAKE_BASE_BRANCH, SAKE_SOURCE_BRANCH)"
+    echonice "    --upgrade-regex REGEX      commit subjects on base that count as upgrade work, not features"
     echonice "-w, --work-dir DIR             where repos are cloned (default: $workDir)"
     echonice "-r, --rector-config NAME       rector config (default: SS62)"
     echonice "    --only a,b,c               only these repo names (prefixes 'sunnysideup-' and 'silverstripe-' are optional: 'ecommerce' = 'silverstripe-ecommerce')"
     echonice "    --skip a,b,c               never touch these repo names (same matching as --only)"
     echonice "-y, --yes                      do not ask per repo (automation)"
     echonice "    --no-changelog             do not run sake-git-merge-towards-production-changes first"
-    echonice "-d, --dry-run                  only report which repos would be upgraded"
-    echonice "    --pr                       open a pull request per repo instead of merging into the base branch"
+    echonice "-d, --dry-run                  only measure and report what would happen per repo"
+    echonice "    --pr                       open a pull request per repo instead of changing the base branch"
     echonice "    --pr-branch NAME           PR branch name (default: upgrade/ss6-merge-5)"
     echonice "    --no-draft                 open PRs as ready for review (default: draft)"
     echonice "    --force-pr                 rebuild a PR branch that already exists (force-with-lease)"
@@ -224,9 +284,10 @@ help_and_exit() {
     echonice "-h, --help                     show help information"
 
     ECHOHEAD "Example usage:"
-    echonice "sake-git-upgrade-5-to-6-all --dry-run"
+    echonice "sake-git-upgrade-5-to-6-all --dry-run                   # measure all repos, see merge / rebuild / human per repo"
     echonice "sake-git-upgrade-5-to-6-all --only silverstripe-seo --skip silverstripe-email-helpers -m github-copilot/claude-sonnet-4.5"
-    echonice "sake-git-upgrade-5-to-6-all --pr --yes                 # a draft PR per repo to review on GitHub"
+    echonice "sake-git-upgrade-5-to-6-all --pr --yes                  # a draft PR per repo to review on GitHub"
+    echonice "sake-git-upgrade-5-to-6-all --pr --only ecommerce --strategy rebuild"
     echonice "sake-git-upgrade-5-to-6-all --push"
 
     echofunctions
@@ -243,7 +304,7 @@ write_prompts() {
 
     cat >"$dir/.agents/prompt-conflicts.txt" <<TXT
 You are resolving a git merge conflict in a Silverstripe module.
-Branch '$sourceBranch' (Silverstripe CMS 5) is being merged into '$base' (Silverstripe CMS 6, PHP 8.3+).
+Branch '$sourceBranch' (Silverstripe CMS 5, already run through Rector for SS6) is being merged into '$base' (Silverstripe CMS 6, PHP 8.3+).
 In the attached file(s), resolve every conflict marker (<<<<<<<, =======, >>>>>>>).
 - Keep shared feature and bug-fix content from both sides.
 - Prefer the Silverstripe 6 compatible form; drop SS5-only plumbing.
@@ -259,13 +320,29 @@ in this Silverstripe module. The attached file merge.diff is the complete incomi
 - Revert anything that is not required or is wrong on '$base': SS5-only class names/APIs, PHP 8.1/8.2-only plumbing,
   SS5 dependency constraints, SS5-only workarounds, downgrades of code that '$base' already has in newer form.
   To revert a file or hunk, edit it back to its '$base' content (you may run: git show HEAD:<path>).
-- composer.json must keep the '$base' version.
+- composer.json must keep the '$base' version, BUT if '$sourceBranch' added a new dependency that the new code needs,
+  add its SS6 compatible version to composer.json (check with: git show $sourceBranch:composer.json).
 - You may run read-only git commands (git diff, git show, git status). Do NOT run git add, commit, checkout, reset or merge.
 - No conflict markers may remain.
 TXT
 
+    cat >"$dir/.agents/prompt-lost.txt" <<TXT
+The '$base' branch of this Silverstripe module is being rebuilt. Branch '$sourceBranch' (Silverstripe CMS 5) has more recent
+work than the old '$base' (Silverstripe CMS 6), so the code now in the working tree is '$sourceBranch' plus Rector ($rectorConfig)
+and the own commits of the old '$base' that could be copied across automatically. It must end up working on SS6 / PHP 8.3.
+The attached lost.diff is 'git diff HEAD origin/$base': lines starting with '+' exist in the old '$base' but not in the working tree.
+Use it for two things:
+1. SS6 upgrade: the old '$base' shows how this module was upgraded to SS6 before. Apply the same SS6 changes (class names,
+   namespaces, APIs, config, templates, composer constraints) to the current code where they are still missing.
+2. Lost work: find features and bug fixes that exist only in the old '$base' and are still needed, and add them.
+Do NOT bring back code that '$sourceBranch' deliberately changed or removed later. When unsure, leave it and write one line about it
+in .agents/lost-notes.md (it is shown to the reviewer).
+You may run read-only git commands (git diff, git show, git log). Do NOT run git add, commit, checkout, reset, merge or cherry-pick.
+No conflict markers may remain.
+TXT
+
     cat >"$dir/.agents/prompt-cleanup.txt" <<TXT
-This Silverstripe module has just had its Silverstripe CMS 5 branch merged into the Silverstripe CMS 6 branch ('$base'),
+This Silverstripe module's '$base' branch now contains the work from its Silverstripe CMS 5 branch ('$sourceBranch'),
 and Rector ($rectorConfig) has already run. Make sure the module works with Silverstripe CMS 6 / PHP 8.3:
 - composer.json: require silverstripe/framework (and other silverstripe/* and sunnysideup/* modules) in their SS6 compatible
   constraints (^6 or the SS6 version of that package), PHP ^8.3, and remove SS5-only constraints.
@@ -325,9 +402,16 @@ run_llm() {
             while true; do
                 read -r -p "   LLM stopped. [s]kip this repo / [c]ontinue with what it did / [q]uit: " ans </dev/tty
                 case "${ans,,}" in
-                s | skip) ABORT_REPO='yes'; break ;;
+                s | skip)
+                    ABORT_REPO='yes'
+                    break
+                    ;;
                 c | continue) break ;;
-                q | quit) ABORT_REPO='yes'; QUIT='yes'; break ;;
+                q | quit)
+                    ABORT_REPO='yes'
+                    QUIT='yes'
+                    break
+                    ;;
                 esac
             done
         else
@@ -345,12 +429,20 @@ aborted() {
     return 0
 }
 
-############################################ PER REPO
+############################################ MEASURING
 
 QUIT='no'
 START_SHA=''
 PR_URLS=()
 VERIFY_DETAIL=''
+STEPS_DONE=()   # what happened to this repo (used in the PR body)
+REPO_NOTE=''    # why a repo was left for a human
+PATH_USED=''    # merge | rebuild
+PREP_SHA=''     # Rector commit on top of the source branch ('' = Rector changed nothing)
+PREP_TIP=''     # source branch + Rector (detached commit, never on a branch, never pushed)
+PREP_BASE=''    # merge base + Rector    (detached commit, never on a branch, never pushed)
+REMERGED=0
+CHANGELOG_DONE='no'
 
 merge_in_progress() { git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; }
 unmerged_paths() { git diff --name-only --diff-filter=U; }
@@ -359,9 +451,63 @@ markers_remaining() {
     git grep -lEI '^(<{7} |={7}$|>{7} )' -- . ':!*.md' 2>/dev/null
 }
 
+# Number of files that would conflict when merging $2 into $1, optionally against merge base $3
+# (nothing is touched; needs git >= 2.40).
+conflict_count() {
+    local args=(--write-tree --name-only --no-messages)
+    [[ -n "${3:-}" ]] && args+=(--merge-base="$3")
+    git merge-tree "${args[@]}" "$1" "$2" 2>/dev/null | tail -n +2 | grep -c .
+}
+
+# Commits on origin/$base since the split that are real work, not upgrade/maintenance (oldest first).
+own_base_commits() {
+    local mb=$1 h s
+    git log --reverse --no-merges --format='%H%x09%s' "$mb..origin/$base" | while IFS=$'\t' read -r h s; do
+        grep -Eiq -- "$upgradeRegex" <<<"$s" || echo "$h"
+    done
+}
+
+# Cheap measurements on the remote branches. Sets A_MB, A_CONFLICTS, A_OWN and A_LINE.
+assess_repo() {
+    local src="origin/$sourceBranch" dst="origin/$base" srcN dstN both
+    A_MB=$(git merge-base "$dst" "$src" 2>/dev/null)
+    if [[ -z "$A_MB" ]]; then
+        A_CONFLICTS=999 A_OWN=0
+        A_LINE="no common history between '$sourceBranch' and '$base'"
+        return
+    fi
+    srcN=$(git diff --name-only "$A_MB" "$src" | grep -c .)
+    dstN=$(git diff --name-only "$A_MB" "$dst" | grep -c .)
+    both=$(comm -12 <(git diff --name-only "$A_MB" "$src" | sort) <(git diff --name-only "$A_MB" "$dst" | sort) | grep -c .)
+    A_CONFLICTS=$(conflict_count "$dst" "$src")
+    A_OWN=$(own_base_commits "$A_MB" | grep -c .)
+    A_LINE="files changed since split: $sourceBranch $srcN, $base $dstN, both $both | conflicts (plain merge): $A_CONFLICTS | own $base commits: $A_OWN"
+}
+
+suggest_strategy() {
+    case $strategy in
+    merge | rebuild)
+        echo "$strategy (forced)"
+        return
+        ;;
+    esac
+    if [[ -z "$A_MB" ]]; then
+        echo 'rebuild (no common history)'
+    elif ((A_CONFLICTS <= conflictLimit)); then
+        echo 'merge'
+    elif ((A_OWN <= mainWorkLimit)); then
+        echo "merge if the Rector prep gets conflicts down to <= $conflictLimit, otherwise rebuild"
+    else
+        echo "merge if the Rector prep gets conflicts down to <= $conflictLimit, otherwise needs a human"
+    fi
+}
+
+############################################ PER REPO
+
 # Put the clone back exactly where this repo's run started.
 bail() {
     merge_in_progress && git merge --abort >/dev/null 2>&1
+    git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null 2>&1 && git cherry-pick --abort >/dev/null 2>&1
     [[ -n "$START_SHA" ]] && git reset --hard "$START_SHA" >/dev/null 2>&1
     git clean -fd -e .agents >/dev/null 2>&1
     return 1
@@ -411,7 +557,7 @@ verify_module() {
 # composer install + phpunit in a scratch copy so vendor/ and composer.lock never end up in the repo.
 # Appends to .agents/verify.txt. rc 0 = passed (or no tests to run), 1 = failed.
 verify_install() {
-    local out="$PWD/.agents/verify.txt" tmp rc=0 f
+    local out="$PWD/.agents/verify.txt" tmp rc=0
     local installLog testLog
     command -v composer >/dev/null 2>&1 || {
         echo "composer not installed; cannot verify install" >>"$out"
@@ -486,9 +632,11 @@ ask_repo() {
     done
 }
 
-# Update CHANGELOG.md on the source branch (commits there) before it is merged.
+# Update CHANGELOG.md on the source branch (commits there) before its work is brought across. Runs once per repo.
 changelog_on_source() {
     local repo=$1
+    [[ "$CHANGELOG_DONE" == 'yes' ]] && return 0
+    CHANGELOG_DONE='yes'
     git checkout -q -B "$sourceBranch" "origin/$sourceBranch" || return 1
     [[ "$runChangelog" == 'yes' && "$useLlm" == 'yes' ]] || return 0
 
@@ -500,26 +648,86 @@ changelog_on_source() {
         echowarn "$repo: changelog step failed; continuing without it"
         git reset -q --hard "origin/$sourceBranch" 2>/dev/null
         git clean -fdq -e .agents
+    else
+        STEPS_DONE+=("CHANGELOG.md updated on \`$sourceBranch\` (that commit is the only change to \`$sourceBranch\`)")
     fi
     return 0
 }
 
+# rector_commit START: detached HEAD at START + base composer.json + Rector, committed if anything changed.
+rector_commit() {
+    local start=$1
+    git checkout -q --detach "$start" || return 1
+    git cat-file -e "origin/$base:composer.json" 2>/dev/null && git checkout "origin/$base" -- composer.json
+    if ! run_rector; then
+        echowarn "Rector on $(git rev-parse --short "$start") failed: no prep"
+        git reset -q --hard "$start"
+        git clean -fdq -e .agents
+        return 1
+    fi
+    git add -A
+    git diff --cached --quiet || git commit -q -m "MNT: Rector $rectorConfig (and '$base' composer.json) before merging into '$base'"
+}
+
+# The prep: apply the same mechanical SS6 upgrade (Rector + base composer.json) to BOTH the source branch and the merge base.
+# Merging against that Rector'd merge base, changes both sides made the same way drop out; only real conflicts remain.
+# Sets PREP_BASE, PREP_TIP and PREP_SHA (all detached commits: no branches are created, nothing is pushed).
+prepare_source() {
+    local start=$1 mb
+    PREP_TIP='' PREP_SHA='' PREP_BASE=''
+    mb=$(git merge-base "origin/$base" "origin/$sourceBranch" 2>/dev/null) || return 1
+    rector_commit "$mb" || return 1
+    PREP_BASE=$(git rev-parse HEAD)
+    if ! rector_commit "$start"; then
+        PREP_BASE=''
+        return 1
+    fi
+    PREP_TIP=$(git rev-parse HEAD)
+    [[ "$PREP_TIP" != "$(git rev-parse "$start^{commit}")" ]] && PREP_SHA=$PREP_TIP
+    return 0
+}
+
+# Redo the 3-way merge of every conflicted file against the Rector'd merge base (PREP_BASE).
+# Clean results are staged; the rest keep (smaller) conflict markers for the LLM. Sets REMERGED.
+remerge_with_prepped_base() {
+    local f o b t rc files
+    REMERGED=0
+    [[ -n "$PREP_BASE" ]] || return 0
+    o=$(mktemp) b=$(mktemp) t=$(mktemp)
+    mapfile -t files < <(unmerged_paths)
+    for f in "${files[@]}"; do
+        git show ":2:$f" >"$o" 2>/dev/null && git show "$PREP_BASE:$f" >"$b" 2>/dev/null && git show ":3:$f" >"$t" 2>/dev/null || continue
+        git merge-file -q -L "$base" -L "merge base (Rector'd)" -L "$sourceBranch" "$o" "$b" "$t"
+        rc=$?
+        ((rc < 128)) || continue # error (binary file ...): keep git's own conflict
+        cp "$o" "$f"
+        if ((rc == 0)); then
+            git add -- "$f"
+            REMERGED=$((REMERGED + 1))
+        fi
+    done
+    rm -f "$o" "$b" "$t"
+    echonice "$REMERGED of ${#files[@]} conflicted file(s) merged cleanly against the Rector'd merge base"
+}
+
+# Branch all work happens on: the PR branch, or base itself.
+work_branch() {
+    if [[ "$prMode" == 'yes' ]]; then echo "$prBranch"; else echo "$base"; fi
+}
+
 # Push the PR branch and open a pull request into base. Never touches base or the source branch on origin.
 open_pull_request() {
-    local repo=$1 body=.agents/pr-body.md pushArgs=(-u)
+    local repo=$1 body=.agents/pr-body.md pushArgs=(-u) i
     [[ "$forcePr" == 'yes' ]] && pushArgs+=(--force-with-lease)
 
     {
         echo "## Upgrade to Silverstripe 6"
         echo
-        echo "Automated by \`sake-git-upgrade-5-to-6-all\`: merges \`$sourceBranch\` (SS5) into \`$base\` (SS6)."
+        echo "Automated by \`sake-git-upgrade-5-to-6-all\` ($PATH_USED path): brings the SS5 work from \`$sourceBranch\` into \`$base\` (SS6)."
+        echo "\`$sourceBranch\` stays on Silverstripe 5."
         echo
         echo "### What was done"
-        echo "1. CHANGELOG.md updated on \`$sourceBranch\` (included in this PR)"
-        echo "2. \`$sourceBranch\` merged into \`$base\`; conflicts cleaned up"
-        echo "3. LLM review of the whole incoming diff, reverting changes not needed on SS6"
-        echo "4. Rector (\`$rectorConfig\`) and an LLM SS6 clean-up"
-        echo "5. Verification: static checks passed (\`composer validate\`, \`php -l\`, no conflict markers). $VERIFY_SUMMARY"
+        for i in "${!STEPS_DONE[@]}"; do echo "$((i + 1)). ${STEPS_DONE[$i]}"; done
         if [[ -n "$VERIFY_DETAIL" ]]; then
             echo
             echo '<details><summary>Failure output</summary>'
@@ -529,9 +737,14 @@ open_pull_request() {
             echo '```'
             echo '</details>'
         fi
+        if [[ -s .agents/lost-notes.md ]]; then
+            echo
+            echo "### Left out on purpose / unsure (from the old \`$base\`)"
+            cat .agents/lost-notes.md
+        fi
         echo
         echo "### Commits"
-        git log --no-merges --oneline "origin/$base..HEAD" | sed 's/^/- /'
+        git log --no-merges --oneline "origin/$base..HEAD" | head -n 60 | sed 's/^/- /'
         echo
         echo "### Files changed"
         echo '```'
@@ -543,6 +756,7 @@ open_pull_request() {
         echo "- [ ] \`composer.json\` constraints are right for SS6"
         echo "- [ ] Tests pass in CI / a real SS6 project (see the verification line above for what the script actually ran)"
         echo "- [ ] LLM edits (conflict resolution, clean-up) look sensible"
+        [[ "$PATH_USED" == 'rebuild' ]] && echo "- [ ] Nothing from the old \`$base\` is missing (compare with its last commit: \`git diff HEAD^2 HEAD\` on the rebuild merge)"
     } >"$body"
 
     git push "${pushArgs[@]}" origin "$prBranch" || {
@@ -551,7 +765,7 @@ open_pull_request() {
     }
 
     local prArgs=(pr create --repo "$owner/$repo" --base "$base" --head "$prBranch"
-        --title "Upgrade to Silverstripe 6 (merge $sourceBranch into $base)" --body-file "$body")
+        --title "Upgrade to Silverstripe 6 ($PATH_USED: $sourceBranch into $base)" --body-file "$body")
     [[ "$prDraft" == 'yes' ]] && prArgs+=(--draft)
     local url
     if url=$(gh "${prArgs[@]}" 2>&1 | tail -n1); then
@@ -564,46 +778,45 @@ open_pull_request() {
     return 1
 }
 
-# Work inside the cloned repo (cwd already set). Returns 0 = upgraded, 1 = failed.
-upgrade_repo() {
-    local repo=$1 f
-
-    changelog_on_source "$repo" || return 1
-
-    if [[ "$prMode" == 'yes' ]]; then
-        git checkout -q -B "$prBranch" "origin/$base" || return 1
-    else
-        git checkout -q -B "$base" "origin/$base" || return 1
-    fi
+############ MERGE path: merge (a Rector'd copy of) the source branch into base
+merge_path() {
+    local repo=$1 from=$2 f
+    PATH_USED='merge'
+    git checkout -q -B "$(work_branch)" "origin/$base" || return 1
     START_SHA=$(git rev-parse HEAD)
 
-    write_prompts "$PWD"
-    printf '.agents/\n' >>"$(git rev-parse --git-path info/exclude)"
+    [[ -n "$PREP_BASE" ]] &&
+        STEPS_DONE+=("Rector (\`$rectorConfig\`) run on scratch copies of \`$sourceBranch\` and of the merge base first, so the mechanical SS6 changes match \`$base\` and merge cleanly")
 
     ############ (a) merge
     ECHOHEAD "$repo: merging $sourceBranch into $base"
-    git merge --no-ff --no-commit "$sourceBranch" >/dev/null 2>&1
+    git merge --no-ff --no-commit "$from" >/dev/null 2>&1
 
     if ! merge_in_progress; then
         echonice "$repo: nothing to merge"
         return 0
     fi
 
-    # composer.json is version specific: always keep the base branch version
+    # composer.json is version specific: always keep the base branch version (the review step adds new dependencies)
     if unmerged_paths | grep -qx 'composer.json'; then
         git checkout --ours composer.json 2>/dev/null && git add composer.json
     fi
 
-    ############ (c) conflicts
+    # mechanical SS6 differences drop out when merging against the Rector'd merge base
+    [[ -n "$(unmerged_paths)" ]] && remerge_with_prepped_base
+
+    ############ (b) conflicts
+    local n_total=0
     if [[ -n "$(unmerged_paths)" ]]; then
         if [[ "$useLlm" != 'yes' ]]; then
             echobad "conflicts in: $(unmerged_paths | tr '\n' ' ') (and --no-llm given)"
             bail
             return 1
         fi
-        local salvageDir salvageKey n_total=0 n_done=0 n_reused=0
+        local salvageDir salvageKey n_done=0 n_reused=0
         salvageDir="$(realpath -m "$workDir")/.salvage/$repo"
-        salvageKey="$(git rev-parse "origin/$base") $(git rev-parse "$sourceBranch")"
+        # keyed on the remote branches (not the local changelog commit, which is new on every run)
+        salvageKey="$(git rev-parse "origin/$base") $(git rev-parse "origin/$sourceBranch") prep=$([[ -n "$PREP_BASE" ]] && echo yes || echo no) $rectorConfig"
         if [[ "$(cat "$salvageDir/.key" 2>/dev/null)" != "$salvageKey" ]]; then
             rm -rf "$salvageDir"
         fi
@@ -683,8 +896,9 @@ upgrade_repo() {
         fi
     fi
     git add -A
+    STEPS_DONE+=("\`$sourceBranch\` merged into \`$base\`; $REMERGED file(s) merged cleanly thanks to the prep, $n_total conflicted file(s) resolved by the LLM (\`composer.json\` keeps the \`$base\` version)")
 
-    ############ (b) review the whole incoming change set
+    ############ (c) review the whole incoming change set
     if [[ "$useLlm" == 'yes' ]]; then
         ECHOHEAD "$repo: LLM review of incoming changes"
         git diff --cached HEAD >.agents/merge.diff
@@ -696,6 +910,7 @@ upgrade_repo() {
             return 1
         fi
         git add -A
+        STEPS_DONE+=("LLM review of the whole incoming diff, reverting changes not needed on SS6")
     fi
 
     git commit -q --no-edit -m "Merge branch '$sourceBranch' into $base" || {
@@ -703,8 +918,99 @@ upgrade_repo() {
         return 1
     }
     echogood "$repo: merge committed"
+    finish_ss6 "$repo"
+}
 
-    ############ (d) works with SS6
+############ REBUILD path: start again from the source branch, upgrade it, keep the old base in the history
+rebuild_path() {
+    local repo=$1 mb h ported=0 notPorted=()
+    PATH_USED='rebuild'
+    changelog_on_source "$repo" || return 1
+
+    ECHOHEAD "$repo: rebuilding $base from $sourceBranch"
+    # the work branch starts at the source branch; the source branch itself is not changed
+    git checkout -q -B "$(work_branch)" "$sourceBranch" || return 1
+    START_SHA=$(git rev-parse HEAD)
+
+    ############ (a) SS6 starting point: base composer.json + Rector (+ your own upgrade command)
+    git cat-file -e "origin/$base:composer.json" 2>/dev/null && git checkout "origin/$base" -- composer.json
+    if ! run_rector; then
+        echobad "rector failed"
+        bail
+        return 1
+    fi
+    if [[ -n "$upgradeCmd" ]]; then
+        echonice "running upgrade command: $upgradeCmd"
+        if ! SAKE_REPO="$repo" SAKE_BASE_BRANCH="$base" SAKE_SOURCE_BRANCH="$sourceBranch" bash -c "$upgradeCmd"; then
+            echobad "$repo: upgrade command failed"
+            bail
+            return 1
+        fi
+    fi
+    git add -A
+    git diff --cached --quiet || git commit -q -m "API: upgrade '$sourceBranch' code to Silverstripe 6 (Rector $rectorConfig, composer.json from '$base')"
+    STEPS_DONE+=("Started from \`$sourceBranch\`: \`composer.json\` taken from \`$base\`, Rector (\`$rectorConfig\`)${upgradeCmd:+ and \`$upgradeCmd\`} run")
+
+    ############ (b) copy base's own commits (features / fixes made on SS6 only)
+    mb=$(git merge-base "origin/$base" "origin/$sourceBranch" 2>/dev/null)
+    if [[ -n "$mb" ]]; then
+        while IFS= read -r h; do
+            [[ -n "$h" ]] || continue
+            if git cherry-pick -x "$h" >/dev/null 2>&1; then
+                ported=$((ported + 1))
+            elif [[ -z "$(unmerged_paths)" ]] && git diff --cached --quiet; then
+                git cherry-pick --skip >/dev/null 2>&1 # already there: nothing to copy
+            else
+                git cherry-pick --abort >/dev/null 2>&1
+                notPorted+=("$(git log -1 --format='%h %s' "$h")")
+            fi
+        done < <(own_base_commits "$mb")
+    fi
+    echonice "$repo: copied $ported own '$base' commit(s); ${#notPorted[@]} left for the LLM"
+    STEPS_DONE+=("$ported own commit(s) of the old \`$base\` copied across (\`cherry-pick -x\`); ${#notPorted[@]} could not be copied automatically")
+
+    ############ (c) old base becomes an ancestor: no force push needed, its content is NOT taken
+    git merge -q -s ours --no-edit -m "Merge old '$base' into the SS6 rebuild from '$sourceBranch' (content from the rebuild; old '$base' kept in history)" "origin/$base" || {
+        bail
+        return 1
+    }
+    STEPS_DONE+=("Old \`$base\` merged with \`-s ours\`: it stays in the history (no force push), the content comes from the rebuild")
+
+    ############ (d) what would be lost? apply the old SS6 upgrade where missing and bring back needed work
+    if [[ "$useLlm" == 'yes' ]]; then
+        ECHOHEAD "$repo: LLM comparison with the old $base"
+        git diff HEAD "origin/$base" -- . ':!CHANGELOG.md' ':!composer.lock' >.agents/lost.diff
+        cp .agents/prompt-lost.txt .agents/prompt-lost-repo.txt
+        if ((${#notPorted[@]} > 0)); then
+            {
+                echo
+                echo "Commits of the old '$base' that could not be copied automatically (inspect with: git show <hash>):"
+                printf -- '- %s\n' "${notPorted[@]}"
+            } >>.agents/prompt-lost-repo.txt
+        fi
+        run_llm "$PWD/.agents/prompt-lost-repo.txt" '.agents/lost.diff' || echowarn "LLM comparison exited non-zero"
+        aborted && return 1
+        if [[ -n "$(markers_remaining)" ]]; then
+            echobad "conflict markers remain in: $(markers_remaining | tr '\n' ' ')"
+            bail
+            return 1
+        fi
+        git add -A
+        git diff --cached --quiet || git commit -q -m "FIX: bring SS6 upgrade work and fixes across from the old '$base'"
+        STEPS_DONE+=("LLM compared the result with the old \`$base\`: applied its SS6 upgrade where still missing and brought back needed work")
+    elif ((${#notPorted[@]} > 0)); then
+        echobad "$repo: ${#notPorted[@]} commit(s) from '$base' could not be copied and --no-llm is set: $(printf '%s; ' "${notPorted[@]}")"
+        bail
+        return 1
+    fi
+
+    finish_ss6 "$repo"
+}
+
+############ both paths: make sure it works with SS6, commit, push / PR
+finish_ss6() {
+    local repo=$1
+
     ECHOHEAD "$repo: rector $rectorConfig"
     if ! run_rector; then
         echobad "rector failed"
@@ -717,6 +1023,7 @@ upgrade_repo() {
         run_llm "$PWD/.agents/prompt-cleanup.txt" 'composer.json' || echowarn "LLM clean-up exited non-zero"
         aborted && return 1
     fi
+    STEPS_DONE+=("Rector (\`$rectorConfig\`) and an LLM SS6 clean-up")
 
     ECHOHEAD "$repo: verifying"
     if ! verify_all; then
@@ -741,9 +1048,10 @@ upgrade_repo() {
         fi
     fi
     echogood "$repo: verification passed"
+    STEPS_DONE+=("Verification: static checks passed (\`composer validate\`, \`php -l\`, no conflict markers). $VERIFY_SUMMARY")
 
     ############ commit (and push) the clean-up
-    local msg="API: upgrade to Silverstripe 6 (merged $sourceBranch into $base)"
+    local msg="API: upgrade to Silverstripe 6 (brought $sourceBranch into $base)"
     if [[ -n "$(git status --porcelain)" ]]; then
         if [[ "$push" == 'yes' && "$prMode" != 'yes' ]]; then
             sake-git-commit-and-push -m "$msg" -v no -r no . || {
@@ -765,13 +1073,15 @@ upgrade_repo() {
     fi
 
     if [[ "$push" == 'yes' ]]; then
-        # make sure everything lands, even if there was nothing left to commit for the tool above
-        if [[ "$(git rev-parse "$sourceBranch")" != "$(git rev-parse "origin/$sourceBranch")" ]]; then
+        # the changelog commit on the source branch (the only change ever made to it)
+        if git rev-parse -q --verify "refs/heads/$sourceBranch" >/dev/null &&
+            [[ "$(git rev-parse "refs/heads/$sourceBranch")" != "$(git rev-parse "origin/$sourceBranch")" ]]; then
             git push origin "$sourceBranch" && echogood "$repo: pushed changelog commit on $sourceBranch" ||
                 echowarn "$repo: could not push $sourceBranch"
         fi
         git fetch -q origin "$base"
-        if [[ "$(git rev-parse "$base")" != "$(git rev-parse "origin/$base")" ]]; then
+        if [[ "$(git rev-parse "refs/heads/$base")" != "$(git rev-parse "origin/$base")" ]]; then
+            # a normal (fast-forward) push in both paths: origin/base is always an ancestor
             git push origin "$base" || {
                 echobad "$repo: push failed"
                 return 1
@@ -782,14 +1092,77 @@ upgrade_repo() {
     return 0
 }
 
+# Work inside the cloned repo (cwd already set). Returns 0 = done, 1 = failed, 2 = left for a human (REPO_NOTE says why).
+upgrade_repo() {
+    local repo=$1 from n own mb exclude
+    START_SHA='' STEPS_DONE=() REPO_NOTE='' PATH_USED='' PREP_SHA='' PREP_TIP='' PREP_BASE='' REMERGED=0 CHANGELOG_DONE='no'
+
+    write_prompts "$PWD"
+    exclude=$(git rev-parse --git-path info/exclude)
+    grep -qxF '.agents/' "$exclude" 2>/dev/null || printf '.agents/\n' >>"$exclude"
+
+    [[ "$strategy" == 'rebuild' ]] && {
+        rebuild_path "$repo"
+        return $?
+    }
+
+    ############ prep: Rector on scratch copies of the source branch and the merge base, then measure the real conflicts
+    if [[ "$prep" == 'yes' ]]; then
+        ECHOHEAD "$repo: Rector ($rectorConfig) on scratch copies of '$sourceBranch' and the merge base"
+        prepare_source "origin/$sourceBranch"
+    fi
+
+    if [[ "$strategy" == 'auto' ]]; then
+        if [[ -n "$PREP_BASE" ]]; then
+            n=$(conflict_count "origin/$base" "$PREP_TIP" "$PREP_BASE")
+        else
+            n=$(conflict_count "origin/$base" "origin/$sourceBranch")
+        fi
+        echonice "$repo: conflicted files when merging now: $n (limit $conflictLimit)"
+        if ((n > conflictLimit)); then
+            mb=$(git merge-base "origin/$base" "origin/$sourceBranch" 2>/dev/null)
+            own=0
+            [[ -n "$mb" ]] && own=$(own_base_commits "$mb" | grep -c .)
+            if [[ -z "$mb" ]] || ((own <= mainWorkLimit)); then
+                echowarn "$repo: too many conflicts and '$base' has only $own own commit(s): rebuilding instead of merging"
+                rebuild_path "$repo"
+                return $?
+            fi
+            REPO_NOTE="$n conflicted files after the Rector prep AND $own own commits on '$base' (try --strategy merge or rebuild by hand)"
+            return 2
+        fi
+    fi
+
+    ############ changelog on the source branch, then put the Rector commit on top of it
+    changelog_on_source "$repo" || return 1
+    from=$sourceBranch
+    if [[ -n "$PREP_SHA" ]]; then
+        if [[ "$(git rev-parse "refs/heads/$sourceBranch")" == "$(git rev-parse "origin/$sourceBranch")" ]]; then
+            from=$PREP_TIP
+        elif git checkout -q --detach "$sourceBranch" && git cherry-pick "$PREP_SHA" >/dev/null 2>&1; then
+            from=$(git rev-parse HEAD)
+        else
+            git cherry-pick --abort >/dev/null 2>&1
+            prepare_source "$sourceBranch" && [[ -n "$PREP_SHA" ]] && from=$PREP_TIP
+        fi
+    fi
+
+    merge_path "$repo" "$from"
+}
+
 ############################################ RUN
 
-for tool in gh git sake-llm-opencode sake-lint-php-rector sake-git-merge-towards-production-changes sake-git-commit-and-push; do
+for tool in gh git jq sake-llm-opencode sake-lint-php-rector sake-git-merge-towards-production-changes sake-git-commit-and-push; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echobad "Required tool not found: $tool"
         exit 1
     fi
 done
+gitVersion=$(git version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+if awk -v v="$gitVersion" 'BEGIN {split(v, a, "."); exit !(a[1] < 2 || (a[1] == 2 && a[2] < 40))}'; then
+    echobad "git 2.40 or newer is needed (for git merge-tree --merge-base); you have $gitVersion"
+    exit 1
+fi
 
 ECHOHEAD "LLM that will be used"
 while IFS= read -r l; do echonice "$l"; done < <(effective_model)
@@ -853,7 +1226,7 @@ fi
 
 echonice "repos to check: ${#repos[@]}"
 
-upgraded=() failed=() skipped=() candidates=()
+upgraded=() failed=() skipped=() candidates=() needsHuman=()
 
 for line in "${repos[@]}"; do
     [[ -n "$line" ]] || continue
@@ -905,8 +1278,12 @@ for line in "${repos[@]}"; do
         continue
     fi
 
+    assess_repo
+    suggestion=$(suggest_strategy)
     echowarn "$name: '$sourceBranch' is $aheadOfBase commit(s) ahead of '$base'"
-    candidates+=("$name")
+    echonice "   $A_LINE"
+    echonice "   suggested: $suggestion"
+    candidates+=("$name: $suggestion  [$A_LINE]")
 
     [[ "$dryRun" == 'yes' ]] && continue
 
@@ -923,12 +1300,20 @@ for line in "${repos[@]}"; do
     costBefore=$(total_cost)
     VERIFY_DETAIL=''
     VERIFY_SUMMARY='static checks only (composer validate, php -l); dependencies were NOT installed and PHPUnit was NOT run'
-    if upgrade_repo "$name"; then
-        upgraded+=("$name")
+    upgrade_repo "$name"
+    rc=$?
+    case $rc in
+    0)
+        upgraded+=("$name ($PATH_USED)")
         rm -rf "$(realpath -m "$workDir")/.salvage/$name"
-    else
-        failed+=("$name")
-    fi
+        ;;
+    2) needsHuman+=("$name: $REPO_NOTE") ;;
+    *)
+        failed+=("$name${PATH_USED:+ ($PATH_USED)}")
+        # a failed rebuild resets its branch to the source branch: put base back where origin has it
+        git checkout -q -f -B "$base" "origin/$base" 2>/dev/null
+        ;;
+    esac
     echonice "$name: LLM cost for this repo \$$(awk -v a="$(total_cost)" -v b="$costBefore" 'BEGIN {printf "%.4f", a-b}')"
     [[ "$QUIT" == 'yes' ]] && break
 done
@@ -941,10 +1326,15 @@ ECHOHEAD "Summary"
 echonice "LLM total:       \$$(total_cost)  ($(total_tokens))"
 echonice "ahead of base:   ${#candidates[@]}"
 if [[ "$dryRun" == 'yes' ]]; then
-    for n in "${candidates[@]}"; do echonice "  would upgrade: $n"; done
+    for n in "${candidates[@]}"; do echonice "  $n"; done
+    echonice "(conflict counts above are for a plain merge; the Rector prep usually brings them down a lot)"
 else
     echogood "upgraded:        ${#upgraded[@]}"
-    for n in "${upgraded[@]}"; do echonice "  $n  ($workDir/$n)"; done
+    for n in "${upgraded[@]}"; do echonice "  $n  ($workDir/${n%% *})"; done
+    if ((${#needsHuman[@]} > 0)); then
+        echowarn "needs a human:   ${#needsHuman[@]}"
+        for n in "${needsHuman[@]}"; do echonice "  $n"; done
+    fi
     if ((${#failed[@]} > 0)); then
         echobad "failed:          ${#failed[@]}"
         for n in "${failed[@]}"; do echonice "  $n"; done

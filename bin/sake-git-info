@@ -12,10 +12,24 @@ dir='./'
 ############################################ SETTINGS
 help='no'
 full='no'
+base_branch='develop'
+remote='origin'
+stale_days=90
 while (($#)); do
     case $1 in
     -f | --full)
         full='yes'
+        ;;
+    -b | --base)
+        base_branch="${2:?--base needs a branch name}"
+        shift
+        ;;
+    -r | --remote)
+        remote="${2:?--remote needs a remote name}"
+        shift
+        ;;
+    -s | --stale)
+        stale_days="${2:?--stale needs a number of days}"
         shift
         ;;
     *)
@@ -29,7 +43,6 @@ while (($#)); do
     shift
 done
 
-
 ############################################ HELP
 
 help_and_exit() {
@@ -37,124 +50,448 @@ help_and_exit() {
     echonice "$SCRIPT_SUMMARY"
     echonice ""
     echonice "directory of script:           $SCRIPT_DIR"
-    echonice "directory to commit:           $WORKING_DIR/$dir"
+    echonice "directory to check:            $WORKING_DIR/$dir"
 
     ECHOHEAD "Available settings:"
     echonice "-h, --help                     show help information"
-    echonice "-f, --full                     run a full git pull and git push on all branches"
+    echonice "-b, --base BRANCH              branch to compare everything against (default: develop)"
+    echonice "-r, --remote NAME              remote to inspect (default: origin)"
+    echonice "-s, --stale DAYS               flag unmerged branches older than DAYS as stale (default: 90)"
+    echonice "-f, --full                     also sync: fast-forward local branches from their upstream,"
+    echonice "                               push local-only commits, and create the base branch"
+    echonice "                               from main/master if it is missing (never force, never merges)"
 
     ECHOHEAD "Example usage:"
-    echonice "e.g. sake-git-info "
+    echonice "e.g. sake-git-info"
+    echonice "e.g. sake-git-info --full"
+    echonice "e.g. sake-git-info -b main -s 30 vendor/my-org/my-module"
 
     echofunctions
     exit
 }
 
-
 sake_check_help_and_exit
+
+if [[ ! $stale_days =~ ^[0-9]+$ ]]; then
+    echobad "--stale must be a whole number of days (got: $stale_days)"
+    exit 1
+fi
+
+############################################ HELPERS
+
+if [[ -t 1 ]]; then
+    RED=$'\033[0;31m'
+    GREEN=$'\033[0;32m'
+    YELLOW=$'\033[0;33m'
+    BLUE=$'\033[0;34m'
+    GREY=$'\033[0;90m'
+    BOLD=$'\033[1m'
+    NC=$'\033[0m'
+else
+    RED='' GREEN='' YELLOW='' BLUE='' GREY='' BOLD='' NC=''
+fi
+
+SEP=$'\x1f' # field separator that cannot appear in branch names or (realistically) subjects
+NOW=$(date +%s)
+
+ref_exists() {
+    git rev-parse --quiet --verify "$1^{commit}" >/dev/null 2>&1
+}
+
+# prints "<behind> <ahead>" for $2 compared with $1
+behind_ahead() {
+    git rev-list --left-right --count "$1...$2" 2>/dev/null || echo "0 0"
+}
+
+# prefer the remote copy of a branch (most up to date after fetch), fall back to the local one
+resolve_ref() {
+    if [[ $has_remote == 'yes' ]] && ref_exists "refs/remotes/$remote/$1"; then
+        echo "$remote/$1"
+    elif ref_exists "refs/heads/$1"; then
+        echo "$1"
+    fi
+}
+
+truncate_text() {
+    local text=$1 max=$2
+    if ((${#text} > max)); then
+        printf '%s...' "${text:0:max-3}"
+    else
+        printf '%s' "$text"
+    fi
+}
+
+row() {
+    printf "  %-22s %s\n" "$1" "$2"
+}
+
+colour_count() {
+    # $1 = number, $2 = colour to use when > 0
+    if (($1 > 0)); then
+        printf '%s' "$2"
+    else
+        printf '%s' "$GREY"
+    fi
+}
 
 ############################################ CODE
 
 cd_or_fail "$WORKING_DIR/$dir" help_and_exit
 
-############################################ REMEMBER ORIGINAL BRANCH
-# branch name, or short SHA if we started in detached HEAD
-ORIGINAL_REF=$(git symbolic-ref --quiet --short HEAD || git rev-parse --short HEAD 2>/dev/null)
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO"
+    echoend
+    exit 1
+fi
 
-return_to_original_ref() {
-    if [ -n "$ORIGINAL_REF" ]; then
-        ECHOHEAD "# returning to original branch: $ORIGINAL_REF"
-        git checkout -q "$ORIGINAL_REF"
+if ! ref_exists HEAD; then
+    echobad "$WORKING_DIR/$dir has no commits yet"
+    echoend
+    exit 1
+fi
+
+GIT_TOP=$(git rev-parse --show-toplevel)
+GIT_DIR_PATH=$(git rev-parse --git-dir)
+
+has_remote='yes'
+if ! git remote get-url "$remote" >/dev/null 2>&1; then
+    has_remote='no'
+    echobad "remote '$remote' not found - only local information is shown"
+fi
+
+############################################ FETCH
+
+if [[ $has_remote == 'yes' ]]; then
+    ECHOHEAD "# fetching all remotes (and pruning deleted branches)"
+    if ! git fetch --all --prune --quiet; then
+        echobad "fetch failed - the numbers below may be out of date"
     fi
-}
-trap return_to_original_ref EXIT
-
-ECHOHEAD "# making sure we have the core branches"
-
-git checkout develop
-
-git fetch --all
-
-# Check if the develop branch exists
-if [ "$(git branch | grep develop)" == "" ]; then
-    # If it does not exist, create and push it
-    echo "Creating and pushing develop branch..."
-    git checkout -b develop master
-    git push origin develop
 fi
 
-# Check if the production branch exists
-if [ "$(git branch | grep production)" == "" ]; then
-    # If it does not exist, create and push it
-    echo "RECOMMENDED: create production branch..."
+############################################ WORK OUT THE CORE BRANCHES
+
+main_branch=''
+if [[ $has_remote == 'yes' ]]; then
+    main_branch=$(git symbolic-ref --quiet --short "refs/remotes/$remote/HEAD" 2>/dev/null)
+    main_branch=${main_branch#"$remote/"}
 fi
-
-GIT_DIR=$(git rev-parse --show-toplevel)
-
-if test -f "$GIT_DIR/.git/config"; then
-
-    ECHOHEAD "# check status"
-    ECHOHEAD "fetchin --all"
-    git fetch --all
-
-    # set the right way to look at testbranches
-    git config push.default matching
-
-    ECHOHEAD "# check git status"
-    git status
-
-    ECHOHEAD "# current commit"
-    git rev-parse --short --verify HEAD
-
-    ECHOHEAD "# last commit"
-    git log -1
-
-    ECHOHEAD "# unpushed branches"
-    git log --branches --not --remotes --no-walk --decorate --oneline
-
-    ECHOHEAD "# behind / ahead"
-    # Get all remote branches
-    remote_branches=$(git branch -r)
-    # Red color
-    RED='\033[0;31m'
-    # Green color
-    GREEN='\033[0;32m'
-    # No color
-    NC='\033[0m'
-
-    printf "${NC}%-70s ${RED}%-5s${NC} ${GREEN}%s${NC}\n" "Branch Name" "Behind" "Ahead"
-
-    for branch in $remote_branches; do
-        # Skip HEAD
-        if [ "$branch" != "origin/HEAD" ] && [ "$branch" != "->" ]; then
-
-            # Check out the branch to compare
-            git checkout -q $branch
-            if [[ "$full" == "yes" ]]; then
-                git pull -q origin $branch
-                git push -q origin $branch
-            fi
-
-            # Get the number of commits the branch is ahead of develop
-            ahead=$(git rev-list --count develop..$branch)
-
-            # Get the number of commits the branch is behind develop
-            behind=$(git rev-list --count $branch..develop)
-
-            # Print formatted output
-            # Check if $ahead is greater than 0
-            if (($ahead > 0)); then
-                # Get the date of the last commit
-                last_commit_date=$(git show -s --format=%ci)
-                printf "%-70s ${RED}%-5s${NC} ${GREEN}%s${NC} %s\n" "$branch" "$behind" "$ahead" "$last_commit_date"
-            else
-                printf "%-70s ${RED}%-5s${NC} %s\n" "$branch" "$behind" "$ahead"
-            fi
+if [[ -z $main_branch || $main_branch == "$base_branch" ]]; then
+    main_branch=''
+    for candidate in main master; do
+        if [[ $candidate != "$base_branch" && -n $(resolve_ref "$candidate") ]]; then
+            main_branch=$candidate
+            break
         fi
     done
+fi
 
+BASE_REF=$(resolve_ref "$base_branch")
+if [[ -z $BASE_REF ]]; then
+    if [[ $full == 'yes' && $has_remote == 'yes' && -n $main_branch ]]; then
+        ECHOHEAD "# creating $base_branch from $main_branch"
+        git branch "$base_branch" "$(resolve_ref "$main_branch")" &&
+            git push --quiet -u "$remote" "$base_branch"
+        BASE_REF=$(resolve_ref "$base_branch")
+    else
+        echobad "base branch '$base_branch' does not exist - use --full to create it from main/master, or -b to pick another"
+    fi
+fi
+
+MAIN_REF=''
+[[ -n $main_branch ]] && MAIN_REF=$(resolve_ref "$main_branch")
+PRODUCTION_REF=''
+[[ $base_branch != 'production' ]] && PRODUCTION_REF=$(resolve_ref production)
+
+is_core_ref() {
+    local short=${1#"$remote/"}
+    [[ $short == "$base_branch" || ($short == "$main_branch" && -n $main_branch) || $short == 'production' ]]
+}
+
+############################################ OPTIONAL SYNC (--full)
+
+if [[ $full == 'yes' && $has_remote == 'yes' ]]; then
+    ECHOHEAD "# syncing local branches with $remote (fast-forward only)"
+    current_branch=$(git symbolic-ref --quiet --short HEAD)
+    # branches checked out in other worktrees must not be moved underneath them
+    other_worktree_branches=$(git worktree list --porcelain | awk -v top="$GIT_TOP" '
+        /^worktree / { wt = substr($0, 10) }
+        /^branch /   { if (wt != top) print substr($0, 19) }')
+    synced=0
+    while IFS=$SEP read -r name upstream; do
+        [[ -z $upstream || $upstream != "$remote/"* ]] && continue
+        if ! ref_exists "$upstream"; then
+            echonice "  $name: upstream $upstream is gone - skipped"
+            continue
+        fi
+        read -r behind ahead < <(behind_ahead "$upstream" "$name")
+        if ((behind > 0 && ahead > 0)); then
+            echobad "  $name: diverged ($ahead ahead, $behind behind $upstream) - resolve manually"
+        elif ((behind > 0)); then
+            if grep -qxF "$name" <<<"$other_worktree_branches"; then
+                echonice "  $name: $behind behind, but checked out in another worktree - skipped"
+            elif [[ $name == "$current_branch" ]]; then
+                if git merge --ff-only --quiet "$upstream"; then
+                    echonice "  $name: pulled $behind commit(s)"
+                    synced=$((synced + 1))
+                else
+                    echobad "  $name: could not fast-forward (local changes in the way?)"
+                fi
+            else
+                git update-ref -m "sake-git-info: fast-forward" \
+                    "refs/heads/$name" "$(git rev-parse "$upstream")" "$(git rev-parse "$name")" &&
+                    echonice "  $name: pulled $behind commit(s)" &&
+                    synced=$((synced + 1))
+            fi
+        elif ((ahead > 0)); then
+            if git push --quiet "$remote" "refs/heads/$name:refs/heads/${upstream#"$remote/"}"; then
+                echonice "  $name: pushed $ahead commit(s)"
+                synced=$((synced + 1))
+            else
+                echobad "  $name: push failed"
+            fi
+        fi
+    done < <(git for-each-ref --format="%(refname:short)%1f%(upstream:short)" refs/heads)
+    ((synced == 0)) && echonice "  everything already in sync"
+fi
+
+############################################ REPOSITORY OVERVIEW
+
+ECHOHEAD "# repository"
+row "path" "$GIT_TOP"
+[[ $has_remote == 'yes' ]] && row "remote ($remote)" "$(git remote get-url "$remote")"
+
+current=$(git symbolic-ref --quiet --short HEAD || echo "(detached HEAD)")
+row "current branch" "${BOLD}${current}${NC}"
+row "HEAD" "$(git log -1 --format='%h  %s' HEAD)"
+row "" "${GREY}$(git log -1 --format='%an, %cd (%cr)' --date=format:'%Y-%m-%d %H:%M' HEAD)${NC}"
+
+if upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); then
+    read -r up_behind up_ahead < <(behind_ahead "$upstream" HEAD)
+    if ((up_behind == 0 && up_ahead == 0)); then
+        row "upstream" "$upstream ${GREEN}(in sync)${NC}"
+    else
+        row "upstream" "$upstream ($(colour_count "$up_ahead" "$GREEN")$up_ahead to push${NC}, $(colour_count "$up_behind" "$RED")$up_behind to pull${NC})"
+    fi
 else
-    echobad "$WORKING_DIR/$dir IS NOT A GIT REPO"
+    row "upstream" "${YELLOW}none set${NC}"
+fi
+
+read -r staged unstaged untracked conflicted < <(git status --porcelain | awk '
+    substr($0, 1, 2) == "??"                  { u++; next }
+    /^(DD|AU|UD|UA|DU|AA|UU)/                 { c++; next }
+    { if (substr($0, 1, 1) != " ") s++; if (substr($0, 2, 1) != " ") m++ }
+    END { print s + 0, m + 0, u + 0, c + 0 }')
+if ((staged + unstaged + untracked + conflicted == 0)); then
+    row "working tree" "${GREEN}clean${NC}"
+else
+    tree_state="$staged staged, $unstaged modified, $untracked untracked"
+    ((conflicted > 0)) && tree_state+=", ${RED}$conflicted conflicted${NC}"
+    row "working tree" "${YELLOW}${tree_state}${NC}"
+fi
+
+in_progress=()
+[[ -f $GIT_DIR_PATH/MERGE_HEAD ]] && in_progress+=("merge")
+[[ -d $GIT_DIR_PATH/rebase-merge || -d $GIT_DIR_PATH/rebase-apply ]] && in_progress+=("rebase")
+[[ -f $GIT_DIR_PATH/CHERRY_PICK_HEAD ]] && in_progress+=("cherry-pick")
+[[ -f $GIT_DIR_PATH/REVERT_HEAD ]] && in_progress+=("revert")
+[[ -f $GIT_DIR_PATH/BISECT_LOG ]] && in_progress+=("bisect")
+((${#in_progress[@]} > 0)) && row "in progress" "${RED}${in_progress[*]}${NC}"
+
+stash_count=$(git stash list | wc -l)
+((stash_count > 0)) && row "stashes" "${YELLOW}$stash_count${NC}" || row "stashes" "0"
+
+latest_tag=$(git for-each-ref --sort=-creatordate --count=1 \
+    --format='%(refname:short)  (%(creatordate:short))' refs/tags)
+row "latest tag" "${latest_tag:-none}"
+
+############################################ CORE BRANCHES / RELEASE PIPELINE
+
+ECHOHEAD "# core branches"
+for name in "$base_branch" "$main_branch" production; do
+    [[ -z $name ]] && continue
+    ref=$(resolve_ref "$name")
+    if [[ -z $ref ]]; then
+        if [[ $name == 'production' ]]; then
+            row "$name" "${YELLOW}missing - RECOMMENDED: create a production branch${NC}"
+        else
+            row "$name" "${RED}missing${NC}"
+        fi
+        continue
+    fi
+    info=$(git log -1 --format='%h  %cd (%cr)' --date=short "$ref")
+    # flag a local copy that differs from the remote copy
+    if [[ $ref == "$remote/$name" ]] && ref_exists "refs/heads/$name"; then
+        read -r lb la < <(behind_ahead "$ref" "refs/heads/$name")
+        ((la + lb > 0)) && info+="  ${YELLOW}[local copy: $la to push, $lb to pull]${NC}"
+    fi
+    row "$name" "$info"
+done
+
+compare_pair() {
+    # $1 = "from" ref (newer work), $2 = "to" ref (where it gets released)
+    local from=$1 to=$2 waiting hotfixes
+    read -r hotfixes waiting < <(behind_ahead "$to" "$from")
+    echo ""
+    if ((waiting == 0 && hotfixes == 0)); then
+        printf "  %s%s and %s are identical%s\n" "$GREEN" "$from" "$to" "$NC"
+        return
+    fi
+    printf "  %s%s%s commit(s) in %s not yet in %s" "$(colour_count "$waiting" "$GREEN")" "$waiting" "$NC" "$from" "$to"
+    if ((waiting > 0)); then
+        printf "  %s(%s non-merge)%s" "$GREY" "$(git rev-list --count --no-merges "$to..$from")" "$NC"
+    fi
+    printf "\n"
+    if ((hotfixes > 0)); then
+        printf "  %s%s commit(s) in %s not in %s - merge these back%s\n" "$RED" "$hotfixes" "$to" "$from" "$NC"
+    fi
+    if ((waiting > 0)); then
+        git log --no-merges -n 10 --date=short \
+            --format="      ${GREY}%h %ad${NC}  %<(60,trunc)%s ${GREY}%an${NC}" "$to..$from"
+        local total_nm
+        total_nm=$(git rev-list --count --no-merges "$to..$from")
+        ((total_nm > 10)) && printf "      %s... and %s more%s\n" "$GREY" "$((total_nm - 10))" "$NC"
+    fi
+}
+
+if [[ -n $BASE_REF || -n $MAIN_REF || -n $PRODUCTION_REF ]]; then
+    ECHOHEAD "# release pipeline"
+    [[ -n $BASE_REF && -n $MAIN_REF ]] && compare_pair "$BASE_REF" "$MAIN_REF"
+    [[ -n $MAIN_REF && -n $PRODUCTION_REF ]] && compare_pair "$MAIN_REF" "$PRODUCTION_REF"
+    [[ -n $BASE_REF && -z $MAIN_REF && -n $PRODUCTION_REF ]] && compare_pair "$BASE_REF" "$PRODUCTION_REF"
+fi
+
+############################################ LOCAL BRANCHES
+
+ECHOHEAD "# local branches (vs their own upstream) - most unpushed first"
+local_rows=()
+local_width=6
+while IFS=$SEP read -r name upstream unix is_head; do
+    if [[ -z $upstream ]]; then
+        to_push=$(git rev-list --count "refs/heads/$name" --not --remotes)
+        to_pull=0
+        state='NO UPSTREAM'
+    elif ! ref_exists "$upstream"; then
+        to_push=$(git rev-list --count "refs/heads/$name" --not --remotes)
+        to_pull=0
+        state='UPSTREAM GONE'
+    else
+        read -r to_pull to_push < <(behind_ahead "$upstream" "refs/heads/$name")
+        if ((to_pull > 0 && to_push > 0)); then
+            state='DIVERGED'
+        elif ((to_push > 0)); then
+            state='TO PUSH'
+        elif ((to_pull > 0)); then
+            state='TO PULL'
+        else
+            state='IN SYNC'
+        fi
+    fi
+    ((${#name} + 2 > local_width)) && local_width=$((${#name} + 2))
+    local_rows+=("$to_push$SEP$to_pull$SEP$unix$SEP$is_head$SEP$name$SEP${upstream:--}$SEP$state")
+done < <(git for-each-ref --format="%(refname:short)%1f%(upstream:short)%1f%(committerdate:unix)%1f%(HEAD)" refs/heads)
+((local_width > 50)) && local_width=50
+
+printf "  ${BOLD}%6s %6s  %-14s %-*s %s${NC}\n" "Push" "Pull" "State" "$local_width" "Branch" "Upstream"
+while IFS=$SEP read -r to_push to_pull unix is_head name upstream state; do
+    case $state in
+    'IN SYNC') state_colour=$GREY ;;
+    'TO PUSH') state_colour=$GREEN ;;
+    'TO PULL') state_colour=$YELLOW ;;
+    *) state_colour=$RED ;;
+    esac
+    marker='  '
+    [[ $is_head == '*' ]] && marker='* '
+    printf "  %s%6s%s %s%6s%s  %s%-14s%s %-*s %s%s%s\n" \
+        "$(colour_count "$to_push" "$GREEN")" "$to_push" "$NC" \
+        "$(colour_count "$to_pull" "$RED")" "$to_pull" "$NC" \
+        "$state_colour" "$state" "$NC" \
+        "$local_width" "$marker$(truncate_text "$name" $((local_width - 2)))" \
+        "$GREY" "$upstream" "$NC"
+done < <(printf '%s\n' "${local_rows[@]}" | sort -t "$SEP" -k1,1nr -k2,2nr -k3,3nr)
+
+############################################ ALL BRANCHES VS BASE
+
+if [[ -n $BASE_REF ]]; then
+    if [[ $has_remote == 'yes' ]]; then
+        branch_ns="refs/remotes/$remote"
+    else
+        branch_ns="refs/heads"
+    fi
+
+    ECHOHEAD "# branches vs $BASE_REF - most ahead first"
+    branch_rows=()
+    name_width=6
+    count_active=0 count_stale=0 count_merged=0 count_released=0
+    deletable=()
+    while IFS=$SEP read -r name symref unix date author subject; do
+        [[ -n $symref || $name == "$remote" || $name == "$BASE_REF" ]] && continue
+        read -r behind ahead < <(behind_ahead "$BASE_REF" "$name")
+        age=$(((NOW - unix) / 86400))
+        if is_core_ref "$name"; then
+            status='CORE'
+        elif ((ahead == 0)); then
+            release_ref=${PRODUCTION_REF:-$MAIN_REF}
+            if [[ -n $release_ref ]] && git merge-base --is-ancestor "$name" "$release_ref"; then
+                status='RELEASED'
+                count_released=$((count_released + 1))
+            else
+                status='MERGED'
+                count_merged=$((count_merged + 1))
+            fi
+            deletable+=("${name#"$remote/"}")
+        elif ((age > stale_days)); then
+            status='STALE'
+            count_stale=$((count_stale + 1))
+        else
+            status='ACTIVE'
+            count_active=$((count_active + 1))
+        fi
+        ((${#name} > name_width)) && name_width=${#name}
+        branch_rows+=("$ahead$SEP$unix$SEP$behind$SEP$age$SEP$date$SEP$status$SEP$name$SEP$author$SEP$subject")
+    done < <(git for-each-ref \
+        --format="%(refname:short)%1f%(symref)%1f%(committerdate:unix)%1f%(committerdate:short)%1f%(authorname)%1f%(subject)" \
+        "$branch_ns")
+    ((name_width > 50)) && name_width=50
+
+    if ((${#branch_rows[@]} == 0)); then
+        echonice "  no other branches"
+    else
+        printf "  ${BOLD}%6s %6s  %-10s %6s  %-9s %-*s  %-18s %s${NC}\n" \
+            "Ahead" "Behind" "Last" "Age" "Status" "$name_width" "Branch" "Author" "Last commit"
+        while IFS=$SEP read -r ahead unix behind age date status name author subject; do
+            case $status in
+            ACTIVE) status_colour=$GREEN ;;
+            STALE) status_colour=$YELLOW ;;
+            CORE) status_colour=$BLUE ;;
+            *) status_colour=$GREY ;;
+            esac
+            age_colour=$NC
+            ((age > stale_days)) && age_colour=$YELLOW
+            printf "  %s%6s%s %s%6s%s  %-10s %s%5sd%s  %s%-9s%s %-*s  %-18s %s%s%s\n" \
+                "$(colour_count "$ahead" "$GREEN")" "$ahead" "$NC" \
+                "$(colour_count "$behind" "$RED")" "$behind" "$NC" \
+                "$date" \
+                "$age_colour" "$age" "$NC" \
+                "$status_colour" "$status" "$NC" \
+                "$name_width" "$(truncate_text "$name" "$name_width")" \
+                "$(truncate_text "$author" 18)" \
+                "$GREY" "$(truncate_text "$subject" 60)" "$NC"
+        done < <(printf '%s\n' "${branch_rows[@]}" | sort -t "$SEP" -k1,1nr -k2,2nr)
+
+        echo ""
+        printf "  ${GREEN}%s active${NC}, ${YELLOW}%s stale${NC} (no commits for %s+ days), ${GREY}%s merged, %s merged and released${NC}\n" \
+            "$count_active" "$count_stale" "$stale_days" "$count_merged" "$count_released"
+
+        if ((${#deletable[@]} > 0)); then
+            echo ""
+            echonice "  These branches are fully contained in $BASE_REF and could be deleted:"
+            if [[ $has_remote == 'yes' ]]; then
+                echonice "    git push $remote --delete ${deletable[*]}"
+            else
+                echonice "    git branch -d ${deletable[*]}"
+            fi
+        fi
+    fi
 fi
 
 echoend
