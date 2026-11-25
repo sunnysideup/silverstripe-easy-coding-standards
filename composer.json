@@ -90,6 +90,7 @@
     "bin/sake-lint-run-one-file",
     "bin/sake-lint-ss-ide-annotator",
     "bin/sake-lint-ss-template-check",
+    "bin/sake-llm-add-agents-file",
     "bin/sake-llm-opencode",
     "bin/sake-npm-build",
     "bin/sake-npm-build-dev",

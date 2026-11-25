@@ -94,6 +94,7 @@ lives in the `pm` group: `sake-<category>-pm-<task>` (see `sake-help -f -pm-`).
  - sake-lint-ss-template-check - Checks template files for conflicts and aligns with vendor module structure
 
 # llm
+ - sake-llm-add-agents-file - Adds an AGENTS.md file (instructions for LLM coding agents) to a project (default) or globally for your user
  - sake-llm-opencode - Runs OpenCode LLM agent to process files based on custom prompts
 
 # npm
