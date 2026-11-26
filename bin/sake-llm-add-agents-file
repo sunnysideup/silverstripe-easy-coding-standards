@@ -107,38 +107,136 @@ project_file_unsafe_reason() {
 
 print_global_agents_template() {
     cat <<'EOF'
-# AGENTS.md (global)
+# AGENTS.md (global: Sunny Side Up company rules)
 
-Personal instructions for LLM coding agents, applied to every project on this machine.
-Project-specific rules belong in the AGENTS.md of that project, which takes precedence.
+Instructions for LLM coding agents, applied to every project on this machine.
+These are the SAME for every developer at Sunny Side Up. Change them in
+sunnysideup/silverstripe-easy-coding-standards (bin/sake-llm-add-agents-file) by pull request, not by hand.
+Project-specific facts belong in the AGENTS.md of that project, which takes precedence where they disagree.
 
-## About me
+## 1. Who we are
 
-- Role and main technologies: TODO
-- Preferred language for replies and commit messages: TODO
+- Sunny Side Up is a small Wellington web agency. We build and host websites for NZ clients, many of them e-commerce.
+- We usually use Silverstripe CMS, but not always. Check composer.json and package.json before assuming.
+- We maintain many of our own modules (sunnysideup/*). Prefer fixing a problem once in a module over patching each site.
+- Use NZ English in anything a client or site visitor will read.
 
-## How to work
+## 2. How to reply
 
-- Keep answers short and to the point.
-- Read the relevant code before changing it.
-- Prefer small, focused changes over large refactors.
-- Follow the conventions of the project you are in.
-- If a request is ambiguous, ask instead of guessing.
+- Lead with the answer or result in one or two lines. Details after, only if needed.
+- Short. No preamble, no restating the question, no filler. Bullets over paragraphs.
+- **Bold** the one thing the developer must not miss.
+- Start a line with a tag when it applies:
+  - `URGENT:` broken, risky or blocking (security, data loss, production, payments).
+  - `ACTION NEEDED:` the developer must do or decide something before you can continue.
+  - `FYI:` worth knowing, no action.
+- Show only changed lines of code, with the file path above each block. Don't repeat unchanged code.
+- If you're unsure, say so plainly and say what would confirm it.
 
-## Safety
+## 3. Ask first
 
-- Never commit secrets, `.env` files, or credentials.
-- Do not delete or overwrite files you did not create without asking.
-- Do not force-push, and do not rewrite shared history.
-- Do not commit or push unless asked to.
+- Always ask questions before starting, to make sure we have the right architecture.
+- Ask at most 3 questions at a time, numbered, each with your best guess, so the developer can reply "yes" or "2: no".
+- For anything bigger than a small fix, give 2 or 3 options in one line each, say which you recommend and why, and wait for a choice.
+- Vague request ("fix it", "make it better", "tidy this up")? Don't start. Ask what's wrong, where, and what done looks like.
+- Before changing more than one file, show a short plan (files and steps) and wait for a go-ahead.
+- If the job is really two jobs, say so and suggest the second one in a new session.
+- If the same change is needed on other sites, say so and suggest a tool (Rector rule, coding standard, module change) instead of editing each site by hand.
+- Once the developer has answered, get on with it. Don't ask again for things already answered.
 
-## Git
+## 4. Our development environment
+
+- You are working on a development machine, never production.
+- PHP: Silverstripe 5 uses PHP 8.3, Silverstripe 6 uses PHP 8.4. Switch with `php-switch 8.3` or `php-switch 8.4`.
+- Database credentials are in `.env`. You may read the database to understand a problem, but any change you make there is lost: changing the database is never the solution. Fix the code, config or migration instead.
+- Preview the current site at the `SS_BASE_URL` in `.env`.
+- Build the front end with `bin/npm-build.sh`.
+- Our `sake-*` commands (sunnysideup/easy-coding-standards) do common jobs, e.g. `sake-lint-all`. Prefer them over hand-written commands.
+
+## 5. Security
+
+- Check the security implications of all new code before calling it done: output escaping, SQL injection, permission checks (canView/canEdit/canDelete/canCreate), CSRF on forms, file uploads, open redirects.
+- Never print, copy, save or commit secrets (API keys, passwords, `.env` values). If you see one, tell the developer instead of repeating it.
+- Never put real customer details (names, emails, addresses, orders) in answers, tests or fixtures. Use made-up data.
+
+## 6. Modules (sunnysideup packages in vendor/)
+
+- Repositories owned by sunnysideup in `vendor/` may be edited directly: carefully and generically, so the change works for every site that uses the module.
+- If a fix is generic, make it in the module, not in the project.
+- Ask before committing and pushing module changes.
+- Each module has a generic `README.md` in its root, and a short TL;DR and gotchas in `docs/en/INDEX.md`. Always update the README (and INDEX.md where relevant) when you add something to a module.
+- Don't edit packages in `vendor/` that are not owned by sunnysideup.
+
+## 7. Keep cost down
+
+- Only open the files the task needs. Don't read `vendor/` (except the module you're working on), `node_modules/`, `public/_resources/`, `public/assets/` or `silverstripe-cache/`.
+- Ask before reading a file over 500 lines, a whole folder, a database dump or a minified file. Use grep to find things.
+- Database queries: always `LIMIT 50` or less, and select only the columns you need.
+- Logs and long command output: `tail -n 100`, `grep` or `head`. Never print whole log files.
+- Don't re-read a file you've already read in this session unless it has changed.
+
+## 8. Session reminders (one line at the end of your reply, only when it applies)
+
+- After you finish a task: `Next: commit, then start a new session for the next task.`
+- When the session has covered a lot (many files read, several tasks, long output): `Big session: run /compact before your next break, or type exit to write a handover.`
+- When the job was routine (small CSS or text change, commit message, simple review): `Tip: a cheaper model does jobs like this for a fraction of the cost.`
+- At most one reminder per reply, none while still mid-task, never the same one twice in a row.
+
+## 9. Handovers
+
+- When the developer types `exit` (or says they're stopping, done for the day or handing over), write a handover BEFORE anything else.
+- Also write or update it at the end of each finished task.
+- Put it in `_dev/handovers/YYYY-MM-DD-<branch>.md` (create the folder if needed). One file per branch per day; update it rather than making a new one.
+- Include: goal, status, what's done, next steps, decisions and why, key files, gotchas and what didn't work, how to check it works, open questions.
+- Keep it under 80 lines and specific: file paths, class and method names, commands, exact errors. Only write what you're sure of; mark guesses "unconfirmed".
+- At the start of a session, read the newest handover in `_dev/handovers/` for the current branch, if there is one, and say in two lines where the work is up to.
+- Then remind: `ACTION NEEDED: commit the handover with your branch.`
+
+## 10. Silverstripe standards
+
+- PHP follows PSR-12. Strict types and typed properties and methods in new code.
+- Use the ORM (`DataObject::get()`, `filter()`, `exclude()`, `sort()`, `limit()`), not raw SQL. If SQL is truly needed, use parameterised queries.
+- Config in YAML under `app/_config` (one file per concern, with a clear `Name`), not in PHP. Private static properties for class config.
+- Use Injector / `::create()` rather than `new` for Silverstripe classes. Extensions over editing core or third-party code.
+- New DataObjects: `$table_name`, typed relations, `$summary_fields`, and can* permission methods.
+- After schema changes, remind the developer to run a dev/build with flush.
+- Templates: keep logic out of `.ss` files; add methods on the controller or model. Escape output by default (`$Title`, not `$Title.RAW`).
+- Use the APIs of the Silverstripe version the project is on (5 or 6).
+- Elemental blocks extend `BaseElement`, with their own template in the theme.
+
+## 11. E-commerce and money
+
+- Anything touching orders, payments, prices, GST or stock is high risk: plan first, test after.
+- Never change historical orders. Calculations apply to new orders only.
+- Use the site's existing currency and rounding approach.
+- Never log or print card details, payment tokens or full customer records.
+
+## 12. Front end
+
+- Use the project's existing build (`bin/npm-build.sh`) and CSS approach. Don't add a framework or library without asking.
+- Don't edit compiled files in `public/` or `dist/`. Edit the source and rebuild.
+- Accessibility: alt text on images, labels on form fields, keyboard access, colour contrast, headings in order.
+- Mobile first. Check changes at phone width.
+
+## 13. Safety
+
+- Don't delete or overwrite files you didn't create without asking.
+- Ask before: `composer update`, adding packages, changing `.htaccess` or server config, deleting files, or running migrations.
+- Never connect to or run commands against production databases or servers.
+- Don't force-push, and don't rewrite shared history.
+- Don't commit or push unless asked to.
+
+## 14. Git
 
 - Commit messages start with a prefix: `API`, `NEW`, `ENH`, `FIX`, `DOC`, `DEP`, `TLN` or `MNT`, e.g. `FIX: null check in search form`.
+- Small commits with clear messages. Don't mix formatting changes with logic changes in one commit.
 
-## Notes
+## 15. Before you say you're done
 
-- Anything else that applies to all your projects: TODO
+- Run the tests and linters the project has (e.g. `sake-lint-all`). Check the changed pages load at `SS_BASE_URL` without errors.
+- Check the security implications (section 5).
+- Say exactly what you checked. Never say tests pass unless you ran them.
+- List anything still to do: dev/build and flush, front end build, README update, client sign-off.
 EOF
 }
 
@@ -147,20 +245,22 @@ print_agents_template() {
 # AGENTS.md
 
 Instructions for LLM coding agents (OpenCode, Claude Code, Copilot, Codex, etc.) working in this repository.
-Keep this file short and accurate. If something here is wrong or out of date, fix it.
+Company-wide rules are in the global AGENTS.md (sake-llm-add-agents-file --global).
+This file is only for facts about THIS project. Keep it short and accurate. If something here is wrong or out of date, fix it.
 
 ## Project overview
 
 - What this project is and who it is for: TODO
-- Main technologies (language, framework, versions): TODO
-- Where the important code lives: TODO
+- Silverstripe version and PHP version (SS5 = PHP 8.3, SS6 = PHP 8.4): TODO
+- Where the important code lives (e.g. `app/src`, `themes/<theme>`): TODO
 
 ## Setup and commands
 
 - Install dependencies: TODO (e.g. `composer install`, `npm install`)
-- Build: TODO
+- Front end build: `bin/npm-build.sh` (or TODO if different)
+- Preview: the `SS_BASE_URL` in `.env`
 - Run tests: TODO
-- Lint / static analysis: TODO
+- Lint / static analysis: `sake-lint-all` (or TODO)
 
 ## Code style
 
@@ -172,7 +272,7 @@ Keep this file short and accurate. If something here is wrong or out of date, fi
 ## Rules for agents
 
 - Read the relevant code before changing it.
-- Do not edit generated files or anything in `vendor/` or `node_modules/`.
+- Do not edit generated files, `node_modules/`, or packages in `vendor/` not owned by sunnysideup.
 - Do not commit secrets, `.env` files, or credentials.
 - Do not change unrelated files.
 - Run the tests and linters listed above before saying a task is done.
@@ -186,7 +286,8 @@ Keep this file short and accurate. If something here is wrong or out of date, fi
 
 ## Notes
 
-- Anything else an agent should know (gotchas, deployment, external services): TODO
+- Gotchas, quirks, external services, deployment: TODO
+- If this is a module: keep README.md and `docs/en/INDEX.md` (TL;DR and gotchas) up to date.
 EOF
 }
 
@@ -258,7 +359,7 @@ fi
 
 echogood "Created $targetFile"
 if [[ "$global" == 'yes' ]]; then
-    echonice "Next: fill in the TODO items. This applies to all your projects (project AGENTS.md files take precedence)."
+    echonice "These are the Sunny Side Up company rules. Change them in the easy-coding-standards repo, not by hand. Project AGENTS.md files take precedence."
 else
     echonice "Next: fill in the TODO items so agents know how to build, test and lint this project."
 fi
