@@ -216,7 +216,7 @@ if [[ "$useLlm" == 'yes' ]]; then
     if [[ -n "$message" ]]; then
         messageInstruction="A commit message has already been chosen by the user, so do NOT write $MESSAGE_FILE."
     else
-        messageInstruction="Write the commit message to $MESSAGE_FILE (see COMMIT MESSAGE below)."
+        messageInstruction="Write the commit message to $MESSAGE_FILE, following the rules below."
     fi
 
     cat >"$PROMPT_FILE" <<EOF

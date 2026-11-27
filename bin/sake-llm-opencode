@@ -383,9 +383,12 @@ fi
 provider="${model%%/*}"
 
 # Variant (e.g. medium) is appended as provider/model#variant unless already present
-variant="${variantOverride:-${LLM_VARIANT:-$DEFAULT_VARIANT}}"
+# An explicitly empty LLM_VARIANT (set but empty) means "no variant", for models that have none.
+variant="${variantOverride:-${LLM_VARIANT-$DEFAULT_VARIANT}}"
 if [[ "$model" == *"#"* ]]; then
     variant="${model#*#}"
+    model="${model%%#*}"
+    [[ -n "$variant" ]] && model="$model#$variant"
 elif [[ -n "$variant" ]]; then
     model="$model#$variant"
 fi
