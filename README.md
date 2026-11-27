@@ -42,6 +42,7 @@ lives in the `pm` group: `sake-<category>-pm-<task>` (see `sake-help -f -pm-`).
 
 # git
 ## commit
+ - sake-gc - Git commit shortcut: lists vendor modules with changes, has an LLM review the diff for security issues and write the commit message, then commits and pushes
  - sake-git-commit-and-push - Commits changes to git and pushes to remote with optional tagging and review
  - sake-git-commit-and-push-vendor-packages - Scans vendor directories for git changes and optionally commits them
  - sake-git-commit-quick - Quickly commits all changes and pushes with auto vendor checks

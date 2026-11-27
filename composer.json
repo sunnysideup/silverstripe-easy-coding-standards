@@ -50,6 +50,7 @@
     "bin/sake-find-in-files",
     "bin/sake-find-large-files",
     "bin/sake-find-large-folders",
+    "bin/sake-gc",
     "bin/sake-git-commit-and-push",
     "bin/sake-git-commit-and-push-vendor-packages",
     "bin/sake-git-commit-quick",
