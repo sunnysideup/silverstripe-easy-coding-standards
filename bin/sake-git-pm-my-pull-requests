@@ -10,10 +10,20 @@ SCRIPT_SUMMARY="Lists pull requests filtered by mode (mine/incoming/review) and 
 includeSnyk='no'
 filterFor=''
 filterNot=''
-mode='mine' # mine | incoming | review
+mode='default' # default (incoming, then mine) | mine | incoming | review
+owners=''
+maxAgeYears='2' # 0 = no limit
 
 while (($#)); do
     case $1 in
+    -a | --max-age-years)
+        maxAgeYears="${2:-}"
+        shift 2
+        ;;
+    --all)
+        maxAgeYears='0'
+        shift
+        ;;
     -s | --include-snyk)
         includeSnyk='yes'
         shift
@@ -29,6 +39,10 @@ while (($#)); do
     -i | --incoming)
         mode='incoming'
         shift
+        ;;
+    -o | --owner)
+        owners="${2:-}"
+        shift 2
         ;;
     -m | --mine)
         mode='mine'
@@ -58,17 +72,23 @@ help_and_exit() {
 
     ECHOHEAD 'Available settings:'
     echonice '-h, --help                     show help information'
+    echonice 'default: PRs made to my modules first, then PRs made by me'
+    echonice '-a, --max-age-years N          ignore PRs older than N years (default: 2)'
+    echonice '    --all                      do not ignore old PRs (same as -a 0)'
     echonice '-s, --include-snyk             include PRs with [snyk] in title'
     echonice '-f, --filter-for STRING        only include PRs containing STRING'
     echonice '-n, --filter-not STRING        exclude PRs containing STRING'
-    echonice '-m, --mine                     show PRs created by me (default)'
-    echonice '-i, --incoming                 show PRs others made on my repositories'
+    echonice '-m, --mine                     only show PRs created by me'
+    echonice '-i, --incoming                 only show PRs others made on my repositories'
+    echonice '-o, --owner OWNER[,OWNER]      users / orgs whose repositories count as mine (default: me)'
     echonice '-r, --review-requested         show PRs where I am requested as a reviewer'
 
     ECHOHEAD 'Example usage:'
     echonice 'sake-git-pm-my-pull-requests'
     echonice 'sake-git-pm-my-pull-requests --filter-not upgrade'
     echonice 'sake-git-pm-my-pull-requests --incoming'
+    echonice 'sake-git-pm-my-pull-requests --max-age-years 5'
+    echonice 'sake-git-pm-my-pull-requests --all'
 
     echofunctions
     exit
@@ -76,28 +96,36 @@ help_and_exit() {
 
 sake_check_help_and_exit
 
-############################################ SEARCH SETTINGS
-
-searchArgs=(
-    gh search prs
-    --state open
-    --limit 200
-    --sort created
-    --order desc
-    --json number,title,repository,url,createdAt,author
-)
-
-if [[ "$mode" == 'mine' ]]; then
-    searchArgs+=(--author @me)
-elif [[ "$mode" == 'review' ]]; then
-    searchArgs+=(--review-requested @me)
+if [[ ! "$maxAgeYears" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    echo "Invalid value for --max-age-years: '$maxAgeYears' (expected a non-negative number)" >&2
+    exit 1
 fi
 
-############################################ RUN
+############################################ SEARCH
 
-ECHOHEAD 'Pull Requests'
+run_search() {
+    local sectionMode="$1"
+    local searchArgs=(
+        gh search prs
+        --state open
+        --limit 200
+        --sort created
+        --order desc
+        --json number,title,repository,url,createdAt,author
+    )
 
-"${searchArgs[@]}" --jq "
+    if [[ "$sectionMode" == 'mine' ]]; then
+        searchArgs+=(--author @me)
+    elif [[ "$sectionMode" == 'review' ]]; then
+        searchArgs+=(--review-requested @me)
+    elif [[ "$sectionMode" == 'incoming' ]]; then
+        local owner
+        for owner in ${owners//,/ }; do
+            searchArgs+=(--owner "$owner")
+        done
+    fi
+
+    "${searchArgs[@]}" --jq "
 def ago:
   (now - (.createdAt | fromdateiso8601)) as \$d
   | if \$d < 3600 then \"\((\$d/60|floor))m ago\"
@@ -106,23 +134,42 @@ def ago:
     end;
 
 .[]
-$(if [[ "$mode" == 'incoming' ]]; then
-    echo '| select(.author.login != "@me")'
-fi)
+$(if [[ "$sectionMode" == 'incoming' ]]; then
+        printf '| select(.author.login != "%s")\n' "$me"
+    fi)
+$(if [[ "$maxAgeYears" != 0 && "$maxAgeYears" =~ [1-9] ]]; then
+        printf '| select((now - (.createdAt | fromdateiso8601)) < (%s * 365.25 * 86400))\n' "$maxAgeYears"
+    fi)
 $(if [[ "$includeSnyk" != 'yes' ]]; then
-    echo '| select(.title | test("\\[snyk\\]"; "i") | not)'
-fi)
+        echo '| select(.title | test("\\[snyk\\]"; "i") | not)'
+    fi)
 $(if [[ -n "$filterFor" ]]; then
-    printf '| select(.title | test("%s"; "i"))\n' "$filterFor"
-fi)
+        printf '| select(.title | test("%s"; "i"))\n' "$filterFor"
+    fi)
 $(if [[ -n "$filterNot" ]]; then
-    printf '| select(.title | test("%s"; "i") | not)\n' "$filterNot"
-fi)
+        printf '| select(.title | test("%s"; "i") | not)\n' "$filterNot"
+    fi)
 | \"\(.repository.nameWithOwner)\"
   + \" | \(.author.login)\"
   + \" | \(ago)\"
   + \" | \(.url)\"
   + \" | \(.title)\"
 "
+}
+
+############################################ RUN
+
+me=$(gh api user --jq '.login')
+[[ -z "$owners" ]] && owners="$me"
+
+if [[ "$mode" == 'default' ]]; then
+    ECHOHEAD 'Pull Requests made to my modules'
+    run_search incoming
+    ECHOHEAD 'Pull Requests made by me'
+    run_search mine
+else
+    ECHOHEAD 'Pull Requests'
+    run_search "$mode"
+fi
 
 echoend
