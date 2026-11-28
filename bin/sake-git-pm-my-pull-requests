@@ -72,7 +72,7 @@ help_and_exit() {
 
     ECHOHEAD 'Available settings:'
     echonice '-h, --help                     show help information'
-    echonice 'default: PRs made to my modules first, then PRs made by me'
+    echonice 'default: PRs by others to my modules, then PRs by me to my modules, then PRs by me to others'
     echonice '-a, --max-age-years N          ignore PRs older than N years (default: 2)'
     echonice '    --all                      do not ignore old PRs (same as -a 0)'
     echonice '-s, --include-snyk             include PRs with [snyk] in title'
@@ -114,7 +114,10 @@ run_search() {
         --json number,title,repository,url,createdAt,author
     )
 
-    if [[ "$sectionMode" == 'mine' ]]; then
+    local ownersJson
+    ownersJson=$(printf '%s\n' ${owners//,/ } | jq -R . | jq -sc .)
+
+    if [[ "$sectionMode" == 'mine' || "$sectionMode" == 'mine-own' || "$sectionMode" == 'mine-others' ]]; then
         searchArgs+=(--author @me)
     elif [[ "$sectionMode" == 'review' ]]; then
         searchArgs+=(--review-requested @me)
@@ -136,6 +139,10 @@ def ago:
 .[]
 $(if [[ "$sectionMode" == 'incoming' ]]; then
         printf '| select(.author.login != "%s")\n' "$me"
+    elif [[ "$sectionMode" == 'mine-own' ]]; then
+        printf '| select(.repository.nameWithOwner | split("/")[0] as $o | (%s | index($o)) != null)\n' "$ownersJson"
+    elif [[ "$sectionMode" == 'mine-others' ]]; then
+        printf '| select(.repository.nameWithOwner | split("/")[0] as $o | (%s | index($o)) == null)\n' "$ownersJson"
     fi)
 $(if [[ "$maxAgeYears" != 0 && "$maxAgeYears" =~ [1-9] ]]; then
         printf '| select((now - (.createdAt | fromdateiso8601)) < (%s * 365.25 * 86400))\n' "$maxAgeYears"
@@ -165,8 +172,15 @@ me=$(gh api user --jq '.login')
 if [[ "$mode" == 'default' ]]; then
     ECHOHEAD 'Pull Requests made to my modules'
     run_search incoming
-    ECHOHEAD 'Pull Requests made by me'
-    run_search mine
+    ECHOHEAD 'Pull Requests made by me to my modules / owner / user'
+    run_search mine-own
+    ECHOHEAD 'Pull Requests made by me to others'
+    run_search mine-others
+elif [[ "$mode" == 'mine' ]]; then
+    ECHOHEAD 'Pull Requests made by me to my modules / owner / user'
+    run_search mine-own
+    ECHOHEAD 'Pull Requests made by me to others'
+    run_search mine-others
 else
     ECHOHEAD 'Pull Requests'
     run_search "$mode"
